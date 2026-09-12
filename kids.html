@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Детям — SkyySchool</title>
+<meta name="theme-color" content="#f6faff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon-512.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/sky.css">
+<style>
+.tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin-bottom:24px;overflow:auto}
+.tabs button{padding:12px 15px;font-size:13.5px;font-weight:900;color:var(--muted);border-bottom:2.5px solid transparent;white-space:nowrap}
+.tabs button[aria-selected="true"]{color:var(--m-kids);border-bottom-color:var(--m-kids)}
+
+/* ---- три в ряд ---- */
+.m3-wrap{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:24px;align-items:start}
+@media(max-width:860px){.m3-wrap{grid-template-columns:1fr}}
+.m3{
+  display:grid;gap:4px;aspect-ratio:1;width:100%;
+  background:var(--panel-2);border:1px solid var(--line);
+  border-radius:var(--r-lg);padding:8px;box-shadow:var(--shadow);
+  touch-action:manipulation;
+}
+.gem{
+  display:grid;place-items:center;border-radius:12px;
+  font-size:min(5.4vw,30px);line-height:1;cursor:pointer;
+  background:var(--panel);border:2px solid transparent;
+  transition:transform .14s, border-color .14s, opacity .18s;
+  user-select:none;
+}
+.gem:hover{transform:scale(1.07)}
+.gem.sel{border-color:var(--m-kids);transform:scale(1.12);box-shadow:0 0 0 3px var(--m-kids-soft)}
+.gem.pop{animation:pop3 .3s ease-out}
+.gem.drop{animation:drop3 .28s cubic-bezier(.3,1.4,.5,1)}
+@keyframes pop3{50%{transform:scale(1.3)}100%{transform:scale(0);opacity:0}}
+@keyframes drop3{from{transform:translateY(-38%);opacity:.3}}
+.m3-hud{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.hud{
+  flex:1 1 92px;background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--r);padding:11px 14px;text-align:center;
+}
+.hud b{display:block;font-size:22px;font-weight:900;line-height:1.2}
+.hud span{font-size:10.5px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+.hud.moves b{color:var(--m-kids)}
+.hud.moves.low b{color:var(--no)}
+
+/* ---- память ---- */
+.mem{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;max-width:420px;margin:0 auto}
+.card{
+  aspect-ratio:1;border-radius:14px;display:grid;place-items:center;
+  font-size:29px;cursor:pointer;
+  background:linear-gradient(135deg,var(--sky-400),var(--sky-600));
+  color:transparent;transition:.25s;border:2px solid transparent;
+}
+.card.open{background:var(--panel);border-color:var(--m-kids);color:inherit}
+.card.found{background:var(--ok-soft);border-color:var(--ok);color:inherit;cursor:default}
+
+/* ---- счёт на скорость ---- */
+.race-q{font-size:44px;font-weight:900;text-align:center;letter-spacing:-.02em;margin:18px 0}
+.race-opts{display:grid;grid-template-columns:repeat(2,1fr);gap:11px;max-width:400px;margin:0 auto}
+.race-opts button{
+  padding:20px;border-radius:16px;font-size:25px;font-weight:900;
+  background:var(--panel);border:2.5px solid var(--line);transition:.14s;
+}
+.race-opts button:hover{border-color:var(--m-kids);transform:translateY(-2px)}
+.race-opts button.right{background:var(--ok-soft);border-color:var(--ok)}
+.race-opts button.wrong{background:var(--no-soft);border-color:var(--no)}
+.timer{height:7px;background:var(--panel-2);border-radius:99px;overflow:hidden;border:1px solid var(--line)}
+.timer i{display:block;height:100%;background:var(--m-kids);transition:width .1s linear}
+</style>
+</head>
+<body>
+<header id="appHeader"></header>
+
+<main class="wrap">
+  <h1 data-i18n="h1"></h1>
+  <p class="lead" data-i18n="lead"></p>
+
+  <div class="row section" style="max-width:330px">
+    <div class="field">
+      <label data-i18n="ageL"></label>
+      <select id="age">
+        <option value="6" data-i18n="age6"></option>
+        <option value="9" data-i18n="age9"></option>
+      </select>
+    </div>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button type="button" data-tab="m3" aria-selected="true" data-i18n="tabM3"></button>
+    <button type="button" data-tab="mem" aria-selected="false" data-i18n="tabMem"></button>
+    <button type="button" data-tab="race" aria-selected="false" data-i18n="tabRace"></button>
+  </div>
+
+  <!-- ТРИ В РЯД -->
+  <section id="tab-m3">
+    <div class="m3-wrap">
+      <div>
+        <div class="m3-hud">
+          <div class="hud"><b id="m3Score">0</b><span data-i18n="score"></span></div>
+          <div class="hud moves"><b id="m3Moves">0</b><span data-i18n="movesLeft"></span></div>
+          <div class="hud"><b id="m3Best">0</b><span data-i18n="record"></span></div>
+        </div>
+        <div class="m3" id="m3Board"></div>
+      </div>
+      <div>
+        <div class="panel">
+          <h2 data-i18n="howT"></h2>
+          <p class="lead" style="font-size:13px;margin-top:8px" data-i18n="howD"></p>
+          <div class="actions">
+            <button class="btn kids full" id="btnEarn" data-i18n="earnMoves"></button>
+          </div>
+          <button class="btn ghost full small" id="btnNewGame" style="margin-top:9px" data-i18n="newGame"></button>
+        </div>
+        <div class="panel" style="margin-top:16px">
+          <div class="eyebrow" data-i18n="solvedHere"></div>
+          <div class="count" id="m3Solved" style="margin-top:6px">0</div>
+          <p class="lead" style="font-size:12.5px;margin-top:4px" data-i18n="solvedHereD"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ПАМЯТЬ -->
+  <section id="tab-mem" class="hidden">
+    <div class="m3-hud" style="max-width:420px;margin:0 auto 16px">
+      <div class="hud"><b id="memMoves">0</b><span data-i18n="tries"></span></div>
+      <div class="hud"><b id="memFound">0</b><span data-i18n="pairsFound"></span></div>
+      <div class="hud"><b id="memBest">—</b><span data-i18n="record"></span></div>
+    </div>
+    <div class="mem" id="memBoard"></div>
+    <div class="actions" style="justify-content:center;margin-top:20px">
+      <button class="btn ghost" id="memNew" data-i18n="newGame"></button>
+    </div>
+    <p class="lead" style="font-size:13px;text-align:center;margin:16px auto 0;max-width:46ch" data-i18n="memHint"></p>
+  </section>
+
+  <!-- СЧЁТ НА СКОРОСТЬ -->
+  <section id="tab-race" class="hidden">
+    <div class="panel" style="max-width:460px;margin:0 auto">
+      <div class="m3-hud">
+        <div class="hud"><b id="raceScore">0</b><span data-i18n="score"></span></div>
+        <div class="hud"><b id="raceStreak">0</b><span data-i18n="inRow"></span></div>
+        <div class="hud"><b id="raceBest">0</b><span data-i18n="record"></span></div>
+      </div>
+      <div class="timer" id="raceTimer"><i style="width:100%"></i></div>
+      <div class="race-q" id="raceQ">—</div>
+      <div class="race-opts" id="raceOpts"></div>
+      <div class="actions" style="justify-content:center">
+        <button class="btn kids" id="raceStart" data-i18n="startRace"></button>
+      </div>
+      <p class="lead" style="font-size:12.5px;text-align:center;margin-top:12px" data-i18n="raceHint"></p>
+    </div>
+  </section>
+</main>
+
+<footer id="appFooter"></footer>
+
+<script src="assets/config.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/db.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/match3.js"></script>
+<script src="data/bank-kids.js"></script>
+<script>
+'use strict';
+Sky.init({
+  h1:{ru:'Играем и учимся',en:'Play and learn'},
+  lead:{ru:'В «три в ряд» ходы не даются даром: они зарабатываются решёнными заданиями. Поэтому чем дольше играешь, тем больше успеваешь научиться.',
+        en:'In match-3 the moves are not free: you earn them by solving problems. So the longer you play, the more you actually learn.'},
+  ageL:{ru:'Возраст',en:'Age'},
+  age6:{ru:'6–8 лет',en:'6–8 years'},
+  age9:{ru:'9–11 лет',en:'9–11 years'},
+
+  tabM3:{ru:'Три в ряд',en:'Match 3'},
+  tabMem:{ru:'Память',en:'Memory'},
+  tabRace:{ru:'Счёт на скорость',en:'Quick maths'},
+
+  score:{ru:'очки',en:'score'},
+  movesLeft:{ru:'ходов',en:'moves'},
+  record:{ru:'рекорд',en:'best'},
+  tries:{ru:'попыток',en:'tries'},
+  pairsFound:{ru:'пар найдено',en:'pairs found'},
+  inRow:{ru:'подряд',en:'in a row'},
+
+  howT:{ru:'Как играть',en:'How to play'},
+  howD:{ru:'Поменяйте местами две соседние фишки так, чтобы собрался ряд из трёх и больше. Каждый обмен тратит один ход. Кончились ходы — решите задание и получите ещё пять.',
+        en:'Swap two neighbouring pieces so that a line of three or more forms. Each swap costs one move. Out of moves? Solve a problem and get five more.'},
+  earnMoves:{ru:'Решить задание (+5 ходов)',en:'Solve a problem (+5 moves)'},
+  newGame:{ru:'Начать заново',en:'Start again'},
+  solvedHere:{ru:'Решено заданий в игре',en:'Problems solved in game'},
+  solvedHereD:{ru:'Каждое верное решение — это пять новых ходов и одно повторённое правило.',
+               en:'Every correct answer is five new moves and one rule practised.'},
+
+  noMoves:{ru:'Ходы закончились. Решите задание, чтобы продолжить.',en:'Out of moves. Solve a problem to carry on.'},
+  reshuffled:{ru:'Ходов на поле не осталось — перемешал фишки.',en:'No moves left on the board — pieces reshuffled.'},
+  gotMoves:{ru:'Верно! +5 ходов',en:'Correct! +5 moves'},
+  wrongTry:{ru:'Не то. Вот как это решается:',en:'Not quite. Here is how it works:'},
+  tryAnother:{ru:'Другое задание',en:'Another problem'},
+  cascade:{ru:'Каскад ×%1!',en:'Cascade ×%1!'},
+
+  memHint:{ru:'Переворачивайте по две карточки и запоминайте, где что лежит. Одинаковые остаются открытыми.',
+           en:'Turn over two cards at a time and remember what is where. Matching pairs stay open.'},
+  memWin:{ru:'Все пары найдены за %1 попыток!',en:'All pairs found in %1 tries!'},
+
+  startRace:{ru:'Поехали',en:'Go'},
+  raceAgain:{ru:'Ещё раз',en:'Again'},
+  raceHint:{ru:'На каждый пример десять секунд. Ошибка обнуляет серию, но игра продолжается.',
+            en:'Ten seconds per problem. A mistake resets the streak, but the game goes on.'},
+  raceOver:{ru:'Время вышло. Результат: %1',en:'Time is up. Your score: %1'},
+
+  checkA:{ru:'Проверить',en:'Check'},
+  nextK:{ru:'Дальше',en:'Next'}
+});
+
+const $ = s => document.querySelector(s);
+const TASKS = window.KIDS_TASKS || [];
+const GEMS = ['🍎','🍋','🍇','🫐','🍓','⭐'];
+
+let age = +Sky.get('kidsAge', 6);
+$('#age').value = String(age);
+$('#age').addEventListener('change', () => {
+  age = +$('#age').value; Sky.set('kidsAge', age);
+});
+
+/* вкладки */
+document.querySelector('.tabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-tab]'); if (!b) return;
+  document.querySelectorAll('.tabs button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+  ['m3','mem','race'].forEach(n =>
+    document.getElementById('tab-' + n).classList.toggle('hidden', n !== b.dataset.tab));
+});
+
+/* ================= задание во всплывающем окне ================= */
+function pickTask() {
+  const pool = TASKS.filter(t => t.age === age);
+  return pool[Math.floor(Math.random() * pool.length)] || TASKS[0];
+}
+
+function askTask(onCorrect) {
+  const task = pickTask();
+  const order = Sky.shuffle(task.options.map((_, i) => i));
+  let picked = null, answered = false;
+
+  Sky.modal('', (box, close) => {
+    const draw = () => {
+      box.innerHTML =
+        `<span class="tag kids">${Sky.L(task.topic)}</span>
+         <div class="question">${Sky.auth.esc(Sky.L(task.text))}</div>
+         <div class="options" id="kOpts"></div>
+         <div class="note hidden" id="kHint"></div>
+         <div class="verdict hidden" id="kVerdict"></div>
+         <div class="solution hidden" id="kSol"></div>
+         <div class="actions">
+           <button class="btn ghost" id="kHintBtn">💡</button>
+           <button class="btn kids" id="kGo" disabled>${Sky.t('checkA')}</button>
+         </div>`;
+
+      const opts = box.querySelector('#kOpts');
+      order.forEach((oi, shown) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'opt';
+        b.setAttribute('aria-pressed', String(picked === oi));
+        b.innerHTML = `<span class="k">${'ABCD'[shown]}</span><span></span>`;
+        b.lastChild.textContent = Sky.L(task.options[oi]);
+        if (answered) {
+          b.disabled = true;
+          if (oi === task.answer) b.classList.add('right');
+          else if (oi === picked) b.classList.add('wrong');
+        } else {
+          b.addEventListener('click', () => { picked = oi; draw(); });
+        }
+        opts.appendChild(b);
+      });
+
+      box.querySelector('#kGo').disabled = picked === null;
+      box.querySelector('#kHintBtn').addEventListener('click', () => {
+        const h = box.querySelector('#kHint');
+        h.textContent = Sky.L(task.hint); h.classList.remove('hidden');
+      });
+
+      box.querySelector('#kGo').addEventListener('click', () => {
+        if (answered) { close(); return; }
+        answered = true;
+        const ok = picked === task.answer;
+        Sky.record('kids', task.id, ok);
+
+        draw();
+        const v = box.querySelector('#kVerdict');
+        v.className = 'verdict ' + (ok ? 'ok' : 'no');
+        v.textContent = ok ? '✓ ' + Sky.t('right') : '✕ ' + Sky.t('wrongTry');
+        v.classList.remove('hidden');
+        const sol = box.querySelector('#kSol');
+        sol.textContent = Sky.L(task.solution);
+        sol.classList.remove('hidden');
+
+        const go = box.querySelector('#kGo');
+        go.disabled = false;
+        go.textContent = Sky.t('done');
+
+        if (ok) onCorrect();
+      });
+    };
+    draw();
+  });
+}
+
+/* ================= три в ряд ================= */
+const COLS = 8, ROWS = 8;
+let grid = null, sel = null, m3score = 0, m3moves = 8, busy = false;
+let m3solved = Sky.get('m3solved', 0);
+
+function m3New() {
+  grid = Match3.create(COLS, ROWS, GEMS.length);
+  m3score = 0; m3moves = 8; sel = null; busy = false;
+  drawBoard(); drawHud();
+}
+
+function drawHud() {
+  $('#m3Score').textContent = m3score;
+  $('#m3Moves').textContent = m3moves;
+  $('#m3Best').textContent = Sky.get('m3best', 0);
+  $('#m3Solved').textContent = m3solved;
+  $('.hud.moves').classList.toggle('low', m3moves <= 2);
+}
+
+function drawBoard(popped, dropped) {
+  const el = $('#m3Board');
+  el.style.gridTemplateColumns = `repeat(${COLS},1fr)`;
+  el.innerHTML = '';
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      const i = Match3.idx(grid, x, y);
+      const d = document.createElement('div');
+      d.className = 'gem';
+      d.dataset.x = x; d.dataset.y = y;
+      const v = grid.cells[i];
+      d.textContent = v >= 0 ? GEMS[v] : '';
+      if (sel && sel.x === x && sel.y === y) d.classList.add('sel');
+      if (popped && popped.has(i)) d.classList.add('pop');
+      if (dropped) d.classList.add('drop');
+      el.appendChild(d);
+    }
+  }
+}
+
+$('#m3Board').addEventListener('click', async e => {
+  if (busy) return;
+  const cell = e.target.closest('.gem'); if (!cell) return;
+  const pos = { x: +cell.dataset.x, y: +cell.dataset.y };
+
+  if (!sel) { sel = pos; drawBoard(); return; }
+  if (sel.x === pos.x && sel.y === pos.y) { sel = null; drawBoard(); return; }
+
+  if (!Match3.areNeighbours(sel, pos)) { sel = pos; drawBoard(); return; }
+
+  if (m3moves <= 0) { sel = null; drawBoard(); Sky.toast(Sky.t('noMoves')); return; }
+
+  const from = sel; sel = null;
+  if (!Match3.trySwap(grid, from, pos)) { drawBoard(); return; }
+
+  m3moves--;
+  busy = true;
+  await runCascades();
+  busy = false;
+  drawHud();
+
+  if (!Match3.hasMove(grid)) {
+    Match3.reshuffle(grid);
+    drawBoard(null, true);
+    Sky.toast(Sky.t('reshuffled'));
+  }
+  if (m3moves <= 0) Sky.toast(Sky.t('noMoves'));
+});
+
+/* Каскады показываем по шагам: сначала подсвечиваем исчезающие фишки,
+   потом роняем верхние. Без паузы игрок не понимает, что произошло. */
+async function runCascades() {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  let wave = 0;
+  let hits = Match3.findMatches(grid);
+  while (hits.size) {
+    wave++;
+    drawBoard(hits);
+    await sleep(280);
+
+    m3score += hits.size * 10 * wave;
+    if (wave > 1) Sky.toast(Sky.t('cascade').replace('%1', wave), 1400);
+
+    Match3.clear(grid, hits);
+    Match3.collapse(grid);
+    drawBoard(null, true);
+    drawHud();
+    await sleep(200);
+
+    hits = Match3.findMatches(grid);
+  }
+  drawBoard();
+  const best = Sky.get('m3best', 0);
+  if (m3score > best) Sky.set('m3best', m3score);
+  drawHud();
+}
+
+$('#btnEarn').addEventListener('click', () => {
+  askTask(() => {
+    m3moves += 5;
+    m3solved++;
+    Sky.set('m3solved', m3solved);
+    drawHud();
+    Sky.toast(Sky.t('gotMoves'));
+  });
+});
+$('#btnNewGame').addEventListener('click', m3New);
+
+/* ================= память ================= */
+const MEM_ICONS = ['🐶','🐱','🦊','🐼','🦁','🐸','🐵','🦉'];
+let memCards = [], memOpen = [], memMoves = 0, memFound = 0, memBusy = false;
+
+function memNew() {
+  const pairs = MEM_ICONS.slice(0, 8);
+  memCards = Sky.shuffle(pairs.concat(pairs)).map(icon => ({ icon, open: false, found: false }));
+  memOpen = []; memMoves = 0; memFound = 0; memBusy = false;
+  drawMem();
+}
+
+function drawMem() {
+  const el = $('#memBoard');
+  el.innerHTML = '';
+  memCards.forEach((c, i) => {
+    const d = document.createElement('button');
+    d.type = 'button';
+    d.className = 'card' + (c.found ? ' found' : c.open ? ' open' : '');
+    d.textContent = (c.open || c.found) ? c.icon : '?';
+    d.addEventListener('click', () => memClick(i));
+    el.appendChild(d);
+  });
+  $('#memMoves').textContent = memMoves;
+  $('#memFound').textContent = memFound;
+  const best = Sky.get('membest', null);
+  $('#memBest').textContent = best === null ? '—' : best;
+}
+
+function memClick(i) {
+  if (memBusy) return;
+  const c = memCards[i];
+  if (c.open || c.found) return;
+  c.open = true;
+  memOpen.push(i);
+  drawMem();
+
+  if (memOpen.length === 2) {
+    memMoves++;
+    memBusy = true;
+    const [a, b] = memOpen;
+    const same = memCards[a].icon === memCards[b].icon;
+    setTimeout(() => {
+      if (same) {
+        memCards[a].found = memCards[b].found = true;
+        memFound++;
+      }
+      memCards[a].open = memCards[b].open = false;
+      memOpen = [];
+      memBusy = false;
+      drawMem();
+
+      if (memFound === 8) {
+        const best = Sky.get('membest', null);
+        if (best === null || memMoves < best) Sky.set('membest', memMoves);
+        Sky.toast(Sky.t('memWin').replace('%1', memMoves));
+        drawMem();
+      }
+    }, same ? 380 : 780);
+  }
+}
+$('#memNew').addEventListener('click', memNew);
+
+/* ================= счёт на скорость ================= */
+let raceScore = 0, raceStreak = 0, raceTimer = null, raceLeft = 0, raceOn = false;
+
+function makeSum() {
+  const big = age >= 9;
+  const ops = big ? ['+','-','×'] : ['+','-'];
+  const op = ops[Math.floor(Math.random() * ops.length)];
+  let a, b, res;
+  if (op === '×') { a = 2 + Math.floor(Math.random() * 8); b = 2 + Math.floor(Math.random() * 8); res = a * b; }
+  else if (op === '+') {
+    const max = big ? 50 : 15;
+    a = 1 + Math.floor(Math.random() * max); b = 1 + Math.floor(Math.random() * max); res = a + b;
+  } else {
+    const max = big ? 60 : 18;
+    a = 5 + Math.floor(Math.random() * max); b = 1 + Math.floor(Math.random() * a); res = a - b;
+  }
+  /* Неверные варианты делаем близкими к правильному: если разброс
+     большой, ответ виден без счёта и смысл упражнения теряется. */
+  const wrong = new Set();
+  while (wrong.size < 3) {
+    const delta = [-3,-2,-1,1,2,3,10,-10][Math.floor(Math.random() * 8)];
+    const cand = res + delta;
+    if (cand !== res && cand >= 0) wrong.add(cand);
+  }
+  return { text: `${a} ${op} ${b}`, res, opts: Sky.shuffle([res, ...wrong]) };
+}
+
+function raceNext() {
+  const q = makeSum();
+  $('#raceQ').textContent = q.text + ' = ?';
+  const box = $('#raceOpts');
+  box.innerHTML = '';
+  q.opts.forEach(v => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = v;
+    b.addEventListener('click', () => {
+      if (!raceOn) return;
+      if (v === q.res) {
+        b.classList.add('right');
+        raceScore += 10 + raceStreak * 2;
+        raceStreak++;
+        raceLeft = Math.min(10, raceLeft + 1.5);
+      } else {
+        b.classList.add('wrong');
+        raceStreak = 0;
+        raceLeft = Math.max(0, raceLeft - 2);
+      }
+      $('#raceScore').textContent = raceScore;
+      $('#raceStreak').textContent = raceStreak;
+      setTimeout(raceNext, 260);
+    });
+    box.appendChild(b);
+  });
+}
+
+function raceStart() {
+  raceScore = 0; raceStreak = 0; raceLeft = 10; raceOn = true;
+  $('#raceScore').textContent = 0;
+  $('#raceStreak').textContent = 0;
+  $('#raceStart').textContent = Sky.t('raceAgain');
+  raceNext();
+  clearInterval(raceTimer);
+  raceTimer = setInterval(() => {
+    raceLeft -= 0.1;
+    $('#raceTimer i').style.width = Math.max(0, raceLeft / 10 * 100) + '%';
+    if (raceLeft <= 0) {
+      clearInterval(raceTimer);
+      raceOn = false;
+      const best = Sky.get('racebest', 0);
+      if (raceScore > best) Sky.set('racebest', raceScore);
+      $('#raceBest').textContent = Sky.get('racebest', 0);
+      $('#raceQ').textContent = '⏱';
+      $('#raceOpts').innerHTML = '';
+      Sky.toast(Sky.t('raceOver').replace('%1', raceScore));
+    }
+  }, 100);
+}
+$('#raceStart').addEventListener('click', raceStart);
+$('#raceBest').textContent = Sky.get('racebest', 0);
+
+/* запуск */
+document.addEventListener('langchange', () => { drawHud(); drawMem(); });
+m3New();
+memNew();
+</script>
+</body>
+</html>

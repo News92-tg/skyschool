@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Тренажёр — SkyySchool</title>
+<meta name="theme-color" content="#f6faff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon-512.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/sky.css">
+</head>
+<body>
+<header id="appHeader"></header>
+
+<main class="wrap">
+
+  <section id="setup">
+    <h1 data-i18n="h1"></h1>
+    <p class="lead" data-i18n="lead"></p>
+
+    <div class="panel section">
+      <div class="row">
+        <div class="field">
+          <label data-i18n="subject"></label>
+          <select id="subject"><option value="all" data-i18n="allSubjects"></option></select>
+        </div>
+        <div class="field">
+          <label data-i18n="exam"></label>
+          <select id="exam">
+            <option value="all" data-i18n="anyExam"></option>
+            <option value="oge">ОГЭ</option>
+            <option value="ege">ЕГЭ</option>
+          </select>
+        </div>
+        <div class="field">
+          <label data-i18n="level"></label>
+          <select id="difficulty">
+            <option value="all" data-i18n="anyLevel"></option>
+            <option value="easy" data-i18n="easy"></option>
+            <option value="medium" data-i18n="medium"></option>
+            <option value="hard" data-i18n="hard"></option>
+          </select>
+        </div>
+        <div class="field">
+          <label data-i18n="mode"></label>
+          <select id="mode">
+            <option value="due" data-i18n="modeDue"></option>
+            <option value="all" data-i18n="modeAll"></option>
+            <option value="weak" data-i18n="modeWeak"></option>
+          </select>
+        </div>
+      </div>
+      <p class="note" id="modeNote"></p>
+
+      <div class="spread teacher-bar" style="margin-top:14px">
+        <span class="who"><span class="ava" id="tchAva"></span><span id="tchName"></span></span>
+        <a class="btn ghost small" href="teachers.html" data-i18n="tchChange"></a>
+      </div>
+
+      <div class="spread" style="margin-top:14px">
+        <span class="tag gray" id="aiState"></span>
+        <button class="btn ghost small" id="aiSetupBtn"></button>
+      </div>
+      <p class="note hidden" id="ruNote" style="border-left-color:var(--warn)"></p>
+      <button class="btn full big" id="startBtn" style="margin-top:16px" data-i18n="start"></button>
+    </div>
+
+    <div class="stats section">
+      <div class="stat accent"><b id="stSolved">0</b><span data-i18n="solvedL"></span></div>
+      <div class="stat"><b id="stAcc">0%</b><span data-i18n="accuracyL"></span></div>
+      <div class="stat ok"><b id="stToday">0</b><span data-i18n="todayL"></span></div>
+      <div class="stat"><b id="stAvail">0</b><span data-i18n="availL"></span></div>
+    </div>
+  </section>
+
+  <section id="quiz" class="hidden">
+    <div class="progress" style="margin-bottom:20px"><i id="bar"></i></div>
+    <div class="panel">
+      <div class="meta">
+        <span class="tag" id="qTopic"></span>
+        <span class="tag gray" id="qExam"></span>
+        <span class="tag gray" id="qLevel"></span>
+        <span class="tag gray" id="qCount"></span>
+        <span class="tag warn" id="qBox"></span>
+      </div>
+      <div class="question" id="qText"></div>
+      <div class="options" id="qOptions"></div>
+
+      <div class="note hidden" id="qHint"></div>
+      <div class="verdict hidden" id="qVerdict"></div>
+      <div class="solution hidden" id="qSolution"></div>
+      <div class="ai hidden" id="qAi"></div>
+
+      <div class="pye-wrap hidden" id="pythonEditor">
+        <div class="pye-head">
+          <b data-i18n="pyeTitle"></b>
+          <span class="pye-status" id="pyeStatus"><span class="dot"></span><span id="pyeStatusText" data-i18n="pyeIdle"></span></span>
+        </div>
+        <textarea class="pye-editor" id="pyeCode" spellcheck="false"></textarea>
+        <button class="btn pye-run" id="pyeRunBtn" data-i18n="pyeRun"></button>
+        <div class="pye-console hidden" id="pyeOutput"></div>
+      </div>
+
+      <div class="actions">
+        <button class="btn ghost" id="hintBtn" data-i18n="hint"></button>
+        <button class="btn" id="checkBtn" disabled data-i18n="check"></button>
+        <button class="btn hidden" id="aiBtn" data-i18n="aiTitle"></button>
+        <button class="btn hidden" id="nextBtn" data-i18n="next"></button>
+        <button class="btn ghost" id="stopBtn" data-i18n="finish"></button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer id="appFooter"></footer>
+
+<script src="assets/config.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/db.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/python-editor.js"></script>
+<script src="data/ai-teachers.js"></script>
+<script src="assets/ai-teachers.js"></script>
+<script src="data/bank-math.js"></script>
+<script src="data/bank-informatics.js"></script>
+<script src="data/bank-russian.js"></script>
+<script src="data/bank-physics.js"></script>
+<script src="data/bank-biology.js"></script>
+<script src="data/bank-chemistry.js"></script>
+<script src="data/bank-geography.js"></script>
+<script src="data/bank-social.js"></script>
+<script src="data/bank-history.js"></script>
+<script src="data/bank-english.js"></script>
+<script src="data/bank-polish.js"></script>
+<script src="data/bank-spanish.js"></script>
+<script src="data/bank-german.js"></script>
+<script>
+'use strict';
+Sky.init({
+  h1:{ru:'Тренажёр',en:'Trainer'},
+  lead:{ru:'Ошиблись — задание вернётся завтра. Ответили верно несколько раз подряд — будет появляться всё реже. Так время уходит на то, что вы плохо помните, а не на то, что и так знаете.',
+        en:'Get one wrong and it comes back tomorrow. Get it right several times running and it appears less and less often. That way your time goes to what you barely remember, not to what you already know.'},
+  subject:{ru:'Предмет',en:'Subject'},
+  exam:{ru:'Экзамен',en:'Exam'},
+  level:{ru:'Сложность',en:'Difficulty'},
+  mode:{ru:'Режим',en:'Mode'},
+  allSubjects:{ru:'Все предметы',en:'All subjects'},
+  anyExam:{ru:'ЕГЭ и ОГЭ',en:'Both exams'},
+  anyLevel:{ru:'Любая',en:'Any'},
+  modeDue:{ru:'Повторение по расписанию',en:'Scheduled review'},
+  modeAll:{ru:'Все задания подряд',en:'Everything, in order'},
+  modeWeak:{ru:'Работа над ошибками',en:'Mistakes only'},
+  noteDue:{ru:'Новые задания и те, которые пора повторить. Обычный режим на каждый день.',
+           en:'New problems plus those due for review. The normal everyday mode.'},
+  noteAll:{ru:'Все задания по фильтрам, включая уже решённые. Полезно перед самым экзаменом.',
+           en:'Everything matching the filters, solved ones included. Useful right before the exam.'},
+  noteWeak:{ru:'Только те задания, в которых вы уже ошибались.',en:'Only the problems you have already got wrong.'},
+  start:{ru:'Начать',en:'Start'},
+  hint:{ru:'Подсказка',en:'Hint'},
+  check:{ru:'Проверить',en:'Check'},
+  finish:{ru:'Закончить',en:'Finish'},
+  solvedL:{ru:'решено всего',en:'solved overall'},
+  accuracyL:{ru:'верных',en:'accuracy'},
+  todayL:{ru:'сегодня',en:'today'},
+  availL:{ru:'доступно сейчас',en:'available now'},
+  countOf:{ru:'%1 из %2',en:'%1 of %2'},
+  empty:{ru:'По этим фильтрам заданий нет. Смените предмет, экзамен или режим.',
+         en:'No problems match these filters. Change the subject, exam or mode.'},
+  doneT:{ru:'На сегодня всё',en:'That is everything for now'},
+  doneD:{ru:'Задания по этим фильтрам закончились. Остальные вернутся по расписанию повторения — или переключите режим на «Все задания подряд».',
+         en:'You have finished the problems matching these filters. The rest return on the review schedule — or switch the mode to "Everything, in order".'},
+  boxNew:{ru:'новое',en:'new'},
+  boxN:{ru:'повтор %1/5',en:'review %1/5'},
+  nextIn:{ru:'Вернётся через %1 дн.',en:'Comes back in %1 days'},
+  nextTomorrow:{ru:'Вернётся завтра.',en:'Comes back tomorrow.'},
+  off:{ru:'не подключён',en:'not connected'},
+  change:{ru:'Изменить',en:'Change'},
+  pyeTitle:{ru:'Решение кодом',en:'Solve with code'},
+  pyeRun:{ru:'Запустить',en:'Run'},
+  pyeIdle:{ru:'не запущен',en:'not started'},
+  pyeLoading:{ru:'загрузка…',en:'loading…'},
+  pyeReady:{ru:'готов',en:'ready'},
+  pyeRunning:{ru:'выполняется…',en:'running…'},
+  pyeFirstRun:{ru:'Первая загрузка Python ~10–15 МБ, дальше в этом браузере работает офлайн.',
+               en:'First load of Python is ~10–15 MB; after that it runs offline in this browser.'},
+  pyeNoOutput:{ru:'(программа ничего не вывела)',en:'(no output)'},
+  tchWith:{ru:'Объясняет: %1',en:'Explained by: %1'},
+  tchChange:{ru:'Сменить',en:'Change'}
+});
+
+/* ---------- выбранный AI-учитель ----------
+   Он не украшение шапки: его промпт уходит в разбор (см. aiPrompt
+   в assets/core.js), поэтому важно видеть, кто именно сейчас
+   объясняет. */
+function renderTeacher() {
+  if (!window.SkyTeachers) return;
+  const t = SkyTeachers.selected();
+  if (!t) return;
+  const ava = document.querySelector('#tchAva');
+  const name = document.querySelector('#tchName');
+  if (ava) ava.textContent = t.emoji;
+  if (name) name.textContent = Sky.t('tchWith').replace('%1', Sky.L(t.name));
+}
+document.addEventListener('teacherchange', renderTeacher);
+document.addEventListener('langchange', renderTeacher);
+renderTeacher();
+
+const BANKS = window.BANKS || {};
+const $ = s => document.querySelector(s);
+const EXAM_LABEL = { oge:'ОГЭ', ege:'ЕГЭ', both:'ЕГЭ/ОГЭ' };
+
+/* список предметов */
+const subjSel = $('#subject');
+for (const b of Object.values(BANKS)) {
+  const o = document.createElement('option');
+  o.value = b.id; o.dataset.bank = b.id;
+  subjSel.appendChild(o);
+}
+function fillSubjectNames() {
+  for (const o of subjSel.options) {
+    if (o.dataset.bank) {
+      const b = BANKS[o.dataset.bank];
+      o.textContent = b.icon + '  ' + Sky.L(b.name);
+    }
+  }
+}
+
+const qs = new URLSearchParams(location.search);
+if (qs.get('subject') && BANKS[qs.get('subject')]) subjSel.value = qs.get('subject');
+if (['due','all','weak'].includes(qs.get('mode'))) $('#mode').value = qs.get('mode');
+
+let queue = [], pos = 0, current = null, bank = null, picked = null, answered = false, order = [];
+
+function noteText() {
+  const m = $('#mode').value;
+  $('#modeNote').textContent = Sky.t(m === 'due' ? 'noteDue' : m === 'all' ? 'noteAll' : 'noteWeak');
+
+  /* Честная пометка вместо смешанного языка: предметы российской
+     школьной программы остаются по-русски, и об этом надо сказать
+     прямо, а не показывать английский интерфейс поверх русского
+     задания без объяснений. */
+  const ru = $('#ruNote');
+  const sub = subjSel.value;
+  const showsRuOnly = Sky.lang === 'en' &&
+    (sub === 'all' ? Object.values(BANKS).some(b => b.ruOnly) : (BANKS[sub] && BANKS[sub].ruOnly));
+  ru.classList.toggle('hidden', !showsRuOnly);
+  if (showsRuOnly) ru.textContent = Sky.t('ruOnlyNote');
+}
+$('#mode').addEventListener('change', noteText);
+subjSel.addEventListener('change', () => { noteText(); renderStats(); });
+$('#exam').addEventListener('change', renderStats);
+$('#difficulty').addEventListener('change', renderStats);
+
+function renderStats() {
+  const s = Sky.stats();
+  $('#stSolved').textContent = s.solved;
+  $('#stAcc').textContent = Sky.pct(s.right, s.solved) + '%';
+  $('#stToday').textContent = Sky.todayCount();
+  $('#stAvail').textContent = collect().length;
+}
+
+function collect() {
+  const sub = subjSel.value, ex = $('#exam').value, dif = $('#difficulty').value, mode = $('#mode').value;
+  const out = [];
+  for (const b of Object.values(BANKS)) {
+    if (sub !== 'all' && b.id !== sub) continue;
+    let list = b.tasks.filter(t =>
+      (ex === 'all' || t.exam === ex || t.exam === 'both') &&
+      (dif === 'all' || t.difficulty === dif));
+    if (mode === 'due')  { const ok = new Set(Sky.dueIds(b.id, list.map(t => t.id)));  list = list.filter(t => ok.has(t.id)); }
+    if (mode === 'weak') { const ok = new Set(Sky.weakIds(b.id, list.map(t => t.id))); list = list.filter(t => ok.has(t.id)); }
+    for (const t of list) out.push({ bank: b, task: t });
+  }
+  return Sky.shuffle(out);
+}
+
+$('#startBtn').addEventListener('click', () => {
+  queue = collect();
+  if (!queue.length) { Sky.toast(Sky.t('empty')); return; }
+  pos = 0;
+  $('#setup').classList.add('hidden');
+  $('#quiz').classList.remove('hidden');
+  nextTask();
+});
+
+$('#stopBtn').addEventListener('click', () => {
+  current = null;
+  $('#quiz').classList.add('hidden');
+  $('#setup').classList.remove('hidden');
+  renderStats();
+  window.scrollTo({ top:0, behavior:'smooth' });
+});
+
+function hideExtras() {
+  ['qHint','qVerdict','qSolution','qAi'].forEach(id => $('#' + id).classList.add('hidden'));
+}
+
+function nextTask() {
+  hideExtras();
+  if (pos >= queue.length) {
+    current = null;
+    document.querySelectorAll('.meta .tag').forEach(s => s.classList.add('hidden'));
+    $('#qText').textContent = '';
+    $('#qOptions').innerHTML = `<div class="empty"><div class="big">🌤</div>
+      <b>${Sky.t('doneT')}</b><p>${Sky.t('doneD')}</p></div>`;
+    ['hintBtn','checkBtn','aiBtn','nextBtn'].forEach(id => $('#' + id).classList.add('hidden'));
+    $('#bar').style.width = '100%';
+    return;
+  }
+  const item = queue[pos];
+  bank = item.bank; current = item.task; picked = null; answered = false;
+  /* Порядок вариантов перемешиваем при показе: в файлах базы верный
+     ответ стоит первым — так их удобно писать и проверять, но показывать
+     в том же порядке нельзя, иначе можно жать «A», не читая условие.
+     Фиксируем один раз на задание, чтобы не прыгал при перерисовке. */
+  if (!item.order) item.order = Sky.shuffle(current.options.map((_, i) => i));
+  order = item.order;
+  document.querySelectorAll('.meta .tag').forEach(s => s.classList.remove('hidden'));
+  renderTask();
+}
+
+function renderTask() {
+  if (!current) return;
+  $('#qTopic').textContent = Sky.L(current.topic);
+  $('#qExam').textContent  = EXAM_LABEL[current.exam];
+  $('#qLevel').textContent = Sky.t(current.difficulty);
+  $('#qCount').textContent = Sky.t('countOf').replace('%1', pos + 1).replace('%2', queue.length);
+
+  const box = Sky.boxOf(bank.id, current.id);
+  $('#qBox').textContent = box < 0 ? Sky.t('boxNew') : Sky.t('boxN').replace('%1', box);
+
+  $('#qText').textContent = Sky.L(current.text);
+  $('#bar').style.width = Math.round(pos / queue.length * 100) + '%';
+
+  const list = $('#qOptions'); list.innerHTML = '';
+  order.forEach((oi, shown) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'opt';
+    b.setAttribute('aria-pressed', String(picked === oi));
+    b.innerHTML = `<span class="k">${'ABCDEF'[shown]}</span><span></span>`;
+    b.lastChild.textContent = Sky.L(current.options[oi]);
+    if (answered) {
+      b.disabled = true;
+      if (oi === current.answer) b.classList.add('right');
+      else if (oi === picked) b.classList.add('wrong');
+    } else {
+      b.addEventListener('click', () => { picked = oi; renderTask(); });
+    }
+    list.appendChild(b);
+  });
+
+  $('#checkBtn').disabled = (picked === null);
+  $('#hintBtn').classList.toggle('hidden', answered);
+  $('#checkBtn').classList.toggle('hidden', answered);
+  $('#nextBtn').classList.toggle('hidden', !answered);
+  $('#aiBtn').classList.toggle('hidden', !answered);
+
+  if (!$('#qHint').classList.contains('hidden')) $('#qHint').textContent = Sky.L(current.hint);
+  if (answered) {
+    const ok = picked === current.answer;
+    const v = $('#qVerdict');
+    v.className = 'verdict ' + (ok ? 'ok' : 'no');
+    v.textContent = ok ? '✓ ' + Sky.t('right')
+      : '✕ ' + Sky.t('wrong') + ' — ' + Sky.t('correctIs') + Sky.L(current.options[current.answer]);
+    $('#qSolution').textContent = Sky.L(current.solution);
+  }
+
+  syncPythonEditor();
+}
+
+/* ---------- встроенный Python-редактор ----------
+   Показывается только для информатики и только у заданий с
+   needsCode:true — так задания с одним верным вариантом (их
+   большинство) не обрастают лишним UI. Сейчас таких заданий в базе
+   нет: механизм готов, включается добавлением needsCode:true задаче
+   в data/bank-informatics.js. */
+let pyeTaskId = null;
+function syncPythonEditor() {
+  const wrap = $('#pythonEditor');
+  const show = bank && bank.id === 'informatics' && current && current.needsCode === true;
+  wrap.classList.toggle('hidden', !show);
+  if (!show) return;
+
+  if (pyeTaskId !== current.id) {
+    pyeTaskId = current.id;
+    $('#pyeCode').value = current.starterCode || '# ваш код здесь\n';
+    const out = $('#pyeOutput'); out.textContent = ''; out.classList.add('hidden');
+    setPyeStatus('idle');
+  }
+}
+
+function setPyeStatus(state, text) {
+  const el = $('#pyeStatus');
+  el.className = 'pye-status' + (state === 'idle' ? '' : ' ' + state);
+  $('#pyeStatusText').textContent = text || Sky.t('pye' + state[0].toUpperCase() + state.slice(1));
+}
+
+$('#pyeRunBtn').addEventListener('click', async () => {
+  const code = $('#pyeCode').value;
+  const out = $('#pyeOutput');
+  const firstRun = !window.PythonEditor.isReady();
+  if (firstRun) Sky.toast(Sky.t('pyeFirstRun'), 4000);
+
+  setPyeStatus('running');
+  out.classList.remove('hidden');
+  out.textContent = firstRun ? Sky.t('pyeLoading') : '';
+
+  const r = await window.PythonEditor.runPython(code, (msg) => {
+    if (firstRun) out.textContent = msg;
+  });
+
+  if (r.error) {
+    setPyeStatus('err', Sky.t('pyeIdle'));
+    out.innerHTML = '';
+    const errLine = document.createElement('div');
+    errLine.className = 'err';
+    errLine.textContent = r.error;
+    out.appendChild(errLine);
+    if (r.output) {
+      const pre = document.createElement('div');
+      pre.textContent = r.output;
+      out.appendChild(pre);
+    }
+  } else {
+    setPyeStatus('ready');
+    const text = [r.output, r.result].filter(s => s).join('\n');
+    out.textContent = text || Sky.t('pyeNoOutput');
+  }
+});
+
+$('#hintBtn').addEventListener('click', () => {
+  const h = $('#qHint'); h.textContent = Sky.L(current.hint); h.classList.remove('hidden');
+});
+
+$('#checkBtn').addEventListener('click', () => {
+  if (picked === null || !current) return;
+  answered = true;
+  const ok = picked === current.answer;
+  const res = Sky.record(bank.id, current.id, ok);
+  $('#qVerdict').classList.remove('hidden');
+  $('#qSolution').classList.remove('hidden');
+  renderTask();
+  const days = Math.max(1, Math.round((res.due - Date.now()) / 864e5));
+  Sky.toast(days <= 1 ? Sky.t('nextTomorrow') : Sky.t('nextIn').replace('%1', days));
+});
+
+$('#nextBtn').addEventListener('click', () => {
+  pos++; nextTask(); window.scrollTo({ top:0, behavior:'smooth' });
+});
+
+$('#aiBtn').addEventListener('click', async () => {
+  const box = $('#qAi');
+  box.classList.remove('hidden');
+  box.innerHTML = `<h4>${Sky.t('aiTitle')}</h4>`;
+
+  /* ИИ не подключён — вместо «не удалось» сразу предлагаем подключить */
+  if (Sky.aiMode() === 'off') {
+    const p = document.createElement('p');
+    p.textContent = Sky.t('aiOff');
+    box.appendChild(p);
+    const b = document.createElement('button');
+    b.className = 'btn small';
+    b.style.marginTop = '12px';
+    b.textContent = Sky.t('aiSetup');
+    b.addEventListener('click', openAiSetup);
+    box.appendChild(b);
+    return;
+  }
+
+  const line = document.createElement('div');
+  line.innerHTML = `<span class="spin"></span> ${Sky.t('aiLoading')}`;
+  box.appendChild(line);
+  $('#aiBtn').disabled = true;
+
+  const res = await Sky.explain({
+    task: Sky.L(current.text),
+    options: current.options.map(o => Sky.L(o)),
+    userAnswer: Sky.L(current.options[picked]),
+    correctAnswer: Sky.L(current.options[current.answer]),
+    subject: Sky.L(bank.name),
+    topic: Sky.L(current.topic)
+  });
+
+  line.remove();
+  if (res.text) {
+    box.append(res.text);
+  } else {
+    box.append(res.error);
+    const b = document.createElement('button');
+    b.className = 'btn ghost small';
+    b.style.marginTop = '12px';
+    b.textContent = Sky.t('aiSetup');
+    b.addEventListener('click', openAiSetup);
+    box.appendChild(b);
+  }
+  $('#aiBtn').disabled = false;
+});
+
+/* ---------- окно подключения ИИ ----------
+   Ключ вводит сам пользователь, и он остаётся в его браузере. В файлы
+   сайта ключ не попадает никогда: иначе его увидит любой посетитель. */
+function openAiSetup() {
+  Sky.modal(
+    `<h2>${Sky.t('aiKeyTitle')}</h2>
+     <p class="lead" style="font-size:13px;margin-top:8px">${Sky.t('aiKeyWhy')}</p>
+     <div class="note" style="border-left-color:var(--warn)">${Sky.t('aiKeyPublic')}</div>
+     <div class="field" style="margin-top:16px">
+       <label>DeepSeek API key</label>
+       <input type="password" id="akKey" placeholder="${Sky.t('aiKeyPh')}"
+              style="font-family:'JetBrains Mono',monospace;font-size:12.5px" autocomplete="off">
+       <span class="help">platform.deepseek.com → API keys</span>
+     </div>
+     <button class="btn full big" id="akSave" style="margin-top:16px">${Sky.t('aiKeySave')}</button>
+     <button class="btn ghost full" id="akDrop" style="margin-top:9px">${Sky.t('aiKeyForget')}</button>`,
+    (box, close) => {
+      const input = box.querySelector('#akKey');
+      if (Sky.aiKey()) input.value = Sky.aiKey();
+      box.querySelector('#akDrop').style.display = Sky.aiKey() ? '' : 'none';
+
+      box.querySelector('#akSave').addEventListener('click', () => {
+        const v = input.value.trim();
+        if (!v) return;
+        if (!v.startsWith('sk-')) return Sky.toast(Sky.t('aiKeyOdd'));
+        Sky.setAiKey(v);
+        Sky.toast(Sky.t('aiKeySaved'));
+        close();
+        renderAiState();
+      });
+      box.querySelector('#akDrop').addEventListener('click', () => {
+        Sky.setAiKey('');
+        Sky.toast(Sky.t('aiKeyGone'));
+        close();
+        renderAiState();
+      });
+    }
+  );
+}
+
+document.addEventListener('langchange', () => {
+  function renderAiState() {
+  const mode = Sky.aiMode();
+  const tag = $('#aiState'), btn = $('#aiSetupBtn');
+  tag.textContent = mode === 'key' ? Sky.t('aiOnKey')
+    : mode === 'worker' ? Sky.t('aiOnWorker') : Sky.t('aiTitle') + ' — ' + Sky.t('off');
+  tag.className = 'tag ' + (mode === 'off' ? 'gray' : 'ok');
+  btn.textContent = Sky.t(mode === 'off' ? 'aiSetup' : 'change');
+}
+$('#aiSetupBtn').addEventListener('click', openAiSetup);
+document.addEventListener('langchange', renderAiState);
+
+fillSubjectNames(); noteText(); renderStats(); renderAiState();
+  if (current) renderTask();
+});
+function renderAiState() {
+  const mode = Sky.aiMode();
+  const tag = $('#aiState'), btn = $('#aiSetupBtn');
+  tag.textContent = mode === 'key' ? Sky.t('aiOnKey')
+    : mode === 'worker' ? Sky.t('aiOnWorker') : Sky.t('aiTitle') + ' — ' + Sky.t('off');
+  tag.className = 'tag ' + (mode === 'off' ? 'gray' : 'ok');
+  btn.textContent = Sky.t(mode === 'off' ? 'aiSetup' : 'change');
+}
+$('#aiSetupBtn').addEventListener('click', openAiSetup);
+document.addEventListener('langchange', renderAiState);
+
+fillSubjectNames(); noteText(); renderStats(); renderAiState();
+</script>
+</body>
+</html>

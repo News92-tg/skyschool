@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Домашка по фото — SkyySchool</title>
+<meta name="theme-color" content="#f6faff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon-512.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/sky.css">
+<style>
+.shot{display:grid;grid-template-columns:1fr;gap:14px}
+.shot-frame{
+  position:relative;background:var(--panel-2);border:1.5px dashed var(--line);
+  border-radius:var(--r);min-height:200px;display:grid;place-items:center;overflow:hidden;
+}
+.shot-frame video,.shot-frame img{width:100%;max-height:420px;object-fit:contain;display:block}
+.shot-frame .hint{color:var(--muted);font-size:13px;text-align:center;padding:34px 18px;line-height:1.6}
+.shot-actions{display:flex;gap:9px;flex-wrap:wrap}
+.shot-actions .btn{flex:1;min-width:130px}
+
+.gradebox{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+.grade{
+  width:74px;height:74px;border-radius:20px;flex:none;display:grid;place-items:center;
+  font-size:37px;font-weight:900;color:#fff;
+}
+.grade.g5{background:var(--ok)} .grade.g4{background:#4c9f4c}
+.grade.g3{background:var(--warn)} .grade.g2{background:#e07a3f} .grade.g1{background:var(--no)}
+.gradebox .said{flex:1;min-width:200px;font-size:13.5px;line-height:1.6}
+
+.recog{
+  background:var(--ink,#0e2540);color:#d7e6fa;border-radius:var(--r);padding:14px;
+  font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.65;
+  white-space:pre-wrap;word-break:break-word;max-height:260px;overflow:auto;
+}
+.recog-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+
+.err-item{
+  border-left:3px solid var(--no);background:var(--panel-2);border-radius:0 var(--r) var(--r) 0;
+  padding:11px 14px;margin-bottom:9px;
+}
+.err-item .frag{font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--no);font-weight:700}
+.err-item .why{font-size:13px;line-height:1.6;margin-top:5px}
+.err-item .fix{font-size:13px;line-height:1.6;margin-top:5px;color:var(--ok);font-weight:700}
+
+.good-item{
+  border-left:3px solid var(--ok);background:var(--panel-2);border-radius:0 var(--r) var(--r) 0;
+  padding:9px 14px;margin-bottom:7px;font-size:13px;line-height:1.55;
+}
+
+.hist-row{
+  display:flex;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);
+}
+.hist-row:last-child{border-bottom:none}
+.hist-row .g{
+  width:34px;height:34px;border-radius:11px;flex:none;display:grid;place-items:center;
+  font-weight:900;color:#fff;font-size:16px;
+}
+.hist-row .txt{flex:1;min-width:0}
+.hist-row .txt b{font-size:13px;display:block}
+.hist-row .txt span{font-size:11.5px;color:var(--muted);display:block;margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hist-row .flagged{font-size:11px;color:var(--warn);font-weight:800;flex:none}
+
+.working{display:flex;align-items:center;gap:11px;font-size:13.5px;color:var(--muted);font-weight:700}
+.working .dot{width:9px;height:9px;border-radius:50%;background:var(--warn);animation:phPulse 1s infinite;flex:none}
+@keyframes phPulse{0%,100%{opacity:1}50%{opacity:.3}}
+</style>
+</head>
+<body>
+<header id="appHeader"></header>
+
+<main class="wrap">
+  <h1 data-i18n="h1"></h1>
+  <p class="lead" data-i18n="lead"></p>
+
+  <p class="note hidden" id="needWorker" style="border-left-color:var(--warn)"></p>
+
+  <!-- кто проверяет -->
+  <div class="section">
+    <div class="panel">
+      <div class="spread teacher-bar">
+        <span class="who"><span class="ava" id="tchAva"></span><span id="tchName"></span></span>
+        <a class="btn ghost small" href="teachers.html" data-i18n="tchChange"></a>
+      </div>
+    </div>
+  </div>
+
+  <!-- съёмка -->
+  <div class="section">
+    <div class="panel shot">
+      <div class="shot-frame" id="frame">
+        <div class="hint" id="frameHint"></div>
+        <video id="video" playsinline autoplay muted hidden></video>
+        <img id="preview" alt="" hidden>
+      </div>
+
+      <div class="shot-actions">
+        <button class="btn" id="camBtn"></button>
+        <button class="btn ghost" id="fileBtn"></button>
+        <button class="btn hidden" id="shotBtn"></button>
+        <button class="btn ghost hidden" id="againBtn"></button>
+      </div>
+      <input type="file" id="fileIn" accept="image/*" capture="environment" hidden>
+
+      <div class="field">
+        <label data-i18n="taskLabel"></label>
+        <textarea id="taskText" rows="2" placeholder=""></textarea>
+      </div>
+
+      <button class="btn full big" id="checkBtn" disabled data-i18n="checkBtn"></button>
+      <div class="working hidden" id="working"><span class="dot"></span><span id="workingText"></span></div>
+    </div>
+  </div>
+
+  <!-- результат -->
+  <div class="section hidden" id="resultSection">
+    <div class="section-head"><h2 data-i18n="resultH"></h2></div>
+    <div class="panel" id="result"></div>
+  </div>
+
+  <!-- история -->
+  <div class="section hidden" id="histSection">
+    <div class="section-head"><h2 data-i18n="histH"></h2></div>
+    <div class="panel" id="hist"></div>
+  </div>
+</main>
+
+<footer id="appFooter"></footer>
+
+<script src="assets/config.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/db.js"></script>
+<script src="assets/auth.js"></script>
+<script src="data/ai-teachers.js"></script>
+<script src="assets/ai-teachers.js"></script>
+<script>
+'use strict';
+Sky.init({
+  h1:{ru:'Домашка по фото',en:'Homework by photo'},
+  lead:{ru:'Сфотографируйте страницу тетради — учитель прочитает написанное, поставит оценку и разберёт ошибки. Распознанный текст показывается отдельно: если оценка кажется несправедливой, первым делом смотрите, что именно модель приняла за написанное.',
+        en:'Photograph a page of your exercise book — the teacher reads it, gives a mark and goes through the mistakes. The recognised text is shown separately: if the mark looks unfair, first check what the model actually read.'},
+
+  tchChange:{ru:'Сменить',en:'Change'},
+  tchGrades:{ru:'Проверяет: %1',en:'Marked by: %1'},
+
+  needWorker:{ru:'Разбор фото требует Worker с ключом Gemini: распознавание рукописи делает отдельная модель, и её ключ нельзя держать в браузере. Впишите адрес Worker в assets/config.js → AI_BASE и выполните npx wrangler secret put GEMINI_API_KEY. Как развернуть — в README.',
+              en:'Photo review needs the Worker with a Gemini key: handwriting recognition is a separate model and its key cannot live in the browser. Put the Worker address into assets/config.js → AI_BASE and run npx wrangler secret put GEMINI_API_KEY. See the README.'},
+
+  frameHint:{ru:'Пока ничего не выбрано. Снимите страницу камерой или выберите готовое фото.',
+             en:'Nothing chosen yet. Take a photo of the page or pick an existing one.'},
+  camBtn:{ru:'Включить камеру',en:'Open camera'},
+  fileBtn:{ru:'Выбрать файл',en:'Pick a file'},
+  shotBtn:{ru:'Снять',en:'Capture'},
+  againBtn:{ru:'Переснять',en:'Retake'},
+  camFail:{ru:'Камера недоступна: браузер не дал доступ или её нет. Выберите файл.',
+           en:'Camera unavailable: the browser denied access or there is none. Pick a file instead.'},
+
+  taskLabel:{ru:'Что было задано (необязательно, но с этим проверка точнее)',
+             en:'What was set (optional, but it makes marking more accurate)'},
+  checkBtn:{ru:'Проверить работу',en:'Check the work'},
+  working1:{ru:'Читаю почерк…',en:'Reading the handwriting…'},
+  working2:{ru:'Проверяю работу…',en:'Marking the work…'},
+
+  resultH:{ru:'Разбор',en:'Review'},
+  recogH:{ru:'Что прочитала модель',en:'What the model read'},
+  flagBtn:{ru:'Это распознано неверно',en:'This was read wrong'},
+  flagged:{ru:'Отмечено: распознано неверно',en:'Flagged as misread'},
+  flagThanks:{ru:'Отмечено. Оценка по неверно прочитанному тексту не считается справедливой — перефотографируйте страницу при лучшем освещении.',
+              en:'Flagged. A mark based on misread text is not fair — retake the photo in better light.'},
+  goodH:{ru:'Что сделано верно',en:'What is right'},
+  errH:{ru:'Ошибки',en:'Mistakes'},
+  fixL:{ru:'Как надо: ',en:'Should be: '},
+  nextH:{ru:'Что дальше',en:'What next'},
+  noErrors:{ru:'Ошибок не нашлось.',en:'No mistakes found.'},
+
+  histH:{ru:'Ваши работы',en:'Your work'},
+  histEmpty:{ru:'Пока пусто.',en:'Nothing yet.'},
+  saveFail:{ru:'Разбор показан, но не сохранён: для истории работ нужно войти в аккаунт.',
+            en:'The review is shown but not saved: sign in to keep a history.'},
+  tooBig:{ru:'Фото не удалось сжать до допустимого размера. Попробуйте снять ближе.',
+          en:'Could not compress the photo enough. Try shooting closer.'}
+});
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* Разбор фото возможен ТОЛЬКО через Worker. Своим ключом DeepSeek тут
+   не обойтись: картинки читает Gemini, а её ключ в браузере держать
+   нельзя — его увидит любой, кто откроет исходник страницы. */
+const AI_BASE = (Sky.cfg.AI_BASE || '').trim();
+const hasWorker = /^https?:\/\//i.test(AI_BASE);
+
+let shotDataUrl = null;   // сжатое фото как data:URL
+let stream = null;        // поток камеры, чтобы потом закрыть
+let lastSaved = null;     // строка photo_checks для кнопки «распознано неверно»
+
+/* ---------- учитель ---------- */
+function renderTeacher() {
+  const t = SkyTeachers.selected();
+  if (!t) return;
+  $('#tchAva').textContent = t.emoji;
+  $('#tchName').textContent = Sky.t('tchGrades').replace('%1', Sky.L(t.name));
+}
+
+/* ---------- камера ---------- */
+async function openCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' } }, audio: false
+    });
+  } catch (e) {
+    Sky.toast(Sky.t('camFail'), 4500);
+    return;
+  }
+  const v = $('#video');
+  v.srcObject = stream;
+  v.hidden = false;
+  $('#preview').hidden = true;
+  $('#frameHint').hidden = true;
+  $('#shotBtn').classList.remove('hidden');
+  $('#camBtn').classList.add('hidden');
+}
+
+function closeCamera() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  $('#video').hidden = true;
+  $('#shotBtn').classList.add('hidden');
+}
+
+/* ---------- сжатие ----------
+   Сжимаем в браузере, а не на сервере: снимок с телефона — это 3–6 МБ,
+   и гонять их целиком незачем. Для чтения текста хватает 1024 px по
+   длинной стороне, дальше качество подбираем под потолок размера. */
+const MAX_SIDE = 1024;
+const MAX_KB = 1200;
+
+function compress(srcImg) {
+  const scale = Math.min(1, MAX_SIDE / Math.max(srcImg.naturalWidth, srcImg.naturalHeight));
+  const c = document.createElement('canvas');
+  c.width = Math.round(srcImg.naturalWidth * scale);
+  c.height = Math.round(srcImg.naturalHeight * scale);
+  c.getContext('2d').drawImage(srcImg, 0, 0, c.width, c.height);
+
+  for (const q of [0.82, 0.7, 0.58, 0.45, 0.35]) {
+    const url = c.toDataURL('image/jpeg', q);
+    /* длина base64 примерно на треть больше исходных байт */
+    if ((url.length - url.indexOf(',') - 1) * 0.75 <= MAX_KB * 1024) return url;
+  }
+  return null;
+}
+
+function showShot(dataUrl) {
+  shotDataUrl = dataUrl;
+  const p = $('#preview');
+  p.src = dataUrl;
+  p.hidden = false;
+  $('#frameHint').hidden = true;
+  $('#againBtn').classList.remove('hidden');
+  $('#checkBtn').disabled = !hasWorker;
+}
+
+function captureFromVideo() {
+  const v = $('#video');
+  const c = document.createElement('canvas');
+  const scale = Math.min(1, MAX_SIDE / Math.max(v.videoWidth, v.videoHeight));
+  c.width = Math.round(v.videoWidth * scale);
+  c.height = Math.round(v.videoHeight * scale);
+  c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+  closeCamera();
+  showShot(c.toDataURL('image/jpeg', 0.82));
+}
+
+/* ---------- проверка ---------- */
+async function check() {
+  if (!shotDataUrl) return;
+  const t = SkyTeachers.selected();
+
+  $('#checkBtn').disabled = true;
+  $('#working').classList.remove('hidden');
+  $('#workingText').textContent = Sky.t('working1');
+  /* Второй шаг идёт на сервере сразу за первым, отдельного сигнала
+     оттуда нет — поэтому просто меняем надпись по времени, чтобы
+     ожидание не выглядело зависанием. */
+  const swap = setTimeout(() => { $('#workingText').textContent = Sky.t('working2'); }, 3500);
+
+  let data;
+  try {
+    const r = await fetch(AI_BASE.replace(/\/+$/, '') + '/check-photo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lang: Sky.lang,
+        imageBase64: shotDataUrl,
+        teacher: t ? t.id : null,
+        strictness: t ? t.strictness : 3,
+        subject: 'english',
+        taskText: $('#taskText').value.trim().slice(0, 800)
+      })
+    });
+    data = await r.json().catch(() => null);
+    if (!r.ok) {
+      clearTimeout(swap);
+      $('#working').classList.add('hidden');
+      $('#checkBtn').disabled = false;
+      Sky.toast((data && data.error) || ('Ошибка ' + r.status), 5000);
+      /* распознанное показываем даже при неудачной оценке: оно уже
+         стоило запроса, и ученику полезно его увидеть */
+      if (data && data.recognized_text) renderResult({ recognized_text: data.recognized_text }, true);
+      return;
+    }
+  } catch (e) {
+    clearTimeout(swap);
+    $('#working').classList.add('hidden');
+    $('#checkBtn').disabled = false;
+    Sky.toast(Sky.t('aiNoNet') || 'Нет связи с сервером разбора.', 4500);
+    return;
+  }
+
+  clearTimeout(swap);
+  $('#working').classList.add('hidden');
+  $('#checkBtn').disabled = false;
+
+  renderResult(data, false);
+  await save(data);
+  await renderHistory();
+}
+
+/* ---------- сохранение ---------- */
+async function save(data) {
+  const t = SkyTeachers.selected();
+  const me = Sky.db && Sky.db.me && Sky.db.me();
+
+  /* В сетевом режиме RLS требует, чтобы student_id совпадал с тем, кто
+     пишет: без входа строку просто не примут. Показать разбор это не
+     мешает, а вот промолчать про несохранённую историю — нечестно. */
+  if (Sky.db && Sky.db.isCloud && Sky.db.isCloud() && !me) {
+    lastSaved = null;
+    Sky.toast(Sky.t('saveFail'), 5000);
+    return;
+  }
+
+  try {
+    lastSaved = await Sky.db.insert('photo_checks', {
+      student_id: me ? me.id : 'local',
+      teacher_id: t ? t.id : null,
+      subject: 'english',
+      task_text: $('#taskText').value.trim().slice(0, 800) || null,
+      recognized_text: data.recognized_text || null,
+      grade: data.grade || null,
+      errors: data.errors || [],
+      feedback: data.overall_feedback || null,
+      next_step: data.next_step || null,
+      ocr_flagged: false,
+      status: 'ok'
+    });
+  } catch (e) {
+    lastSaved = null;
+  }
+}
+
+/* ---------- показ разбора ---------- */
+function renderResult(data, partial) {
+  $('#resultSection').classList.remove('hidden');
+  const box = $('#result');
+  const g = data.grade;
+
+  const errors = Array.isArray(data.errors) ? data.errors : [];
+  const good = Array.isArray(data.correct_parts) ? data.correct_parts : [];
+
+  box.innerHTML =
+    (partial ? '' :
+    `<div class="gradebox">
+       <div class="grade g${g || 3}">${esc(g || '—')}</div>
+       <div class="said">${esc(data.overall_feedback || '')}</div>
+     </div>`) +
+
+    `<div class="recog-head">
+       <b>${Sky.t('recogH')}</b>
+       <button class="btn ghost small" id="flagBtn">${Sky.t('flagBtn')}</button>
+     </div>
+     <div class="recog">${esc(data.recognized_text || '')}</div>` +
+
+    (partial ? '' :
+      (good.length ? `<h3 style="margin:18px 0 9px;font-size:14px">${Sky.t('goodH')}</h3>` +
+        good.map(x => `<div class="good-item">${esc(typeof x === 'string' ? x : JSON.stringify(x))}</div>`).join('') : '') +
+
+      `<h3 style="margin:18px 0 9px;font-size:14px">${Sky.t('errH')}</h3>` +
+      (errors.length
+        ? errors.map(e => `
+            <div class="err-item">
+              <div class="frag">${esc(e.fragment || '')}</div>
+              <div class="why">${esc(e.explanation || '')}</div>
+              ${e.fix ? `<div class="fix">${Sky.t('fixL')}${esc(e.fix)}</div>` : ''}
+            </div>`).join('')
+        : `<p class="lead" style="font-size:13px">${Sky.t('noErrors')}</p>`) +
+
+      (data.next_step
+        ? `<h3 style="margin:18px 0 9px;font-size:14px">${Sky.t('nextH')}</h3>
+           <p style="font-size:13.5px;line-height:1.65">${esc(data.next_step)}</p>` : '')
+    );
+
+  const flag = box.querySelector('#flagBtn');
+  if (flag) flag.addEventListener('click', flagOcr);
+}
+
+/* ---------- жалоба на распознавание ----------
+   Нужна не для красоты: это единственный способ узнать, как часто
+   модель врёт на почерке. Оценка, выставленная по неверно прочитанному
+   тексту, выглядит убедительно и при этом несправедлива — ученик
+   должен иметь возможность сказать об этом прямо в интерфейсе. */
+async function flagOcr(e) {
+  const btn = e.currentTarget;
+  btn.disabled = true;
+  if (lastSaved && lastSaved.id) {
+    try { await Sky.db.update('photo_checks', lastSaved.id, { ocr_flagged: true }); } catch (err) {}
+  }
+  btn.textContent = Sky.t('flagged');
+  Sky.toast(Sky.t('flagThanks'), 6000);
+  await renderHistory();
+}
+
+/* ---------- история ---------- */
+async function renderHistory() {
+  const me = Sky.db && Sky.db.me && Sky.db.me();
+  let rows = [];
+  try {
+    rows = await Sky.db.list('photo_checks', me ? { student_id: me.id } : undefined);
+  } catch (e) { rows = []; }
+
+  rows = (rows || []).slice().sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+  if (!rows.length) { $('#histSection').classList.add('hidden'); return; }
+
+  $('#histSection').classList.remove('hidden');
+  $('#hist').innerHTML = rows.slice(0, 20).map(r => `
+    <div class="hist-row">
+      <div class="g g${r.grade || 3}">${esc(r.grade || '—')}</div>
+      <div class="txt">
+        <b>${esc((r.recognized_text || '').split('\n')[0].slice(0, 60) || '—')}</b>
+        <span>${esc(new Date(r.created_at).toLocaleString())}</span>
+      </div>
+      ${r.ocr_flagged ? `<span class="flagged">${Sky.t('flagged')}</span>` : ''}
+    </div>`).join('');
+}
+
+/* ---------- события ---------- */
+$('#camBtn').addEventListener('click', openCamera);
+$('#shotBtn').addEventListener('click', captureFromVideo);
+$('#fileBtn').addEventListener('click', () => $('#fileIn').click());
+$('#againBtn').addEventListener('click', () => {
+  shotDataUrl = null;
+  $('#preview').hidden = true;
+  $('#frameHint').hidden = false;
+  $('#againBtn').classList.add('hidden');
+  $('#camBtn').classList.remove('hidden');
+  $('#checkBtn').disabled = true;
+  $('#resultSection').classList.add('hidden');
+});
+
+$('#fileIn').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  closeCamera();
+  const img = new Image();
+  img.onload = () => {
+    const small = compress(img);
+    if (!small) { Sky.toast(Sky.t('tooBig'), 5000); return; }
+    showShot(small);
+    URL.revokeObjectURL(img.src);
+  };
+  img.src = URL.createObjectURL(f);
+});
+
+$('#checkBtn').addEventListener('click', check);
+document.addEventListener('teacherchange', renderTeacher);
+document.addEventListener('langchange', () => { renderTeacher(); renderHistory(); });
+window.addEventListener('pagehide', closeCamera);
+
+/* ---------- запуск ---------- */
+(function start() {
+  renderTeacher();
+  $('#camBtn').textContent = Sky.t('camBtn');
+  $('#fileBtn').textContent = Sky.t('fileBtn');
+  $('#shotBtn').textContent = Sky.t('shotBtn');
+  $('#againBtn').textContent = Sky.t('againBtn');
+  $('#frameHint').textContent = Sky.t('frameHint');
+
+  if (!hasWorker) {
+    const n = $('#needWorker');
+    n.textContent = Sky.t('needWorker');
+    n.classList.remove('hidden');
+    $('#checkBtn').disabled = true;
+  }
+  renderHistory();
+})();
+</script>
+</body>
+</html>

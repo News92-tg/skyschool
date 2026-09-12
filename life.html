@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Режим дня — SkyySchool</title>
+<meta name="theme-color" content="#f6faff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon-512.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/sky.css">
+<style>
+.tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin-bottom:24px;overflow:auto}
+.tabs button{padding:12px 15px;font-size:13.5px;font-weight:900;color:var(--muted);border-bottom:2.5px solid transparent;white-space:nowrap}
+.tabs button[aria-selected="true"]{color:var(--m-life);border-bottom-color:var(--m-life)}
+
+.chart{display:flex;align-items:flex-end;gap:7px;height:150px;padding-top:10px}
+.bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
+.bar .fill{
+  width:100%;border-radius:8px 8px 4px 4px;min-height:3px;
+  background:linear-gradient(180deg,var(--m-life),#0a9068);
+  transition:height .45s cubic-bezier(.2,.8,.3,1);position:relative;
+}
+.bar .fill.low{background:linear-gradient(180deg,#fbbf24,#d97706)}
+.bar .fill.none{background:var(--line-2)}
+.bar .val{font-size:11px;font-weight:900;font-variant-numeric:tabular-nums}
+.bar .day{font-size:10px;color:var(--muted);font-weight:800}
+.bar.today .day{color:var(--m-life)}
+
+.meal-row{display:grid;grid-template-columns:38px 1fr auto;gap:11px;align-items:center;padding:11px 13px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
+.meal-row .ico{font-size:22px;text-align:center}
+.meal-row.on{border-color:var(--m-life);background:var(--m-life-soft)}
+
+.water{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.water button{width:36px;height:44px;border-radius:9px;border:2px solid var(--line);background:var(--panel);font-size:19px;transition:.15s}
+.water button.on{border-color:var(--m-life);background:var(--m-life-soft)}
+
+.slot{display:grid;grid-template-columns:74px 1fr auto;gap:11px;align-items:center;padding:10px 13px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
+.slot .time{font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:700;color:var(--m-life)}
+.slot.done{opacity:.55}
+.slot.done .what{text-decoration:line-through}
+</style>
+</head>
+<body>
+<header id="appHeader"></header>
+
+<main class="wrap">
+  <h1 data-i18n="h1"></h1>
+  <p class="lead" data-i18n="lead"></p>
+
+  <div class="tabs" role="tablist">
+    <button type="button" data-tab="sleep" aria-selected="true" data-i18n="tabSleep"></button>
+    <button type="button" data-tab="day" aria-selected="false" data-i18n="tabDay"></button>
+    <button type="button" data-tab="food" aria-selected="false" data-i18n="tabFood"></button>
+    <button type="button" data-tab="screen" aria-selected="false" data-i18n="tabScreen"></button>
+  </div>
+
+  <!-- СОН -->
+  <section id="tab-sleep">
+    <div class="grid g2">
+      <div class="panel">
+        <h2 data-i18n="sleepToday"></h2>
+        <div class="row" style="margin-top:14px">
+          <div class="field"><label data-i18n="wentTo"></label><input type="time" id="sIn"></div>
+          <div class="field"><label data-i18n="wokeUp"></label><input type="time" id="sOut"></div>
+        </div>
+        <button class="btn life full" id="sSave" style="margin-top:14px" data-i18n="saveSleep"></button>
+        <div id="sResult" style="margin-top:16px"></div>
+      </div>
+      <div class="panel">
+        <h2 data-i18n="week"></h2>
+        <div class="chart" id="sChart"></div>
+        <p class="lead" style="font-size:12.5px;margin-top:12px" id="sAvg"></p>
+      </div>
+    </div>
+    <div class="panel section">
+      <p class="lead" style="font-size:13px" data-i18n="sleepNote"></p>
+    </div>
+  </section>
+
+  <!-- РАСПИСАНИЕ -->
+  <section id="tab-day" class="hidden">
+    <div class="panel">
+      <h2 data-i18n="dayPlan"></h2>
+      <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="dayPlanD"></p>
+      <div class="row" style="margin:16px 0">
+        <div class="field" style="flex:0 0 120px"><label data-i18n="atTime"></label><input type="time" id="dTime"></div>
+        <div class="field"><label data-i18n="whatDo"></label><input type="text" id="dWhat" data-i18n-ph="whatDoPh"></div>
+        <div class="field" style="flex:0 0 auto;display:flex;align-items:flex-end">
+          <button class="btn life" id="dAdd" data-i18n="add"></button>
+        </div>
+      </div>
+      <div class="list" id="dList"></div>
+      <div class="actions" id="dTemplates"></div>
+    </div>
+  </section>
+
+  <!-- ПИТАНИЕ -->
+  <section id="tab-food" class="hidden">
+    <div class="grid g2">
+      <div class="panel">
+        <h2 data-i18n="mealsToday"></h2>
+        <div class="list" id="mList" style="margin-top:14px"></div>
+        <h3 style="margin-top:20px" data-i18n="waterT"></h3>
+        <p class="lead" style="font-size:12.5px;margin-top:4px" data-i18n="waterD"></p>
+        <div class="water" id="water"></div>
+      </div>
+      <div class="panel">
+        <h2 data-i18n="week"></h2>
+        <div class="chart" id="mChart"></div>
+        <p class="lead" style="font-size:12.5px;margin-top:12px" data-i18n="foodNote"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ЭКРАННОЕ ВРЕМЯ -->
+  <section id="tab-screen" class="hidden">
+    <div class="grid g2">
+      <div class="panel">
+        <div class="eyebrow" data-i18n="screenToday"></div>
+        <div class="count" id="scNow" style="margin:8px 0">0</div>
+        <p class="lead" style="font-size:13px" id="scNote"></p>
+        <div class="row" style="margin-top:18px">
+          <div class="field">
+            <label data-i18n="limitT"></label>
+            <input type="number" id="scLimit" min="10" max="480" step="5">
+          </div>
+          <div class="field" style="flex:0 0 auto;display:flex;align-items:flex-end">
+            <button class="btn life" id="scSave" data-i18n="save"></button>
+          </div>
+        </div>
+        <div class="progress life" style="margin-top:16px"><i id="scBar"></i></div>
+      </div>
+      <div class="panel">
+        <h2 data-i18n="week"></h2>
+        <div class="chart" id="scChart"></div>
+      </div>
+    </div>
+    <div class="panel section">
+      <p class="lead" style="font-size:13px" data-i18n="screenHonest"></p>
+    </div>
+  </section>
+</main>
+
+<footer id="appFooter"></footer>
+
+<script src="assets/config.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/db.js"></script>
+<script src="assets/auth.js"></script>
+<script>
+'use strict';
+Sky.init({
+  h1:{ru:'Режим дня',en:'Daily life'},
+  lead:{ru:'Сон, расписание, еда и экранное время. Смысл не в том, чтобы всё было идеально, а в том, чтобы видеть, как оно есть на самом деле.',
+        en:'Sleep, schedule, meals and screen time. The point is not to be perfect but to see how things actually are.'},
+
+  tabSleep:{ru:'Сон',en:'Sleep'},
+  tabDay:{ru:'Расписание',en:'Schedule'},
+  tabFood:{ru:'Питание',en:'Meals'},
+  tabScreen:{ru:'Экранное время',en:'Screen time'},
+  week:{ru:'Последние 7 дней',en:'The last 7 days'},
+
+  sleepToday:{ru:'Сегодняшний сон',en:'Last night’s sleep'},
+  wentTo:{ru:'Лёг',en:'Went to bed'},
+  wokeUp:{ru:'Встал',en:'Woke up'},
+  saveSleep:{ru:'Записать',en:'Save'},
+  slept:{ru:'Вы спали %1',en:'You slept %1'},
+  avgIs:{ru:'В среднем за неделю: %1 в сутки.',en:'Weekly average: %1 per night.'},
+  avgNone:{ru:'Пока мало записей, чтобы считать среднее.',en:'Not enough entries yet to average.'},
+  sleepNote:{ru:'Школьникам обычно рекомендуют 8–10 часов сна. Это ориентир, а не норматив: важнее не разовая цифра, а то, чтобы время подъёма было примерно одинаковым каждый день — включая выходные. Резкие сдвиги режима на два-три часа переносятся тяжелее, чем недосып на полчаса.',
+             en:'School-age students are usually advised to get 8–10 hours. That is a guide, not a rule: what matters more than any single night is waking up at roughly the same time every day, weekends included. Shifting your rhythm by two or three hours is harder on you than losing half an hour.'},
+
+  dayPlan:{ru:'Расписание на день',en:'Today’s schedule'},
+  dayPlanD:{ru:'Запишите дела по времени. Список сортируется сам, отмечайте сделанное галочкой.',
+            en:'Note what happens when. The list sorts itself; tick things off as you go.'},
+  atTime:{ru:'Время',en:'Time'},
+  whatDo:{ru:'Что делаем',en:'What happens'},
+  whatDoPh:{ru:'Например: математика, 40 минут',en:'e.g. maths, 40 minutes'},
+  useTemplate:{ru:'Взять готовое расписание',en:'Use a ready-made schedule'},
+  clearDay:{ru:'Очистить',en:'Clear'},
+  noSlots:{ru:'Расписание пустое. Добавьте первое дело или возьмите готовое.',
+           en:'The schedule is empty. Add your first item or use a ready-made one.'},
+
+  mealsToday:{ru:'Что ели сегодня',en:'What you ate today'},
+  breakfast:{ru:'Завтрак',en:'Breakfast'},
+  lunch:{ru:'Обед',en:'Lunch'},
+  dinner:{ru:'Ужин',en:'Dinner'},
+  snack:{ru:'Перекус',en:'Snack'},
+  waterT:{ru:'Вода',en:'Water'},
+  waterD:{ru:'Отмечайте выпитые стаканы. Восемь — привычный ориентир, но зависит от погоды и нагрузки.',
+          en:'Tap a glass for each one you drink. Eight is the usual guide, though it depends on weather and activity.'},
+  foodNote:{ru:'Столбики показывают, сколько приёмов пищи вы отметили за день. Пропущенный завтрак перед школой заметен на графике быстрее, чем в ощущениях.',
+            en:'The bars show how many meals you logged each day. A skipped breakfast before school shows up on the chart sooner than it does in how you feel.'},
+
+  screenToday:{ru:'Сегодня в SkyySchool',en:'Today in SkyySchool'},
+  minutes:{ru:'мин',en:'min'},
+  limitT:{ru:'Мягкий предел, мин',en:'Soft limit, min'},
+  scUnder:{ru:'В пределах того, что вы себе поставили.',en:'Within the limit you set yourself.'},
+  scOver:{ru:'Больше вашего предела на %1 мин. Это не запрет — просто цифра, чтобы вы её видели.',
+          en:'Over your limit by %1 min. Not a block — just a number so you can see it.'},
+  screenHonest:{ru:'Здесь считается только время на этом сайте, и только пока вкладка открыта и активна. Сколько времени вы провели в других приложениях, страница знать не может и не пытается: браузер не даёт сайту такого доступа, и это правильно. Если нужен учёт по всему устройству, его включают в настройках телефона — «Экранное время» на iPhone, «Цифровое благополучие» на Android.',
+                en:'This counts only time on this site, and only while the tab is open and in focus. The page cannot know how long you spent in other apps and does not try: browsers do not give sites that access, and rightly so. For device-wide tracking use your phone’s own tools — Screen Time on iPhone, Digital Wellbeing on Android.'},
+  saved:{ru:'Сохранено',en:'Saved'}
+});
+
+const $ = s => document.querySelector(s);
+const esc = Sky.auth.esc;
+
+/* всё хранится в одном объекте по дням */
+function life() { return Sky.get('life', { sleep:{}, meals:{}, water:{}, screen:{}, slots:[], limit:90 }); }
+function saveLife(v) { Sky.set('life', v); }
+
+const DAY_NAMES = { ru:['пн','вт','ср','чт','пт','сб','вс'], en:['Mo','Tu','We','Th','Fr','Sa','Su'] };
+function lastDays(n) {
+  const out = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    out.push({ key: Sky.dayKey(d.getTime()), label: DAY_NAMES[Sky.lang][(d.getDay() + 6) % 7], today: i === 0 });
+  }
+  return out;
+}
+
+function drawChart(host, values, opts) {
+  const max = Math.max(opts.max || 0, ...values.map(v => v.value), 1);
+  host.innerHTML = values.map(v => {
+    const h = Math.round(v.value / max * 100);
+    const cls = v.value === 0 ? 'none' : (opts.lowUnder && v.value < opts.lowUnder ? 'low' : '');
+    return `<div class="bar${v.today ? ' today' : ''}">
+      <span class="val">${v.value ? (opts.fmt ? opts.fmt(v.value) : v.value) : ''}</span>
+      <div class="fill ${cls}" style="height:${Math.max(h, v.value ? 6 : 2)}%"></div>
+      <span class="day">${v.label}</span>
+    </div>`;
+  }).join('');
+}
+
+/* вкладки */
+document.querySelector('.tabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-tab]'); if (!b) return;
+  document.querySelectorAll('.tabs button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+  ['sleep','day','food','screen'].forEach(n =>
+    document.getElementById('tab-' + n).classList.toggle('hidden', n !== b.dataset.tab));
+});
+
+/* ================= СОН ================= */
+function hoursBetween(inT, outT) {
+  const [h1, m1] = inT.split(':').map(Number);
+  const [h2, m2] = outT.split(':').map(Number);
+  let mins = (h2 * 60 + m2) - (h1 * 60 + m1);
+  /* лёг вечером, встал утром — переход через полночь */
+  if (mins <= 0) mins += 24 * 60;
+  return mins / 60;
+}
+function fmtH(h) {
+  const hh = Math.floor(h), mm = Math.round((h - hh) * 60);
+  return Sky.lang === 'ru' ? `${hh} ч ${mm} мин` : `${hh}h ${mm}m`;
+}
+
+function renderSleep() {
+  const L = life();
+  const today = L.sleep[Sky.dayKey()];
+  if (today) { $('#sIn').value = today.in; $('#sOut').value = today.out; }
+
+  $('#sResult').innerHTML = today
+    ? `<div class="verdict ok">${Sky.t('slept').replace('%1', fmtH(today.hours))}</div>` : '';
+
+  const days = lastDays(7).map(d => ({
+    ...d, value: L.sleep[d.key] ? Math.round(L.sleep[d.key].hours * 10) / 10 : 0
+  }));
+  drawChart($('#sChart'), days, { max: 12, lowUnder: 7, fmt: v => v.toFixed(1) });
+
+  const got = days.filter(d => d.value > 0);
+  $('#sAvg').textContent = got.length >= 2
+    ? Sky.t('avgIs').replace('%1', fmtH(got.reduce((s, d) => s + d.value, 0) / got.length))
+    : Sky.t('avgNone');
+}
+
+$('#sSave').addEventListener('click', () => {
+  const a = $('#sIn').value, b = $('#sOut').value;
+  if (!a || !b) return;
+  const L = life();
+  L.sleep[Sky.dayKey()] = { in: a, out: b, hours: hoursBetween(a, b) };
+  saveLife(L);
+  renderSleep();
+  Sky.toast(Sky.t('saved'));
+});
+
+/* ================= РАСПИСАНИЕ ================= */
+const TEMPLATE = [
+  { time:'07:30', ru:'Подъём и завтрак', en:'Wake up and breakfast' },
+  { time:'08:30', ru:'Школа', en:'School' },
+  { time:'15:00', ru:'Обед и отдых', en:'Lunch and a break' },
+  { time:'16:00', ru:'Домашние задания', en:'Homework' },
+  { time:'18:00', ru:'Тренажёр SkyySchool, 30 минут', en:'SkyySchool trainer, 30 minutes' },
+  { time:'19:00', ru:'Ужин', en:'Dinner' },
+  { time:'20:00', ru:'Свободное время', en:'Free time' },
+  { time:'22:00', ru:'Готовимся ко сну', en:'Wind down for bed' }
+];
+
+function renderDay() {
+  const L = life();
+  const list = $('#dList');
+  const slots = (L.slots || []).slice().sort((a, b) => a.time.localeCompare(b.time));
+
+  if (!slots.length) {
+    list.innerHTML = `<div class="empty"><div class="big">🕘</div><p>${Sky.t('noSlots')}</p></div>`;
+  } else {
+    list.innerHTML = '';
+    slots.forEach(s => {
+      const el = document.createElement('div');
+      el.className = 'slot' + (s.done ? ' done' : '');
+      el.innerHTML = `<span class="time">${esc(s.time)}</span>
+        <span class="what">${esc(s.what)}</span>`;
+      const box = document.createElement('button');
+      box.className = 'check'; box.textContent = s.done ? '✓' : '';
+      box.style.cssText = s.done ? 'background:var(--m-life);border-color:var(--m-life)' : '';
+      box.addEventListener('click', () => {
+        const cur = life();
+        const i = cur.slots.findIndex(x => x.id === s.id);
+        cur.slots[i].done = !cur.slots[i].done;
+        saveLife(cur); renderDay();
+      });
+      const rm = document.createElement('button');
+      rm.className = 'btn small ghost'; rm.textContent = '×';
+      rm.addEventListener('click', () => {
+        const cur = life();
+        cur.slots = cur.slots.filter(x => x.id !== s.id);
+        saveLife(cur); renderDay();
+      });
+      const box2 = document.createElement('div');
+      box2.style.cssText = 'display:flex;gap:7px;align-items:center';
+      box2.append(box, rm);
+      el.appendChild(box2);
+      list.appendChild(el);
+    });
+  }
+
+  $('#dTemplates').innerHTML =
+    `<button class="btn ghost small" id="dTpl">${Sky.t('useTemplate')}</button>` +
+    (slots.length ? `<button class="btn ghost small" id="dClear">${Sky.t('clearDay')}</button>` : '');
+  const tpl = $('#dTpl');
+  if (tpl) tpl.addEventListener('click', () => {
+    const cur = life();
+    cur.slots = TEMPLATE.map(t => ({ id: Sky.db.uid(), time: t.time, what: Sky.lang === 'ru' ? t.ru : t.en, done: false }));
+    saveLife(cur); renderDay();
+  });
+  const clr = $('#dClear');
+  if (clr) clr.addEventListener('click', () => {
+    const cur = life(); cur.slots = []; saveLife(cur); renderDay();
+  });
+}
+
+function addSlot() {
+  const time = $('#dTime').value, what = $('#dWhat').value.trim();
+  if (!time || !what) return;
+  const L = life();
+  L.slots = L.slots || [];
+  L.slots.push({ id: Sky.db.uid(), time, what: what.slice(0, 120), done: false });
+  saveLife(L);
+  $('#dWhat').value = '';
+  renderDay();
+}
+$('#dAdd').addEventListener('click', addSlot);
+$('#dWhat').addEventListener('keydown', e => { if (e.key === 'Enter') addSlot(); });
+
+/* ================= ПИТАНИЕ ================= */
+const MEALS = [
+  { id:'breakfast', ico:'🥣' }, { id:'lunch', ico:'🍲' },
+  { id:'dinner', ico:'🍝' }, { id:'snack', ico:'🍎' }
+];
+
+function renderFood() {
+  const L = life();
+  const key = Sky.dayKey();
+  const today = L.meals[key] || {};
+
+  $('#mList').innerHTML = '';
+  MEALS.forEach(m => {
+    const on = !!today[m.id];
+    const el = document.createElement('button');
+    el.className = 'meal-row' + (on ? ' on' : '');
+    el.type = 'button';
+    el.style.cssText = 'width:100%;text-align:left;cursor:pointer';
+    el.innerHTML = `<span class="ico">${m.ico}</span>
+      <span style="font-weight:800;font-size:14px">${Sky.t(m.id)}</span>
+      <span class="check" style="${on ? 'background:var(--m-life);border-color:var(--m-life)' : ''}">${on ? '✓' : ''}</span>`;
+    el.addEventListener('click', () => {
+      const cur = life();
+      cur.meals[key] = cur.meals[key] || {};
+      cur.meals[key][m.id] = !cur.meals[key][m.id];
+      saveLife(cur); renderFood();
+    });
+    $('#mList').appendChild(el);
+  });
+
+  const glasses = (L.water || {})[key] || 0;
+  $('#water').innerHTML = '';
+  for (let i = 1; i <= 8; i++) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = i <= glasses ? 'on' : '';
+    b.textContent = i <= glasses ? '💧' : '○';
+    b.addEventListener('click', () => {
+      const cur = life();
+      cur.water = cur.water || {};
+      cur.water[key] = (cur.water[key] === i) ? i - 1 : i;
+      saveLife(cur); renderFood();
+    });
+    $('#water').appendChild(b);
+  }
+
+  const days = lastDays(7).map(d => ({
+    ...d, value: Object.values(L.meals[d.key] || {}).filter(Boolean).length
+  }));
+  drawChart($('#mChart'), days, { max: 4, lowUnder: 2 });
+}
+
+/* ================= ЭКРАННОЕ ВРЕМЯ =================
+   Считаем только активное время на этой вкладке. Когда вкладка
+   спрятана, счётчик останавливается — иначе цифра врёт. */
+let screenTick = null;
+
+function bumpScreen(mins) {
+  const L = life();
+  const key = Sky.dayKey();
+  L.screen[key] = (L.screen[key] || 0) + mins;
+  saveLife(L);
+}
+
+function renderScreen() {
+  const L = life();
+  const used = Math.round(L.screen[Sky.dayKey()] || 0);
+  const limit = L.limit || 90;
+
+  $('#scNow').textContent = used + ' ' + Sky.t('minutes');
+  $('#scLimit').value = limit;
+  $('#scNote').textContent = used <= limit
+    ? Sky.t('scUnder')
+    : Sky.t('scOver').replace('%1', used - limit);
+  $('#scBar').style.width = Math.min(100, Math.round(used / limit * 100)) + '%';
+
+  const days = lastDays(7).map(d => ({ ...d, value: Math.round(L.screen[d.key] || 0) }));
+  drawChart($('#scChart'), days, { max: limit });
+}
+
+$('#scSave').addEventListener('click', () => {
+  const L = life();
+  L.limit = Math.max(10, Math.min(480, +$('#scLimit').value || 90));
+  saveLife(L);
+  renderScreen();
+  Sky.toast(Sky.t('saved'));
+});
+
+function startScreenClock() {
+  clearInterval(screenTick);
+  screenTick = setInterval(() => {
+    if (document.hidden) return;      // вкладка не на виду — не считаем
+    bumpScreen(1 / 6);                // тик раз в 10 секунд
+    if (!document.getElementById('tab-screen').classList.contains('hidden')) renderScreen();
+  }, 10000);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) renderScreen(); });
+
+/* ================= запуск ================= */
+function renderAll() { renderSleep(); renderDay(); renderFood(); renderScreen(); }
+document.addEventListener('langchange', renderAll);
+renderAll();
+startScreenClock();
+</script>
+</body>
+</html>

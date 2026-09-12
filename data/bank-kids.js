@@ -1,0 +1,160 @@
+/* Развивающие задания для младших.
+   age: 6 — примерно 6–8 лет, age: 9 — примерно 9–11.
+   Объяснения написаны так, чтобы их понял сам ребёнок,
+   без слов «очевидно» и «просто». */
+window.KIDS_TASKS = [
+
+  /* ---------- счёт ---------- */
+  { id:'k1', age:6, topic:{ru:'Счёт',en:'Counting'},
+    text:{ru:'На ветке сидели 7 птиц. Прилетели ещё 5. Сколько птиц стало?',
+          en:'Seven birds sat on a branch. Five more flew in. How many birds are there now?'},
+    options:[{ru:'12',en:'12'},{ru:'11',en:'11'},{ru:'13',en:'13'},{ru:'2',en:'2'}], answer:0,
+    hint:{ru:'Прилетели — значит стало больше. Складываем.',en:'They flew in, so there are more. Add.'},
+    solution:{ru:'7 + 5 = 12.\nУдобно считать так: 7 + 3 = 10, осталось прибавить ещё 2, получается 12.',
+              en:'7 + 5 = 12.\nAn easy way: 7 + 3 = 10, then add the remaining 2 and you get 12.'} },
+
+  { id:'k2', age:6, topic:{ru:'Счёт',en:'Counting'},
+    text:{ru:'У Маши было 15 конфет. Она отдала 6 подруге. Сколько осталось?',
+          en:'Masha had 15 sweets. She gave 6 to a friend. How many are left?'},
+    options:[{ru:'9',en:'9'},{ru:'21',en:'21'},{ru:'8',en:'8'},{ru:'11',en:'11'}], answer:0,
+    hint:{ru:'Отдала — значит стало меньше. Вычитаем.',en:'She gave some away, so there are fewer. Subtract.'},
+    solution:{ru:'15 − 6 = 9.\nМожно так: сначала отнять 5 (получится 10), потом ещё 1 — остаётся 9.',
+              en:'15 − 6 = 9.\nTry it in steps: take away 5 to get 10, then one more, leaving 9.'} },
+
+  { id:'k3', age:9, topic:{ru:'Счёт',en:'Counting'},
+    text:{ru:'В коробке 6 рядов по 4 карандаша. Сколько карандашей всего?',
+          en:'A box has 6 rows with 4 pencils each. How many pencils in total?'},
+    options:[{ru:'24',en:'24'},{ru:'10',en:'10'},{ru:'20',en:'20'},{ru:'12',en:'12'}], answer:0,
+    hint:{ru:'Одинаковые группы удобно не складывать, а умножать.',en:'Equal groups are easier to multiply than to add.'},
+    solution:{ru:'6 × 4 = 24.\nЭто то же самое, что 4 + 4 + 4 + 4 + 4 + 4, только быстрее.',
+              en:'6 × 4 = 24.\nThat is the same as 4 + 4 + 4 + 4 + 4 + 4, only quicker.'} },
+
+  { id:'k4', age:9, topic:{ru:'Счёт',en:'Counting'},
+    text:{ru:'24 яблока разложили поровну в 3 корзины. Сколько яблок в каждой?',
+          en:'24 apples were shared equally into 3 baskets. How many are in each?'},
+    options:[{ru:'8',en:'8'},{ru:'6',en:'6'},{ru:'12',en:'12'},{ru:'21',en:'21'}], answer:0,
+    hint:{ru:'Разложить поровну — это разделить.',en:'Sharing equally means dividing.'},
+    solution:{ru:'24 : 3 = 8.\nПроверка: 8 × 3 = 24 — сходится. Деление и умножение всегда проверяют друг друга.',
+              en:'24 ÷ 3 = 8.\nCheck: 8 × 3 = 24 — it matches. Division and multiplication always check each other.'} },
+
+  /* ---------- последовательности ---------- */
+  { id:'k5', age:6, topic:{ru:'Ряды',en:'Patterns'},
+    text:{ru:'Продолжите ряд: 2, 4, 6, 8, …',
+          en:'Continue the pattern: 2, 4, 6, 8, …'},
+    options:[{ru:'10',en:'10'},{ru:'9',en:'9'},{ru:'12',en:'12'},{ru:'16',en:'16'}], answer:0,
+    hint:{ru:'Посмотрите, на сколько каждый раз увеличивается число.',en:'Look at how much the number grows each time.'},
+    solution:{ru:'Каждое следующее число больше на 2, значит после 8 идёт 10.\nЭто чётные числа — те, которые делятся на 2 без остатка.',
+              en:'Each number is 2 bigger, so after 8 comes 10.\nThese are the even numbers — the ones that divide by 2 exactly.'} },
+
+  { id:'k6', age:9, topic:{ru:'Ряды',en:'Patterns'},
+    text:{ru:'Продолжите ряд: 1, 3, 9, 27, …',
+          en:'Continue the pattern: 1, 3, 9, 27, …'},
+    options:[{ru:'81',en:'81'},{ru:'54',en:'54'},{ru:'36',en:'36'},{ru:'30',en:'30'}], answer:0,
+    hint:{ru:'Здесь числа не складываются, а умножаются.',en:'Here the numbers are multiplied, not added.'},
+    solution:{ru:'Каждое число в 3 раза больше предыдущего: 1 × 3 = 3, 3 × 3 = 9, 9 × 3 = 27, 27 × 3 = 81.\nЕсли бы прибавляли одно и то же, ряд рос бы гораздо медленнее.',
+              en:'Each number is 3 times the one before: 1 × 3 = 3, 3 × 3 = 9, 9 × 3 = 27, 27 × 3 = 81.\nIf we kept adding the same amount, the pattern would grow far more slowly.'} },
+
+  { id:'k7', age:9, topic:{ru:'Ряды',en:'Patterns'},
+    text:{ru:'Продолжите ряд: 1, 1, 2, 3, 5, 8, …',
+          en:'Continue the pattern: 1, 1, 2, 3, 5, 8, …'},
+    options:[{ru:'13',en:'13'},{ru:'11',en:'11'},{ru:'16',en:'16'},{ru:'10',en:'10'}], answer:0,
+    hint:{ru:'Сложите два последних числа.',en:'Add the last two numbers together.'},
+    solution:{ru:'Каждое число — сумма двух предыдущих: 3 + 5 = 8, значит дальше 5 + 8 = 13.\nЭто числа Фибоначчи, они встречаются даже в том, как расположены семечки в подсолнухе.',
+              en:'Each number is the sum of the two before it: 3 + 5 = 8, so next is 5 + 8 = 13.\nThese are the Fibonacci numbers — they even show up in how sunflower seeds are arranged.'} },
+
+  /* ---------- логика ---------- */
+  { id:'k8', age:6, topic:{ru:'Логика',en:'Logic'},
+    text:{ru:'Что здесь лишнее: яблоко, груша, морковь, слива?',
+          en:'Which one does not belong: apple, pear, carrot, plum?'},
+    options:[{ru:'морковь',en:'carrot'},{ru:'яблоко',en:'apple'},{ru:'груша',en:'pear'},{ru:'слива',en:'plum'}], answer:0,
+    hint:{ru:'Что из этого растёт не на дереве?',en:'Which of these does not grow on a tree?'},
+    solution:{ru:'Морковь — овощ, она растёт в земле. Яблоко, груша и слива — фрукты, они растут на деревьях.',
+              en:'A carrot is a vegetable and grows in the ground. Apple, pear and plum are fruits that grow on trees.'} },
+
+  { id:'k9', age:9, topic:{ru:'Логика',en:'Logic'},
+    text:{ru:'Коля выше Пети, а Петя выше Саши. Кто самый низкий?',
+          en:'Kolya is taller than Petya, and Petya is taller than Sasha. Who is the shortest?'},
+    options:[{ru:'Саша',en:'Sasha'},{ru:'Петя',en:'Petya'},{ru:'Коля',en:'Kolya'},{ru:'нельзя определить',en:'cannot tell'}], answer:0,
+    hint:{ru:'Попробуйте расставить всех троих в ряд по росту.',en:'Try lining all three up by height.'},
+    solution:{ru:'Выстроим по росту: Коля > Петя > Саша. Саша оказался в конце, значит он самый низкий.\nТакие задачи всегда проще, если нарисовать или расставить по порядку, а не держать в голове.',
+              en:'Line them up: Kolya > Petya > Sasha. Sasha is at the end, so he is the shortest.\nThese puzzles get much easier if you draw the order instead of holding it in your head.'} },
+
+  { id:'k10', age:9, topic:{ru:'Логика',en:'Logic'},
+    text:{ru:'У всех кошек есть хвост. У Барсика есть хвост. Значит ли это, что Барсик — кошка?',
+          en:'All cats have tails. Barsik has a tail. Does that mean Barsik is a cat?'},
+    options:[{ru:'нет, он может быть кем угодно с хвостом',en:'no, he could be anything with a tail'},
+             {ru:'да, обязательно кошка',en:'yes, definitely a cat'},
+             {ru:'да, если он мяукает',en:'yes, if he meows'},
+             {ru:'нет, у кошек нет хвоста',en:'no, cats have no tails'}], answer:0,
+    hint:{ru:'Хвост есть не только у кошек.',en:'Cats are not the only animals with tails.'},
+    solution:{ru:'Хвост есть у собак, лошадей, ящериц. Из того, что у Барсика есть хвост, следует только то, что он хвостатый.\nЭто частая ловушка: «все А — Б» не значит «все Б — А». Все кошки хвостатые, но не все хвостатые — кошки.',
+              en:'Dogs, horses and lizards have tails too. Knowing Barsik has a tail only tells us he has a tail.\nThis is a common trap: "all A are B" does not mean "all B are A". All cats have tails, but not everything with a tail is a cat.'} },
+
+  /* ---------- геометрия ---------- */
+  { id:'k11', age:6, topic:{ru:'Фигуры',en:'Shapes'},
+    text:{ru:'Сколько углов у треугольника?',en:'How many corners does a triangle have?'},
+    options:[{ru:'3',en:'3'},{ru:'4',en:'4'},{ru:'1',en:'1'},{ru:'0',en:'0'}], answer:0,
+    hint:{ru:'Ответ спрятан в самом слове.',en:'The answer is hidden in the word itself.'},
+    solution:{ru:'Три угла — поэтому фигура и называется треугольник. Сторон у него тоже три.',
+              en:'Three corners — that is why it is called a triangle ("tri" means three). It has three sides too.'} },
+
+  { id:'k12', age:9, topic:{ru:'Фигуры',en:'Shapes'},
+    text:{ru:'У квадрата сторона 5 см. Чему равен его периметр?',
+          en:'A square has sides of 5 cm. What is its perimeter?'},
+    options:[{ru:'20 см',en:'20 cm'},{ru:'25 см',en:'25 cm'},{ru:'10 см',en:'10 cm'},{ru:'15 см',en:'15 cm'}], answer:0,
+    hint:{ru:'Периметр — это длина всей границы, если обойти фигуру по краю.',en:'The perimeter is the whole way round the edge.'},
+    solution:{ru:'У квадрата 4 одинаковые стороны: 5 + 5 + 5 + 5 = 20 см, или короче 5 × 4 = 20 см.\nОтвет 25 см — это площадь (5 × 5), её часто путают с периметром. Периметр меряют в сантиметрах, площадь — в квадратных.',
+              en:'A square has 4 equal sides: 5 + 5 + 5 + 5 = 20 cm, or 5 × 4 = 20 cm.\nThe answer 25 cm is the area (5 × 5), often confused with perimeter. Perimeter is measured in cm, area in square cm.'} },
+
+  /* ---------- время и деньги ---------- */
+  { id:'k13', age:9, topic:{ru:'Время',en:'Time'},
+    text:{ru:'Урок начался в 9:15 и длился 45 минут. Когда он закончился?',
+          en:'A lesson started at 9:15 and lasted 45 minutes. When did it end?'},
+    options:[{ru:'10:00',en:'10:00'},{ru:'9:60',en:'9:60'},{ru:'10:15',en:'10:15'},{ru:'9:45',en:'9:45'}], answer:0,
+    hint:{ru:'В часе 60 минут, а не 100.',en:'An hour has 60 minutes, not 100.'},
+    solution:{ru:'15 + 45 = 60 минут, а 60 минут — это ровно час. Значит 9 часов плюс час — 10:00.\nЗаписи «9:60» не бывает: как только набирается 60 минут, они превращаются в новый час.',
+              en:'15 + 45 = 60 minutes, and 60 minutes is exactly one hour. So 9 o’clock plus an hour is 10:00.\nThere is no such time as "9:60": once you reach 60 minutes they roll over into a new hour.'} },
+
+  { id:'k14', age:9, topic:{ru:'Деньги',en:'Money'},
+    text:{ru:'Тетрадь стоит 30 рублей. Сколько таких тетрадей можно купить на 100 рублей?',
+          en:'A notebook costs 30. How many can you buy with 100?'},
+    options:[{ru:'3, и останется 10',en:'3, with 10 left over'},{ru:'4',en:'4'},{ru:'3, и ничего не останется',en:'3, with nothing left'},{ru:'30',en:'30'}], answer:0,
+    hint:{ru:'Считайте по одной тетради и следите, сколько денег остаётся.',en:'Count one notebook at a time and watch what is left.'},
+    solution:{ru:'30 + 30 + 30 = 90, это три тетради. На четвёртую нужно ещё 30, а осталось только 10.\nЗначит 3 тетради и 10 рублей сдачи. В математике это называется деление с остатком: 100 : 30 = 3 (остаток 10).',
+              en:'30 + 30 + 30 = 90, that is three notebooks. A fourth would need another 30, but only 10 is left.\nSo three notebooks and 10 in change. In maths this is division with a remainder: 100 ÷ 30 = 3 remainder 10.'} },
+
+  /* ---------- внимание ---------- */
+  { id:'k15', age:6, topic:{ru:'Внимание',en:'Attention'},
+    text:{ru:'Какое слово написано не так, как остальные: КОТ, КОТ, КOT, КОТ?',
+          en:'Which word is different from the others: CAT, CAT, CAT, CAT?'},
+    options:[{ru:'третье',en:'the third one'},{ru:'первое',en:'the first one'},{ru:'второе',en:'the second one'},{ru:'все одинаковые',en:'they are all the same'}], answer:0,
+    hint:{ru:'Присмотритесь к буквам очень внимательно.',en:'Look at the letters very closely.'},
+    solution:{ru:'В третьем слове буквы О и Т — латинские, а не русские. Выглядят почти одинаково, но это разные символы.\nТакие подмены используют мошенники в адресах сайтов: буква меняется на похожую, и адрес выглядит настоящим. Внимание к мелочам — полезная привычка.',
+              en:'In the third word the letters are from a different alphabet — they look nearly identical but are different characters.\nScammers use this trick in website addresses: swap one letter for a look-alike and the address seems genuine. Noticing small details is a useful habit.'} },
+
+  { id:'k16', age:9, topic:{ru:'Внимание',en:'Attention'},
+    text:{ru:'Сколько раз буква «о» встречается в слове «молоко»?',
+          en:'How many times does the letter "o" appear in the word "chocolate"?'},
+    options:[{ru:'3',en:'2'},{ru:'2',en:'3'},{ru:'4',en:'1'},{ru:'1',en:'4'}], answer:0,
+    hint:{ru:'Прочитайте слово по буквам вслух.',en:'Read the word letter by letter out loud.'},
+    solution:{ru:'М-О-Л-О-К-О: буква «о» стоит на втором, четвёртом и шестом месте — всего 3 раза.\nКогда считаешь глазами, легко пропустить последнюю. Проверять лучше по буквам, а не целым словом.',
+              en:'C-H-O-C-O-L-A-T-E: the letter "o" appears in the third and fifth positions — 2 times.\nWhen you scan with your eyes it is easy to miss one. Checking letter by letter is more reliable than reading the whole word.'} },
+
+  /* ---------- окружающий мир ---------- */
+  { id:'k17', age:6, topic:{ru:'Мир вокруг',en:'The world'},
+    text:{ru:'Сколько ног у паука?',en:'How many legs does a spider have?'},
+    options:[{ru:'8',en:'8'},{ru:'6',en:'6'},{ru:'4',en:'4'},{ru:'10',en:'10'}], answer:0,
+    hint:{ru:'У насекомых их шесть, а у паука на две больше.',en:'Insects have six; a spider has two more.'},
+    solution:{ru:'У паука 8 ног. Именно поэтому паук — не насекомое: у насекомых всегда 6 ног.\nЖук, муравей и бабочка — насекомые, а паук и скорпион — паукообразные.',
+              en:'A spider has 8 legs. That is exactly why a spider is not an insect: insects always have 6.\nBeetles, ants and butterflies are insects; spiders and scorpions are arachnids.'} },
+
+  { id:'k18', age:9, topic:{ru:'Мир вокруг',en:'The world'},
+    text:{ru:'Почему днём светло?',en:'Why is it light during the day?'},
+    options:[{ru:'наша сторона Земли повёрнута к Солнцу',en:'our side of Earth is turned towards the Sun'},
+             {ru:'Солнце улетает и прилетает',en:'the Sun flies away and comes back'},
+             {ru:'Луна закрывает Солнце ночью',en:'the Moon covers the Sun at night'},
+             {ru:'ночью Солнце выключается',en:'the Sun switches off at night'}], answer:0,
+    hint:{ru:'Земля всё время вращается вокруг своей оси.',en:'The Earth is always spinning on its axis.'},
+    solution:{ru:'Земля вращается, как мячик на палочке. Когда наша сторона повёрнута к Солнцу — день, когда отвернулась — ночь. Полный оборот занимает примерно 24 часа, поэтому в сутках столько часов.\nСолнце при этом никуда не девается и светит всё время.',
+              en:'The Earth spins like a ball on a stick. When our side faces the Sun it is day; when it turns away it is night. One full turn takes about 24 hours, which is why a day is that long.\nThe Sun never goes anywhere — it shines the whole time.'} }
+];

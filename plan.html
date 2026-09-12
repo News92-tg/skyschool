@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>План — SkyySchool</title>
+<meta name="theme-color" content="#f6faff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon-512.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/sky.css">
+<style>
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;margin-top:14px}
+.day{border:1.5px solid var(--line);border-radius:13px;padding:11px 6px;text-align:center;transition:.2s}
+.day b{display:block;font-size:17px;font-weight:900;line-height:1.2}
+.day span{font-size:10px;color:var(--muted);font-weight:800}
+.day.hit{border-color:var(--ok);background:var(--ok-soft)}
+.day.hit b{color:var(--ok)}
+.day.today{border-color:var(--accent);box-shadow:0 0 0 3px var(--m-learn-soft)}
+</style>
+</head>
+<body>
+<header id="appHeader"></header>
+
+<main class="wrap">
+  <h1 data-i18n="h1"></h1>
+  <p class="lead" data-i18n="lead"></p>
+
+  <div class="panel section">
+    <h2 data-i18n="examBlock"></h2>
+    <div class="row" style="margin-top:16px">
+      <div class="field">
+        <label data-i18n="examName"></label>
+        <input type="text" id="examName" data-i18n-ph="examNamePh">
+      </div>
+      <div class="field">
+        <label data-i18n="examDate"></label>
+        <input type="date" id="examDate">
+      </div>
+      <div class="field">
+        <label data-i18n="goal"></label>
+        <input type="number" id="goal" min="1" max="200" step="1">
+      </div>
+      <div class="field" style="flex:0 0 auto;display:flex;align-items:flex-end">
+        <button class="btn" id="saveBtn" data-i18n="save"></button>
+      </div>
+    </div>
+    <div class="grid g2" style="margin-top:22px">
+      <div>
+        <div class="eyebrow" data-i18n="left"></div>
+        <div class="count" id="daysLeft" style="margin:6px 0 4px">—</div>
+        <p class="lead" style="font-size:12.5px" id="paceNote"></p>
+      </div>
+      <div>
+        <div class="eyebrow" data-i18n="todayGoal"></div>
+        <div class="count" id="todayN" style="margin:6px 0 4px">0</div>
+        <div class="progress"><i id="todayBar"></i></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel section">
+    <h2 data-i18n="week"></h2>
+    <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="weekLead"></p>
+    <div class="week" id="week"></div>
+  </div>
+
+  <div class="panel section">
+    <h2 data-i18n="remind"></h2>
+    <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="remindLead"></p>
+    <div class="row" style="margin-top:16px">
+      <div class="field" style="flex:0 0 150px">
+        <label data-i18n="atTime"></label>
+        <input type="time" id="notifyAt">
+      </div>
+      <div class="field" style="flex:0 0 auto;display:flex;align-items:flex-end;gap:9px">
+        <button class="btn" id="notifyOn"></button>
+        <button class="btn ghost" id="notifyTest" data-i18n="test"></button>
+      </div>
+    </div>
+    <p class="note" id="notifyState"></p>
+  </div>
+
+  <div class="panel section">
+    <h2 data-i18n="todo"></h2>
+    <div class="row" style="margin:16px 0">
+      <div class="field"><input type="text" id="newItem" data-i18n-ph="todoPh"></div>
+      <div class="field" style="flex:0 0 auto"><button class="btn" id="addItem" data-i18n="add"></button></div>
+    </div>
+    <div class="list" id="items"></div>
+  </div>
+
+  <div class="panel section">
+    <h2 data-i18n="danger"></h2>
+    <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="dangerLead"></p>
+    <div class="actions">
+      <button class="btn ghost small" id="exportBtn" data-i18n="exportBtn"></button>
+      <button class="btn danger small" id="resetBtn" data-i18n="resetBtn"></button>
+    </div>
+  </div>
+</main>
+
+<footer id="appFooter"></footer>
+
+<script src="assets/config.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/db.js"></script>
+<script src="assets/auth.js"></script>
+<script>
+'use strict';
+Sky.init({
+  h1:{ru:'План подготовки',en:'Your study plan'},
+  lead:{ru:'Дата экзамена, посильная цель на день и напоминание. Всё хранится в этом браузере.',
+        en:'An exam date, a realistic daily goal and a reminder. Everything is stored in this browser.'},
+  examBlock:{ru:'Экзамен и цель',en:'Exam and goal'},
+  examName:{ru:'Какой экзамен',en:'Which exam'},
+  examNamePh:{ru:'Например: ЕГЭ по информатике',en:'e.g. Computer science exam'},
+  examDate:{ru:'Дата',en:'Date'},
+  goal:{ru:'Заданий в день',en:'Problems per day'},
+  left:{ru:'Дней осталось',en:'Days left'},
+  todayGoal:{ru:'Решено сегодня',en:'Solved today'},
+  paceNone:{ru:'Поставьте дату экзамена — посчитаю, сколько заданий в день нужно решать.',
+            en:'Set the exam date and I will work out the daily pace.'},
+  pacePast:{ru:'Дата уже прошла.',en:'That date has passed.'},
+  pace:{ru:'При цели %1 в день это ещё %2 заданий до экзамена.',en:'At %1 a day that is %2 more problems before the exam.'},
+
+  week:{ru:'Последние 7 дней',en:'The last 7 days'},
+  weekLead:{ru:'Зелёным отмечены дни, когда дневная цель выполнена. Смысл не в рекордах, а в том, чтобы не было длинных пропусков.',
+            en:'Green marks the days you hit the goal. The point is not records but avoiding long gaps.'},
+
+  remind:{ru:'Напоминание',en:'Reminder'},
+  remindLead:{ru:'Если к назначенному времени дневная цель не выполнена, браузер покажет уведомление.',
+              en:'If the daily goal is not met by that time, the browser shows a notification.'},
+  atTime:{ru:'Во сколько',en:'At'},
+  enable:{ru:'Включить',en:'Turn on'},
+  disable:{ru:'Выключить',en:'Turn off'},
+  test:{ru:'Проверить',en:'Test it'},
+  stOff:{ru:'Напоминания выключены.',en:'Reminders are off.'},
+  stOn:{ru:'Напоминания включены на %1. Работают, пока открыта вкладка с сайтом: у статического сайта нет сервера, который разбудил бы вас сам.',
+        en:'Reminders are on for %1. They work while this tab is open: a static site has no server that could wake you up on its own.'},
+  stDenied:{ru:'Браузер запретил уведомления для этого сайта. Разрешите их в настройках сайта — значок слева от адреса — и нажмите «Включить» ещё раз.',
+            en:'The browser has blocked notifications for this site. Allow them in the site settings — the icon left of the address — and press "Turn on" again.'},
+  stUnsupported:{ru:'Этот браузер не умеет показывать уведомления. Всё остальное работает.',
+                 en:'This browser cannot show notifications. Everything else works.'},
+  testTitle:{ru:'SkyySchool',en:'SkyySchool'},
+  testBody:{ru:'Вот так будет выглядеть напоминание.',en:'This is what the reminder will look like.'},
+  remindBody:{ru:'Сегодня решено %1 из %2. Десять минут — и цель закрыта.',
+              en:'You have solved %1 of %2 today. Ten minutes and the goal is done.'},
+
+  todo:{ru:'Что нужно сделать',en:'To do'},
+  todoPh:{ru:'Например: разобрать логарифмы',en:'e.g. review logarithms'},
+  todoNone:{ru:'Список пуст. Сюда удобно записывать темы, которые вы отложили «на потом».',
+            en:'The list is empty. A good place for topics you keep putting off.'},
+
+  danger:{ru:'Данные',en:'Your data'},
+  dangerLead:{ru:'Прогресс, расписание повторений и этот план хранятся в localStorage браузера. На сервер не уходят, но и на другое устройство не переносятся — сделайте копию, если чистите браузер.',
+              en:'Progress, the review schedule and this plan live in your browser localStorage. Nothing goes to a server — but nothing moves to another device either, so make a copy if you clear your browser.'},
+  exportBtn:{ru:'Сделать копию',en:'Make a copy'},
+  exportT:{ru:'Копия ваших данных',en:'A copy of your data'},
+  exportD:{ru:'Скопируйте этот текст и сохраните куда угодно — в заметки, в файл, себе в сообщения. Здесь весь прогресс, расписание повторений и план.',
+           en:'Copy this text and keep it anywhere — notes, a file, a message to yourself. It holds all your progress, the review schedule and the plan.'},
+  exportCopy:{ru:'Скопировать',en:'Copy'},
+  exportOk:{ru:'Скопировано',en:'Copied'},
+  exportManual:{ru:'Текст выделен — скопируйте его сочетанием клавиш',en:'The text is selected — copy it with your keyboard'},
+  resetBtn:{ru:'Сбросить прогресс',en:'Reset progress'},
+  resetAsk:{ru:'Удалить всю статистику и расписание повторений? Отменить будет нельзя.',
+            en:'Delete all statistics and the review schedule? This cannot be undone.'},
+  resetDone:{ru:'Прогресс сброшен.',en:'Progress reset.'}
+});
+
+const $ = s => document.querySelector(s);
+const esc = Sky.auth.esc;
+
+const plan = () => Sky.get('plan', { exam:'', examName:'', goal:10, items:[], notify:false, notifyAt:'18:00' });
+const savePlan = v => { Sky.set('plan', v); };
+
+function load() {
+  const p = plan();
+  $('#examName').value = p.examName || '';
+  $('#examDate').value = p.exam || '';
+  $('#goal').value = p.goal || 10;
+  $('#notifyAt').value = p.notifyAt || '18:00';
+  render();
+}
+
+function render() {
+  const p = plan();
+  const d = Sky.daysLeft(p.exam);
+  $('#daysLeft').textContent = (d === null || d < 0) ? '—' : d;
+  $('#paceNote').textContent = d === null ? Sky.t('paceNone')
+    : d < 0 ? Sky.t('pacePast')
+    : Sky.t('pace').replace('%1', p.goal || 10).replace('%2', (p.goal || 10) * d);
+
+  const done = Sky.todayCount(), goal = p.goal || 10;
+  $('#todayN').textContent = done;
+  $('#todayBar').style.width = Math.min(100, Math.round(done / goal * 100)) + '%';
+
+  /* неделя */
+  const week = $('#week'); week.innerHTML = '';
+  const stats = Sky.stats();
+  const names = Sky.lang === 'ru' ? ['пн','вт','ср','чт','пт','сб','вс'] : ['Mo','Tu','We','Th','Fr','Sa','Su'];
+  for (let i = 6; i >= 0; i--) {
+    const dt = new Date(); dt.setDate(dt.getDate() - i);
+    const n = (stats.byDay[Sky.dayKey(dt.getTime())] || {}).n || 0;
+    const el = document.createElement('div');
+    el.className = 'day' + (n >= goal ? ' hit' : '') + (i === 0 ? ' today' : '');
+    el.innerHTML = `<b>${n}</b><span>${names[(dt.getDay() + 6) % 7]}</span>`;
+    week.appendChild(el);
+  }
+
+  /* уведомления */
+  const state = $('#notifyState');
+  if (!('Notification' in window)) state.textContent = Sky.t('stUnsupported');
+  else if (Notification.permission === 'denied') state.textContent = Sky.t('stDenied');
+  else state.textContent = p.notify ? Sky.t('stOn').replace('%1', p.notifyAt || '18:00') : Sky.t('stOff');
+  $('#notifyOn').textContent = Sky.t(p.notify ? 'disable' : 'enable');
+
+  renderItems();
+}
+
+function renderItems() {
+  const p = plan();
+  const box = $('#items');
+  if (!p.items.length) {
+    box.innerHTML = `<div class="empty"><div class="big">📋</div><p>${Sky.t('todoNone')}</p></div>`;
+    return;
+  }
+  box.innerHTML = '';
+  p.items.forEach((it, i) => {
+    const el = document.createElement('div');
+    el.className = 'item' + (it.done ? ' done' : '');
+    el.innerHTML = `<button class="check" type="button">${it.done ? '✓' : ''}</button>
+      <div class="txt"><b>${esc(it.text)}</b></div>
+      <button class="btn small ghost" type="button">×</button>`;
+    el.querySelector('.check').addEventListener('click', () => {
+      const cur = plan(); cur.items[i].done = !cur.items[i].done; savePlan(cur); renderItems();
+    });
+    el.querySelector('.btn').addEventListener('click', () => {
+      const cur = plan(); cur.items.splice(i, 1); savePlan(cur); renderItems();
+    });
+    box.appendChild(el);
+  });
+}
+
+$('#saveBtn').addEventListener('click', () => {
+  const p = plan();
+  p.examName = $('#examName').value.trim();
+  p.exam = $('#examDate').value;
+  p.goal = Math.max(1, Math.min(200, +$('#goal').value || 10));
+  p.notifyAt = $('#notifyAt').value || '18:00';
+  savePlan(p);
+  Sky.toast(Sky.t('saved'));
+  render();
+});
+
+$('#notifyOn').addEventListener('click', async () => {
+  const p = plan();
+  if (p.notify) { p.notify = false; savePlan(p); render(); return; }
+  const res = await Sky.askNotify();
+  if (res === 'granted') { p.notify = true; p.notifyAt = $('#notifyAt').value || '18:00'; savePlan(p); }
+  render();
+});
+
+$('#notifyTest').addEventListener('click', async () => {
+  const res = await Sky.askNotify();
+  if (res === 'granted') Sky.notify(Sky.t('testTitle'), Sky.t('testBody'));
+  else Sky.toast(Sky.t(res === 'denied' ? 'stDenied' : 'stUnsupported'));
+  render();
+});
+
+function addItem() {
+  const v = $('#newItem').value.trim(); if (!v) return;
+  const p = plan();
+  p.items.push({ text: v.slice(0, 120), done: false });
+  savePlan(p);
+  $('#newItem').value = '';
+  renderItems();
+}
+$('#addItem').addEventListener('click', addItem);
+$('#newItem').addEventListener('keydown', e => { if (e.key === 'Enter') addItem(); });
+
+/* Копия данных отдаётся текстом, а не файлом по ссылке.
+   Причина: в части окружений (например когда сайт открыт внутри
+   другого приложения) программное скачивание молча блокируется —
+   кнопка нажимается, а файла нет. Копирование работает везде. */
+$('#exportBtn').addEventListener('click', () => {
+  const dump = {
+    exported: new Date().toISOString(),
+    stats: Sky.stats(), srs: Sky.srs(), plan: plan(),
+    life: Sky.get('life', {}),
+    kids: { m3best: Sky.get('m3best', 0), solved: Sky.get('m3solved', 0) },
+    puzzles: Sky.get('puzzlesSolved', [])
+  };
+  const text = JSON.stringify(dump, null, 2);
+
+  Sky.modal(
+    `<h2>${Sky.t('exportT')}</h2>
+     <p class="lead" style="font-size:13px;margin-top:8px">${Sky.t('exportD')}</p>
+     <div class="field" style="margin-top:14px">
+       <textarea id="exBox" readonly style="height:220px;font-family:'JetBrains Mono',monospace;font-size:11px"></textarea>
+     </div>
+     <button class="btn full big" id="exCopy" style="margin-top:12px">${Sky.t('exportCopy')}</button>`,
+    (box, close) => {
+      const area = box.querySelector('#exBox');
+      area.value = text;
+      box.querySelector('#exCopy').addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          Sky.toast(Sky.t('exportOk'));
+          close();
+        } catch (e) {
+          /* Буфер обмена может быть недоступен без явного разрешения —
+             тогда выделяем текст, чтобы скопировать вручную. */
+          area.focus(); area.select();
+          Sky.toast(Sky.t('exportManual'));
+        }
+      });
+    }
+  );
+});
+
+$('#resetBtn').addEventListener('click', () => {
+  if (!confirm(Sky.t('resetAsk'))) return;
+  Sky.resetProgress();
+  Sky.toast(Sky.t('resetDone'));
+  render();
+});
+
+/* напоминание: проверяем раз в минуту, пока вкладка открыта */
+setInterval(() => {
+  const p = plan();
+  if (!p.notify || !p.notifyAt) return;
+  const now = new Date();
+  const hhmm = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  if (hhmm !== p.notifyAt) return;
+  const key = 'notified_' + Sky.dayKey();
+  if (Sky.get(key)) return;
+  Sky.set(key, true);
+  const done = Sky.todayCount(), goal = p.goal || 10;
+  if (done < goal) Sky.notify(Sky.t('testTitle'), Sky.t('remindBody').replace('%1', done).replace('%2', goal));
+}, 60000);
+
+document.addEventListener('langchange', render);
+document.addEventListener('statschange', render);
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,1068 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Шахматы — SkyySchool</title>
+<meta name="theme-color" content="#f6faff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon-512.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/sky.css">
+<style>
+.piece.w{color:#fff;text-shadow:0 0 1px #10233c,0 0 2px rgba(0,0,0,.8),0 1px 1px rgba(0,0,0,.4)}
+.piece.b{color:#141820;text-shadow:0 0 1px rgba(255,255,255,.35)}
+.tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin-bottom:24px;overflow:auto}
+.tabs button{padding:12px 15px;font-size:13.5px;font-weight:900;color:var(--muted);border-bottom:2.5px solid transparent;white-space:nowrap}
+.tabs button[aria-selected="true"]{color:var(--m-chess);border-bottom-color:var(--m-chess)}
+.lesson{border:1px solid var(--line);border-radius:var(--r-lg);background:var(--panel);overflow:hidden;box-shadow:var(--shadow-sm)}
+.lesson > button{width:100%;text-align:left;padding:16px 19px;font-weight:800;font-size:14.5px;display:flex;gap:10px;align-items:center}
+.lesson > button .arrow{margin-left:auto;color:var(--muted);transition:.2s;font-size:19px}
+.lesson.open > button .arrow{transform:rotate(90deg);color:var(--m-chess)}
+.lesson .body{padding:0 19px 19px;font-size:14px;white-space:pre-wrap;line-height:1.78;color:var(--ink-2)}
+.lesson .board{width:min(290px,100%);margin-top:16px}
+.promo{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.promo button{width:46px;height:46px;font-size:27px;border:2px solid var(--line);border-radius:12px;background:var(--panel)}
+.promo button:hover{border-color:var(--m-chess)}
+.gameinfo{font-size:13.5px;font-weight:800;min-height:22px}
+.code{
+  font-family:'JetBrains Mono',monospace;font-size:23px;font-weight:700;letter-spacing:.18em;
+  text-align:center;padding:14px;background:var(--m-chess-soft);
+  border:2px dashed var(--m-chess);border-radius:var(--r);color:var(--m-chess);
+}
+</style>
+</head>
+<body>
+<header id="appHeader"></header>
+
+<main class="wrap">
+  <h1 data-i18n="h1"></h1>
+  <p class="lead" data-i18n="lead"></p>
+
+  <div class="tabs section" role="tablist" style="margin-top:26px">
+    <button type="button" data-tab="lessons" aria-selected="true" data-i18n="tabLessons"></button>
+    <button type="button" data-tab="puzzles" aria-selected="false" data-i18n="tabPuzzles"></button>
+    <button type="button" data-tab="game"    aria-selected="false" data-i18n="tabGame"></button>
+    <button type="button" data-tab="teacher" aria-selected="false" data-i18n="tabTeacher"></button>
+    <button type="button" data-tab="live"    aria-selected="false" data-i18n="tabLive"></button>
+  </div>
+
+  <!-- УРОКИ -->
+  <section id="tab-lessons"><div class="list" id="lessonList"></div></section>
+
+  <!-- ЗАДАЧИ -->
+  <section id="tab-puzzles" class="hidden">
+    <div class="board-wrap">
+      <div class="board" id="pBoard"></div>
+      <div class="side">
+        <div class="meta">
+          <span class="tag chess" id="pType"></span>
+          <span class="tag gray" id="pCount"></span>
+          <span class="tag gray" id="pTurn"></span>
+        </div>
+        <h2 id="pTitle" style="margin-top:10px"></h2>
+        <p class="lead" style="font-size:13px;margin-top:4px" id="pTask"></p>
+        <div class="note hidden" id="pIdea"></div>
+        <div class="gameinfo" id="pMsg" style="margin-top:12px"></div>
+        <div class="promo hidden" id="pPromo"></div>
+        <div class="actions">
+          <button class="btn ghost small" id="pHint" data-i18n="showIdea"></button>
+          <button class="btn ghost small" id="pRetry" data-i18n="retry"></button>
+          <button class="btn chess small" id="pNext" data-i18n="nextPuzzle"></button>
+        </div>
+        <div class="stats" style="margin-top:18px">
+          <div class="stat"><b id="pSolved">0</b><span data-i18n="pSolvedL"></span></div>
+          <div class="stat"><b id="pTotal">0</b><span data-i18n="pTotalL"></span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ИГРА С БОТОМ -->
+  <section id="tab-game" class="hidden">
+    <div class="row" style="margin-bottom:18px">
+      <div class="field">
+        <label data-i18n="level"></label>
+        <select id="gLevel">
+          <option value="1" data-i18n="lvl1"></option>
+          <option value="2" selected data-i18n="lvl2"></option>
+          <option value="3" data-i18n="lvl3"></option>
+          <option value="4" data-i18n="lvl4"></option>
+        </select>
+      </div>
+      <div class="field">
+        <label data-i18n="side"></label>
+        <select id="gSide">
+          <option value="w" data-i18n="sideW"></option>
+          <option value="b" data-i18n="sideB"></option>
+        </select>
+      </div>
+      <div class="field" style="display:flex;align-items:flex-end">
+        <button class="btn chess full" id="gNew" data-i18n="newGame"></button>
+      </div>
+    </div>
+    <div class="board-wrap">
+      <div class="board" id="gBoard"></div>
+      <div class="side">
+        <div class="captured" id="gCapTop"></div>
+        <div class="gameinfo" id="gStatus" style="margin:10px 0"></div>
+        <div class="captured" id="gCapBottom"></div>
+        <div class="promo hidden" id="gPromo"></div>
+        <div class="review hidden" id="gReview"></div>
+        <div class="movelist" id="gMoves" style="margin-top:12px"></div>
+        <div class="actions">
+          <button class="btn ghost small" id="gUndo" data-i18n="undo"></button>
+          <button class="btn ghost small" id="gFlip" data-i18n="flip"></button>
+        </div>
+        <p class="lead" style="font-size:11.5px;margin-top:12px" data-i18n="engineNote"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- С УЧИТЕЛЕМ -->
+  <section id="tab-teacher" class="hidden">
+    <div id="tGate"></div>
+    <div id="tBody" class="hidden">
+      <div class="section-head">
+        <h2 id="tTitle"></h2>
+        <button class="btn chess small hidden" id="tNew" data-i18n="newChessTask"></button>
+      </div>
+      <div class="list" id="tList"></div>
+    </div>
+  </section>
+
+  <!-- ЖИВАЯ ПАРТИЯ -->
+  <section id="tab-live" class="hidden">
+    <div id="liveSetup">
+      <div class="grid g2">
+        <div class="panel">
+          <h2 data-i18n="createT"></h2>
+          <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="createD"></p>
+          <button class="btn chess full" id="lvCreate" style="margin-top:16px" data-i18n="createBtn"></button>
+        </div>
+        <div class="panel">
+          <h2 data-i18n="joinT"></h2>
+          <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="joinD"></p>
+          <div class="row" style="margin-top:16px">
+            <div class="field"><input type="text" id="lvCode" maxlength="6" style="text-transform:uppercase;font-family:'JetBrains Mono',monospace;letter-spacing:.16em" data-i18n-ph="codePh"></div>
+            <div class="field" style="flex:0 0 auto"><button class="btn" id="lvJoin" data-i18n="joinBtn"></button></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel section"><p class="lead" style="font-size:13px" id="liveNote"></p></div>
+    </div>
+
+    <div id="liveGame" class="hidden">
+      <div class="board-wrap">
+        <div class="board" id="lvBoard"></div>
+        <div class="side">
+          <div class="code" id="lvCodeShow"></div>
+          <div class="gameinfo" id="lvStatus" style="margin:14px 0"></div>
+          <div class="promo hidden" id="lvPromo"></div>
+          <div class="movelist" id="lvMoves"></div>
+          <div class="actions">
+            <button class="btn ghost small" id="lvFlip" data-i18n="flip"></button>
+            <button class="btn ghost small" id="lvLeave" data-i18n="leaveGame"></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer id="appFooter"></footer>
+
+<script src="assets/config.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/db.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/chess-engine.js"></script>
+<script src="assets/chess-ai.js"></script>
+<script src="assets/chess-review.js"></script>
+<script src="data/ai-teachers.js"></script>
+<script src="assets/ai-teachers.js"></script>
+<script src="data/chess-lessons.js"></script>
+<script src="data/chess-puzzles.js"></script>
+<script>
+'use strict';
+const E = window.ChessEngine, AI = window.ChessAI;
+
+Sky.init({
+  h1:{ru:'Шахматы',en:'Chess'},
+  lead:{ru:'Уроки на одну мысль, задачи с разбором, игра против бота и партия с учителем. Правила написаны с нуля и проверены эталонными тестами — движок считает ходы точно.',
+        en:'One-idea lessons, puzzles with explanations, a game against the bot and play with a teacher. The rules are written from scratch and checked against reference tests.'},
+  qBrilliant:{ru:'Отличный ход',en:'Brilliant'},
+  qGood:{ru:'Хороший ход',en:'Good move'},
+  qInaccuracy:{ru:'Неточность',en:'Inaccuracy'},
+  qMistake:{ru:'Ошибка',en:'Mistake'},
+  qBlunder:{ru:'Грубая ошибка',en:'Blunder'},
+  revThinking:{ru:'учитель подбирает слова…',en:'the teacher is finding words…'},
+  revEngine:{ru:'Оценку посчитал движок',en:'Scored by the engine'},
+  tabLessons:{ru:'Уроки',en:'Lessons'},
+  tabPuzzles:{ru:'Задачи',en:'Puzzles'},
+  tabGame:{ru:'Против бота',en:'Play the bot'},
+  tabTeacher:{ru:'С учителем',en:'With a teacher'},
+  tabLive:{ru:'Живая партия',en:'Live game'},
+
+  findMove:{ru:'Найдите лучший ход за %1.',en:'Find the best move for %1.'},
+  white:{ru:'белых',en:'White'}, black:{ru:'чёрных',en:'Black'},
+  whiteMove:{ru:'ход белых',en:'White to move'}, blackMove:{ru:'ход чёрных',en:'Black to move'},
+  tMate1:{ru:'мат в 1 ход',en:'mate in 1'},
+  tTactic:{ru:'тактика',en:'tactic'},
+  tDefence:{ru:'защита',en:'defence'},
+  wrongMove:{ru:'Не то. Попробуйте другой ход.',en:'Not it. Try another move.'},
+  showIdea:{ru:'Показать идею',en:'Show the idea'},
+  retry:{ru:'Сначала',en:'Restart'},
+  nextPuzzle:{ru:'Следующая',en:'Next'},
+  pSolvedL:{ru:'решено задач',en:'puzzles solved'},
+  pTotalL:{ru:'всего задач',en:'puzzles total'},
+  pCountOf:{ru:'%1 из %2',en:'%1 of %2'},
+
+  level:{ru:'Уровень бота',en:'Bot level'},
+  lvl1:{ru:'Новичок',en:'Beginner'}, lvl2:{ru:'Любитель',en:'Casual'},
+  lvl3:{ru:'Клубный',en:'Club'}, lvl4:{ru:'Сильный',en:'Strong'},
+  side:{ru:'Играю',en:'I play'},
+  sideW:{ru:'белыми',en:'White'}, sideB:{ru:'чёрными',en:'Black'},
+  newGame:{ru:'Новая партия',en:'New game'},
+  undo:{ru:'Отменить ход',en:'Undo move'},
+  flip:{ru:'Перевернуть доску',en:'Flip the board'},
+  yourMove:{ru:'Ваш ход',en:'Your move'},
+  botThinks:{ru:'Бот думает…',en:'The bot is thinking…'},
+  waitOpp:{ru:'Ход соперника',en:'Opponent to move'},
+  checkMsg:{ru:'Шах!',en:'Check!'},
+  youWin:{ru:'Мат. Вы выиграли.',en:'Checkmate. You win.'},
+  youLose:{ru:'Мат. Вы проиграли.',en:'Checkmate. You lose.'},
+  stalemate:{ru:'Пат — ничья.',en:'Stalemate — a draw.'},
+  drawMat:{ru:'Ничья: не хватает материала для мата.',en:'Draw: not enough material to mate.'},
+  drawFifty:{ru:'Ничья по правилу 50 ходов.',en:'Draw by the fifty-move rule.'},
+  choosePromo:{ru:'Во что превращаем пешку?',en:'Promote the pawn to:'},
+  engineNote:{ru:'Бот перебирает варианты прямо в браузере: на «Сильном» ход занимает около секунды. Ничего никуда не отправляется.',
+              en:'The bot searches right in your browser: on "Strong" a move takes about a second. Nothing is sent anywhere.'},
+
+  ovWin:{ru:'Победа',en:'You win'},
+  ovLose:{ru:'Поражение',en:'You lose'},
+  ovDraw:{ru:'Ничья',en:'A draw'},
+  whyMateWin:{ru:'Мат: королю соперника некуда уйти, закрыться нечем и защитить его тоже нечем.',
+              en:'Checkmate: the enemy king has nowhere to go, nothing to block with and nothing to defend it.'},
+  whyMateLose:{ru:'Мат вашему королю. Поищите, где начались проблемы — обычно это ход за пять-шесть до конца, а не последний.',
+               en:'Your king is mated. Look for where it started going wrong — usually five or six moves back, not on the last one.'},
+  whyStale:{ru:'Пат: ходить нечем, но шаха нет. По правилам это ничья, даже если у одной стороны фигур намного больше.',
+            en:'Stalemate: no legal move, but no check either. That is a draw by the rules, even if one side has far more material.'},
+  whyMaterial:{ru:'Ни одной из сторон не хватает материала, чтобы поставить мат.',
+               en:'Neither side has enough material to force checkmate.'},
+  whyFifty:{ru:'Пятьдесят ходов подряд без взятий и без движения пешек — ничья по правилу 50 ходов.',
+            en:'Fifty moves with no capture and no pawn move — a draw by the fifty-move rule.'},
+  ovMoves:{ru:'ходов',en:'moves'},
+  ovTaken:{ru:'вы забрали',en:'you took'},
+  ovLost:{ru:'вы отдали',en:'you lost'},
+  ovLook:{ru:'Посмотреть позицию',en:'Look at the position'},
+
+  tTitleS:{ru:'Задания от учителя',en:'Tasks from your teacher'},
+  tTitleT:{ru:'Задания ученикам',en:'Tasks you set'},
+  newChessTask:{ru:'Новое задание',en:'New task'},
+  tNoneS:{ru:'Учитель пока не давал шахматных заданий. Пока можно решать задачи из вкладки рядом.',
+          en:'Your teacher has not set any chess tasks yet. Meanwhile the puzzles tab is right there.'},
+  tNoneT:{ru:'Вы ещё не давали шахматных заданий. Составьте позицию и отправьте ученику — движок сам проверит его ход.',
+          en:'You have not set any chess tasks yet. Build a position and send it to a student — the engine checks their move for you.'},
+  tSignIn:{ru:'Войдите, чтобы получать задания от учителя',en:'Sign in to get tasks from a teacher'},
+  tSignInD:{ru:'Шахматные задания приходят конкретному ученику, поэтому нужен профиль.',
+            en:'Chess tasks are sent to a specific student, so a profile is needed.'},
+  tFen:{ru:'Позиция (FEN)',en:'Position (FEN)'},
+  tFenHelp:{ru:'FEN — строчка, которой шахматисты записывают позицию. Скопируйте её из любой программы или оставьте начальную.',
+            en:'FEN is the one-line notation chess software uses for a position. Paste one from any program or keep the starting position.'},
+  tSolution:{ru:'Правильный ход',en:'The correct move'},
+  tSolHelp:{ru:'В шахматной записи, например Ra8# или Nc7+. Можно несколько через запятую.',
+            en:'In algebraic notation, e.g. Ra8# or Nc7+. Several moves may be listed, comma-separated.'},
+  tNote:{ru:'Что подсказать',en:'A note for the student'},
+  tTo:{ru:'Кому',en:'For'},
+  tSend:{ru:'Отправить задание',en:'Send the task'},
+  tBadFen:{ru:'Эта позиция не читается — на доске нет одного из королей. Проверьте FEN.',
+           en:'That position cannot be read — one of the kings is missing. Check the FEN.'},
+  tImpossible:{ru:'Такой позиции в партии быть не может: король стороны, которая сейчас не ходит, стоит под боем.',
+               en:'This position cannot occur in a game: the king of the side that is not to move is left in check.'},
+  tNoSol:{ru:'Укажите правильный ход — иначе задачу нечем проверить.',
+          en:'Enter the correct move — otherwise there is nothing to check against.'},
+  tBadMove:{ru:'Такого хода в этой позиции нет: %1',en:'That move is not legal in this position: %1'},
+  tSent:{ru:'Задание отправлено',en:'Task sent'},
+  tSolved:{ru:'решено',en:'solved'},
+  tWaiting:{ru:'ждёт решения',en:'waiting'},
+  tFailed:{ru:'ошибся',en:'got it wrong'},
+  tOpen:{ru:'Открыть',en:'Open'},
+  tYourMove:{ru:'Ваш ход в этой позиции',en:'Your move in this position'},
+  tCorrect:{ru:'Верно! Ход %1',en:'Correct! %1'},
+  tWrong:{ru:'Ход %1 — не то, что искал учитель.',en:'%1 is not what the teacher was looking for.'},
+  tFrom:{ru:'от %1',en:'from %1'},
+
+  createT:{ru:'Создать партию',en:'Start a game'},
+  createD:{ru:'Получите короткий код и передайте его сопернику — учителю, другу, кому угодно.',
+           en:'You get a short code — pass it to your opponent: a teacher, a friend, anyone.'},
+  createBtn:{ru:'Создать и получить код',en:'Create and get a code'},
+  joinT:{ru:'Присоединиться',en:'Join a game'},
+  joinD:{ru:'Введите код партии, который вам дали.',en:'Enter the game code you were given.'},
+  codePh:{ru:'КОД',en:'CODE'},
+  joinBtn:{ru:'Войти',en:'Join'},
+  noGame:{ru:'Партия с таким кодом не найдена.',en:'No game with that code.'},
+  gameFull:{ru:'В этой партии уже двое.',en:'That game already has two players.'},
+  waitJoin:{ru:'Ждём соперника. Передайте ему код выше.',en:'Waiting for an opponent. Give them the code above.'},
+  leaveGame:{ru:'Выйти',en:'Leave'},
+  youWhite:{ru:'Вы играете белыми',en:'You play White'},
+  youBlack:{ru:'Вы играете чёрными',en:'You play Black'},
+  liveCloud:{ru:'Партия идёт через общую базу: соперник может быть на другом устройстве и в другом городе. Доска обновляется сама.',
+             en:'The game runs through the shared database: your opponent can be on another device in another city. The board updates itself.'},
+  liveLocal:{ru:'Общая база не подключена, поэтому партия работает между вкладками одного браузера: откройте сайт во втором окне и войдите по коду — доска будет синхронной. Чтобы играть с другого устройства, заполните ключи Supabase в assets/config.js.',
+             en:'No shared database is configured, so the game works between tabs of one browser: open the site in a second window and join with the code — the board stays in sync. To play from another device, fill in the Supabase keys in assets/config.js.'},
+  liveSignIn:{ru:'Войдите, чтобы создать партию',en:'Sign in to start a game'}
+});
+
+const $ = s => document.querySelector(s);
+const esc = Sky.auth.esc;
+const GLYPH = { 1:'♟', 2:'♞', 3:'♝', 4:'♜', 5:'♛', 6:'♚' };
+
+/* ============ доска ============ */
+function makeBoard(el, opts) {
+  const api = { flipped:false, state:null, selected:-1, lastMove:null, onMove:opts.onMove, interactive:true, canMove:() => true };
+
+  function squares() {
+    const list = [];
+    for (let r = 7; r >= 0; r--) for (let f = 0; f < 8; f++) list.push(E.sq(f, r));
+    return api.flipped ? list.reverse() : list;
+  }
+
+  api.render = function () {
+    const st = api.state; if (!st) return;
+    el.innerHTML = '';
+    const legal = (api.selected >= 0) ? E.generate(st, { square: api.selected }) : [];
+    const targets = new Map(legal.map(m => [m.to, m]));
+    const kingSq = E.inCheck(st) ? st.kings[st.turn] : -1;
+
+    for (const s of squares()) {
+      const f = E.fileOf(s), r = E.rankOf(s);
+      const d = document.createElement('div');
+      d.className = 'sqr ' + ((f + r) % 2 ? 'light' : 'dark');
+      d.dataset.sq = s;
+      if (s === api.selected) d.classList.add('sel');
+      else if (api.lastMove && (s === api.lastMove.from || s === api.lastMove.to)) d.classList.add('last');
+      if (s === kingSq) d.classList.add('check');
+
+      const p = st.board[s];
+      if (p) {
+        const sp = document.createElement('span');
+        sp.className = 'piece ' + ((p & 8) ? 'b' : 'w');
+        sp.textContent = GLYPH[p & 7];
+        d.appendChild(sp);
+      }
+      if (targets.has(s)) {
+        if (p) d.classList.add('cap');
+        const dot = document.createElement('span'); dot.className = 'dot';
+        d.appendChild(dot);
+      }
+      const edgeFile = api.flipped ? (r === 7) : (r === 0);
+      const edgeRank = api.flipped ? (f === 7) : (f === 0);
+      if (edgeFile) { const c = document.createElement('span'); c.className = 'co f'; c.textContent = 'abcdefgh'[f]; d.appendChild(c); }
+      if (edgeRank) { const c = document.createElement('span'); c.className = 'co r'; c.textContent = r + 1; d.appendChild(c); }
+      el.appendChild(d);
+    }
+  };
+
+  el.addEventListener('click', e => {
+    if (!api.interactive || !api.state || !api.canMove()) return;
+    const cell = e.target.closest('.sqr'); if (!cell) return;
+    const s = +cell.dataset.sq, st = api.state;
+    if (api.selected >= 0) {
+      const moves = E.generate(st, { square: api.selected }).filter(m => m.to === s);
+      if (moves.length) { api.selected = -1; api.onMove(moves); return; }
+    }
+    const p = st.board[s];
+    api.selected = (p && (p & 8) === st.turn) ? s : -1;
+    api.render();
+  });
+
+  /* ---------- плавный ход ----------
+     Анимируем ДО того, как ход применён к позиции: фигура ещё стоит на
+     старой клетке, поэтому её можно просто сдвинуть трансформацией к
+     новой. Как только доедет — вызываем done(), и там уже делается
+     настоящий ход с перерисовкой.
+
+     Если что-то пошло не так (нет элемента, пользователь свернул
+     вкладку), done() всё равно вызывается: партия не должна зависать
+     из-за анимации. */
+  const ANIM_MS = 210;
+
+  api.animateMove = function (move, done) {
+    const finish = (() => { let called = false; return () => { if (!called) { called = true; done(); } }; })();
+
+    if (prefersReduced()) return finish();
+
+    const fromCell = el.querySelector(`[data-sq="${move.from}"]`);
+    const toCell   = el.querySelector(`[data-sq="${move.to}"]`);
+    const piece    = fromCell && fromCell.querySelector('.piece');
+    if (!fromCell || !toCell || !piece) return finish();
+
+    const a = fromCell.getBoundingClientRect();
+    const b = toCell.getBoundingClientRect();
+    const dx = b.left - a.left, dy = b.top - a.top;
+    if (!dx && !dy) return finish();
+
+    /* Съеденную фигуру сжимаем — видно, что забрали именно её.
+       При взятии на проходе съеденная пешка стоит НЕ на поле, куда мы
+       идём, а на клетку назад по ходу движения — иначе анимация
+       «съедала» бы пустую клетку. */
+    let victimSq = move.to;
+    if (String(move.flags || '').includes('e')) {
+      victimSq = (move.piece & 8) ? move.to + 16 : move.to - 16;
+    }
+    const victim = el.querySelector(`[data-sq="${victimSq}"] .piece`);
+    if (move.captured && victim && victim !== piece) victim.classList.add('taken');
+
+    fromCell.classList.add('flying');
+    piece.classList.add('moving');
+    piece.style.transition = `transform ${ANIM_MS}ms cubic-bezier(.3,.85,.4,1)`;
+    /* смещение задаём в следующем кадре, иначе браузер применит его
+       сразу вместе с transition и анимации не будет */
+    requestAnimationFrame(() => {
+      piece.style.transform = `translate(${dx}px, ${dy}px)`;
+    });
+
+    let timer = setTimeout(finish, ANIM_MS + 60);
+    piece.addEventListener('transitionend', () => { clearTimeout(timer); finish(); }, { once: true });
+  };
+
+  return api;
+}
+
+function prefersReduced() {
+  return window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function askPromotion(host, cb) {
+  host.classList.remove('hidden');
+  host.innerHTML = '';
+  const label = document.createElement('div');
+  label.style.cssText = 'font-size:12px;font-weight:800;width:100%;margin-bottom:4px';
+  label.textContent = Sky.t('choosePromo');
+  host.appendChild(label);
+  for (const t of [E.QUEEN, E.ROOK, E.BISHOP, E.KNIGHT]) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = GLYPH[t];
+    b.addEventListener('click', () => { host.classList.add('hidden'); cb(t); });
+    host.appendChild(b);
+  }
+}
+
+/* ============ вкладки ============ */
+document.querySelector('.tabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-tab]'); if (!b) return;
+  document.querySelectorAll('.tabs button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+  for (const n of ['lessons','puzzles','game','teacher','live'])
+    document.getElementById('tab-' + n).classList.toggle('hidden', n !== b.dataset.tab);
+  if (b.dataset.tab === 'puzzles') puzzleBoard.render();
+  if (b.dataset.tab === 'game') gameBoard.render();
+  if (b.dataset.tab === 'teacher') loadTeacherTasks();
+  if (b.dataset.tab === 'live') { renderLiveNote(); if (liveGame) liveBoard.render(); }
+});
+
+/* ============ уроки ============ */
+function renderLessons() {
+  const box = $('#lessonList');
+  box.innerHTML = '';
+  for (const l of window.CHESS_LESSONS) {
+    const el = document.createElement('div');
+    el.className = 'lesson';
+    el.innerHTML = '<button type="button"><span></span><span class="arrow">›</span></button><div class="body hidden"></div>';
+    el.querySelector('button span').textContent = Sky.L(l.title);
+    const body = el.querySelector('.body');
+    body.textContent = Sky.L(l.body);
+    if (l.fen) {
+      const bd = document.createElement('div');
+      bd.className = 'board';
+      body.appendChild(bd);
+      const api = makeBoard(bd, { onMove(){} });
+      api.interactive = false;
+      api.state = E.create(l.fen);
+      api.render();
+    }
+    el.querySelector('button').addEventListener('click', () => {
+      el.classList.toggle('open');
+      body.classList.toggle('hidden');
+    });
+    box.appendChild(el);
+  }
+}
+
+/* ============ задачи ============ */
+const PUZZLES = window.CHESS_PUZZLES;
+let pIndex = 0, pState = null, pSolved = Sky.get('puzzlesSolved', []);
+const puzzleBoard = makeBoard($('#pBoard'), { onMove: onPuzzleMove });
+
+function loadPuzzle(i) {
+  pIndex = (i + PUZZLES.length) % PUZZLES.length;
+  const p = PUZZLES[pIndex];
+  pState = E.create(p.fen);
+  Object.assign(puzzleBoard, { state:pState, selected:-1, lastMove:null, interactive:true, flipped:pState.turn === E.BLACK });
+  puzzleBoard.render();
+
+  const typeKey = p.type === 'mate1' ? 'tMate1' : p.type === 'defence' ? 'tDefence' : 'tTactic';
+  $('#pType').textContent = Sky.t(typeKey);
+  $('#pCount').textContent = Sky.t('pCountOf').replace('%1', pIndex + 1).replace('%2', PUZZLES.length);
+  $('#pTurn').textContent = Sky.t(pState.turn === E.WHITE ? 'whiteMove' : 'blackMove');
+  $('#pTitle').textContent = Sky.L(p.title);
+  $('#pTask').textContent = Sky.t('findMove').replace('%1', Sky.t(pState.turn === E.WHITE ? 'white' : 'black'));
+  $('#pIdea').textContent = Sky.L(p.idea);
+  $('#pIdea').classList.add('hidden');
+  $('#pMsg').textContent = '';
+  $('#pMsg').className = 'gameinfo';
+  $('#pPromo').classList.add('hidden');
+  $('#pSolved').textContent = pSolved.length;
+  $('#pTotal').textContent = PUZZLES.length;
+}
+
+function onPuzzleMove(moves) {
+  const apply = m => {
+    const san = E.toSAN(pState, m);
+    const p = PUZZLES[pIndex];
+    const clean = s => s.replace(/[+#]/g, '');
+    const ok = p.solutions.some(s => clean(s) === clean(san));
+    const msg = $('#pMsg');
+    if (ok) {
+      puzzleBoard.interactive = false;
+      puzzleBoard.animateMove(m, () => {
+        E.make(pState, m);
+        puzzleBoard.lastMove = m;
+        puzzleBoard.render();
+      });
+      msg.textContent = '✓ ' + Sky.t('right') + '  ' + san;
+      msg.className = 'gameinfo verdict ok';
+      $('#pIdea').classList.remove('hidden');
+      if (!pSolved.includes(p.id)) { pSolved.push(p.id); Sky.set('puzzlesSolved', pSolved); }
+      $('#pSolved').textContent = pSolved.length;
+    } else {
+      msg.textContent = '✕ ' + Sky.t('wrongMove') + '  (' + san + ')';
+      msg.className = 'gameinfo verdict no';
+      puzzleBoard.render();
+    }
+  };
+  if (moves.length > 1 && moves[0].promotion)
+    askPromotion($('#pPromo'), t => apply(moves.find(m => m.promotion === t)));
+  else apply(moves[0]);
+}
+$('#pHint').addEventListener('click', () => $('#pIdea').classList.remove('hidden'));
+$('#pRetry').addEventListener('click', () => loadPuzzle(pIndex));
+$('#pNext').addEventListener('click', () => loadPuzzle(pIndex + 1));
+
+/* ============ игра с ботом ============ */
+let gState = null, gHuman = E.WHITE, gLevel = 2, gBusy = false, gSans = [], gCap = { w:[], b:[] };
+const gameBoard = makeBoard($('#gBoard'), { onMove: onHumanMove });
+
+function newGame() {
+  gState = E.create();
+  gHuman = ($('#gSide').value === 'b') ? E.BLACK : E.WHITE;
+  gLevel = +$('#gLevel').value;
+  gSans = []; gCap = { w:[], b:[] }; gBusy = false;
+  Object.assign(gameBoard, { state:gState, selected:-1, lastMove:null, flipped:gHuman === E.BLACK, interactive:true });
+  $('#gPromo').classList.add('hidden');
+  renderGame();
+  if (gState.turn !== gHuman) setTimeout(botMove, 250);
+}
+
+function renderGame() {
+  gameBoard.render();
+  const rows = [];
+  for (let i = 0; i < gSans.length; i += 2)
+    rows.push(`<b>${i / 2 + 1}.</b> <span>${gSans[i]}</span>` + (gSans[i + 1] ? `<span>${gSans[i + 1]}</span>` : ''));
+  const ml = $('#gMoves');
+  ml.innerHTML = rows.join('<br>');
+  ml.scrollTop = ml.scrollHeight;
+
+  $('#gCapTop').textContent = (gHuman === E.WHITE ? gCap.w : gCap.b).join(' ');
+  $('#gCapBottom').textContent = (gHuman === E.WHITE ? gCap.b : gCap.w).join(' ');
+
+  const st = E.status(gState);
+  const info = $('#gStatus');
+  info.className = 'gameinfo';
+  if (st === 'checkmate') {
+    const won = (gState.turn !== gHuman);
+    info.textContent = won ? Sky.t('youWin') : Sky.t('youLose');
+    info.className = 'gameinfo verdict ' + (won ? 'ok' : 'no');
+    gameBoard.interactive = false;
+  } else if (st === 'stalemate') { info.textContent = Sky.t('stalemate'); gameBoard.interactive = false; }
+  else if (st === 'material')    { info.textContent = Sky.t('drawMat'); gameBoard.interactive = false; }
+  else if (st === 'fifty')       { info.textContent = Sky.t('drawFifty'); gameBoard.interactive = false; }
+  else if (gBusy)                { info.innerHTML = `<span class="spin"></span> ${Sky.t('botThinks')}`; }
+  else info.textContent = (st === 'check' ? Sky.t('checkMsg') + ' ' : '') +
+        (gState.turn === gHuman ? Sky.t('yourMove') : Sky.t('botThinks'));
+}
+
+function pushMove(m) {
+  const san = E.toSAN(gState, m);
+  if (m.captured) gCap[(m.captured & 8) ? 'b' : 'w'].push(GLYPH[m.captured & 7]);
+  E.make(gState, m);
+  gSans.push(san);
+  gameBoard.lastMove = m;
+}
+
+function onHumanMove(moves) {
+  if (gBusy || gState.turn !== gHuman) return;
+  const go = m => {
+    gBusy = true;                     /* пока фигура летит, кликать нельзя */
+    /* Позицию и ход запоминаем ДО того, как ход сделан: разбору нужно
+       сравнить «что было доступно» с «что получилось». */
+    const fenBefore = E.fen(gState);
+    const sanPlayed = E.toSAN(gState, m);
+    gameBoard.animateMove(m, () => {
+      pushMove(m);
+      gBusy = false;
+      renderGame();
+      reviewMove(fenBefore, sanPlayed, gSans.length - 1);
+      const st = E.status(gState);
+      if (st === 'play' || st === 'check') { gBusy = true; renderGame(); setTimeout(botMove, 90); }
+      else finishGame(st);
+    });
+  };
+  if (moves.length > 1 && moves[0].promotion)
+    askPromotion($('#gPromo'), t => go(moves.find(m => m.promotion === t)));
+  else go(moves[0]);
+}
+
+/* ---------- разбор хода ученика ----------
+   Ярлык и лучший ход считает движок (assets/chess-review.js) — быстро,
+   офлайн и точно. Модель, если она подключена, добавляет к готовому
+   вердикту живую фразу; спорить с вердиктом она не может, и без неё
+   раздел работает.
+
+   Счёт идёт через setTimeout, чтобы не задерживать анимацию и ответ
+   бота: ученик ходит дальше, оценка появляется сбоку сама. */
+const gReviews = {};     /* номер полухода → результат разбора */
+
+function reviewMove(fenBefore, san, ply) {
+  if (!window.ChessReview) return;
+  setTimeout(async () => {
+    let r;
+    try { r = ChessReview.review(fenBefore, san); } catch (e) { r = null; }
+    if (!r) return;
+    gReviews[ply] = r;
+    renderReview(r, null);
+
+    const words = await ChessReview.explainWords(r, { lang: Sky.lang });
+    /* Пока модель думала, ученик мог успеть сходить ещё раз — тогда
+       показывать пояснение к прошлому ходу уже поздно и сбивает. */
+    if (words && gReviews[ply] && ply === gSans.length - (gState.turn === gHuman ? 2 : 1)) {
+      renderReview(r, words);
+    }
+  }, 0);
+}
+
+function renderReview(r, words) {
+  const box = $('#gReview');
+  const mark = ChessReview.MARKS[r.quality] || ChessReview.MARKS.good;
+  const title = Sky.t('q' + r.quality[0].toUpperCase() + r.quality.slice(1));
+  const note = ChessReview.shortNote(r, Sky.lang);
+
+  box.className = 'review ' + mark.cls;
+  box.innerHTML =
+    `<div class="rv-head"><span class="rv-icon">${mark.icon}</span>
+       <b>${r.move} — ${title}</b></div>
+     <div class="rv-note">${note.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</div>` +
+    (words
+      ? `<div class="rv-words">${words.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</div>`
+      : '') +
+    `<div class="rv-by">${Sky.t('revEngine')}</div>`;
+  box.classList.remove('hidden');
+}
+
+function botMove() {
+  const res = AI.bestMove(gState, gLevel);
+  if (!res) { gBusy = false; renderGame(); return; }
+  gameBoard.animateMove(res.move, () => {
+    pushMove(res.move);
+    gBusy = false;
+    renderGame();
+    const st = E.status(gState);
+    if (st !== 'play' && st !== 'check') finishGame(st);
+  });
+}
+
+/* ---------- итог партии ----------
+   Раньше конец партии показывался одной строчкой сбоку, и его можно
+   было не заметить. Теперь — отдельное окно: что произошло, почему
+   и что делать дальше. */
+function finishGame(status) {
+  const humanWon = status === 'checkmate' && gState.turn !== gHuman;
+  const humanLost = status === 'checkmate' && gState.turn === gHuman;
+
+  const kind = humanWon ? 'win' : humanLost ? 'lose' : 'draw';
+  const mark = humanWon ? '✓' : humanLost ? '✕' : '=';
+  const title = Sky.t(humanWon ? 'ovWin' : humanLost ? 'ovLose' : 'ovDraw');
+  const why = Sky.t({
+    checkmate: humanWon ? 'whyMateWin' : 'whyMateLose',
+    stalemate: 'whyStale', material: 'whyMaterial', fifty: 'whyFifty'
+  }[status] || 'whyStale');
+
+  const moves = Math.ceil(gSans.length / 2);
+  /* «1 ходов» читается плохо: на русском берём правильную форму слова */
+  const movesWord = Sky.lang === 'ru'
+    ? Sky.plural(moves, 'ход', 'хода', 'ходов').replace(moves + ' ', '')
+    : Sky.t('ovMoves');
+  const taken = gCap[gHuman === E.WHITE ? 'b' : 'w'].length;
+  const lost  = gCap[gHuman === E.WHITE ? 'w' : 'b'].length;
+
+  setTimeout(() => {
+    Sky.modal(
+      `<div class="gameover">
+         <div class="mark ${kind}">${mark}</div>
+         <h2>${title}</h2>
+         <p class="why">${why}</p>
+         <div class="facts">
+           <div><b>${moves}</b><span>${movesWord}</span></div>
+           <div><b>${taken}</b><span>${Sky.t('ovTaken')}</span></div>
+           <div><b>${lost}</b><span>${Sky.t('ovLost')}</span></div>
+         </div>
+       </div>
+       <button class="btn chess full big" id="ovNew" style="margin-top:18px">${Sky.t('newGame')}</button>
+       <button class="btn ghost full" id="ovClose" style="margin-top:9px">${Sky.t('ovLook')}</button>`,
+      (box, close) => {
+        box.querySelector('#ovNew').addEventListener('click', () => { close(); newGame(); });
+        box.querySelector('#ovClose').addEventListener('click', close);
+      }
+    );
+  }, 380);
+}
+
+$('#gNew').addEventListener('click', newGame);
+$('#gUndo').addEventListener('click', () => {
+  if (gBusy) return;
+  for (let i = 0; i < 2 && gState.history.length; i++) {
+    const m = E.unmake(gState);
+    gSans.pop();
+    if (m && m.captured) gCap[(m.captured & 8) ? 'b' : 'w'].pop();
+  }
+  Object.assign(gameBoard, { lastMove:null, selected:-1, interactive:true });
+  renderGame();
+});
+$('#gFlip').addEventListener('click', () => { gameBoard.flipped = !gameBoard.flipped; gameBoard.render(); });
+
+/* ============ задания от учителя ============ */
+let tTasks = [], tPeople = [], tLinks = [];
+
+async function loadTeacherTasks() {
+  const me = Sky.db.me();
+  const gate = $('#tGate'), body = $('#tBody');
+  if (!me) {
+    body.classList.add('hidden');
+    gate.innerHTML = `<div class="panel"><div class="empty"><div class="big">🔐</div>
+      <b>${Sky.t('tSignIn')}</b><p>${Sky.t('tSignInD')}</p>
+      <div class="actions" style="justify-content:center"><button class="btn chess" id="tIn">${Sky.t('signIn')}</button></div>
+      </div></div>`;
+    $('#tIn').addEventListener('click', () => Sky.auth.openAuth());
+    return;
+  }
+  gate.innerHTML = '';
+  body.classList.remove('hidden');
+
+  const isT = me.role === 'teacher';
+  tPeople = await Sky.db.list('profiles');
+  tLinks = await Sky.db.list('links');
+  tTasks = await Sky.db.list('chess_tasks', isT ? { teacher_id: me.id } : { student_id: me.id });
+
+  $('#tTitle').textContent = Sky.t(isT ? 'tTitleT' : 'tTitleS');
+  $('#tNew').classList.toggle('hidden', !isT);
+
+  const list = $('#tList');
+  if (!tTasks.length) {
+    list.innerHTML = `<div class="panel"><div class="empty"><div class="big">♟</div>
+      <p>${Sky.t(isT ? 'tNoneT' : 'tNoneS')}</p></div></div>`;
+    return;
+  }
+
+  list.innerHTML = '';
+  tTasks.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).forEach(task => {
+    const other = tPeople.find(p => p.id === (isT ? task.student_id : task.teacher_id)) || { name:'—' };
+    const tag = task.result === 'ok' ? `<span class="tag ok">${Sky.t('tSolved')}</span>`
+      : task.result === 'fail' ? `<span class="tag no">${Sky.t('tFailed')}</span>`
+      : `<span class="tag gray">${Sky.t('tWaiting')}</span>`;
+    const el = document.createElement('div');
+    el.className = 'item';
+    el.innerHTML = `${Sky.avatar(other.name, 'sm', other.emoji)}
+      <div class="txt"><b>${esc(task.note || Sky.t('tYourMove'))}</b>
+        <span>${esc(other.name)}${task.answer ? ' · ' + esc(task.answer) : ''}</span></div>
+      ${tag}`;
+    const b = document.createElement('button');
+    b.className = 'btn small ghost';
+    b.textContent = Sky.t('tOpen');
+    b.addEventListener('click', () => openChessTask(task, isT));
+    el.appendChild(b);
+    list.appendChild(el);
+  });
+}
+
+$('#tNew').addEventListener('click', () => {
+  const me = Sky.db.me();
+  const students = tLinks.filter(l => l.teacher_id === me.id);
+  if (!students.length) {
+    Sky.toast(Sky.lang === 'ru' ? 'Сначала нужен хотя бы один ученик' : 'You need at least one student first');
+    return;
+  }
+  Sky.modal(
+    `<h2>${Sky.t('newChessTask')}</h2>
+     <div class="field" style="margin:16px 0 12px">
+       <label>${Sky.t('tTo')}</label>
+       <select id="cTo">${students.map(l => {
+         const p = tPeople.find(x => x.id === l.student_id) || { name:'—' };
+         return `<option value="${l.student_id}">${esc(p.name)}</option>`;
+       }).join('')}</select>
+     </div>
+     <div class="field" style="margin-bottom:12px">
+       <label>${Sky.t('tFen')}</label>
+       <input type="text" id="cFen" value="${E.START_FEN}" style="font-family:'JetBrains Mono',monospace;font-size:12px">
+       <span class="help">${Sky.t('tFenHelp')}</span>
+     </div>
+     <div class="field" style="margin-bottom:12px">
+       <label>${Sky.t('tSolution')}</label>
+       <input type="text" id="cSol" placeholder="Ra8#">
+       <span class="help">${Sky.t('tSolHelp')}</span>
+     </div>
+     <div class="field" style="margin-bottom:18px">
+       <label>${Sky.t('tNote')}</label>
+       <input type="text" id="cNote">
+     </div>
+     <button class="btn chess full big" id="cGo">${Sky.t('tSend')}</button>`,
+    (box, close) => {
+      box.querySelector('#cGo').addEventListener('click', async () => {
+        const fen = box.querySelector('#cFen').value.trim();
+        const sols = box.querySelector('#cSol').value.split(',').map(s => s.trim()).filter(Boolean);
+
+        /* Проверяем задание до отправки. Иначе ученик получит задачу,
+           которую невозможно решить, и будет думать, что ошибается он.
+
+           Движок на мусорной строке не падает, а возвращает доску без
+           королей — поэтому «читается ли FEN» проверяем по королям, а
+           не по отсутствию исключения. */
+        let st = null;
+        try { st = E.create(fen); } catch (e) { st = null; }
+        if (!st || !st.board || st.kings[E.WHITE] < 0 || st.kings[E.BLACK] < 0)
+          return Sky.toast(Sky.t('tBadFen'));
+
+        /* Позиция, где король стороны, которая НЕ ходит, стоит под боем,
+           в шахматах невозможна: до неё нельзя было бы доиграть. Ловим
+           это здесь — иначе задача выглядит нормально, а решается странно. */
+        const canTakeKing = E.generate(st).some(m => m.captured && (m.captured & 7) === E.KING);
+        if (canTakeKing) return Sky.toast(Sky.t('tImpossible'));
+
+        if (!sols.length) return Sky.toast(Sky.t('tNoSol'));
+        for (const s of sols) {
+          if (!E.findMove(st, s)) return Sky.toast(Sky.t('tBadMove').replace('%1', s));
+        }
+
+        await Sky.db.insert('chess_tasks', {
+          teacher_id: Sky.db.me().id,
+          student_id: box.querySelector('#cTo').value,
+          fen, solutions: sols,
+          note: box.querySelector('#cNote').value.trim(),
+          result: null, answer: null
+        });
+        close();
+        Sky.toast(Sky.t('tSent'));
+        loadTeacherTasks();
+      });
+    }
+  );
+});
+
+function openChessTask(task, isTeacher) {
+  Sky.modal(
+    `<h2>${esc(task.note || Sky.t('tYourMove'))}</h2>
+     <div class="board" id="ctBoard" style="margin:16px 0"></div>
+     <div class="gameinfo" id="ctMsg"></div>
+     <div class="promo hidden" id="ctPromo"></div>`,
+    (box) => {
+      const st = E.create(task.fen);
+      const api = makeBoard(box.querySelector('#ctBoard'), { onMove });
+      api.state = st;
+      api.flipped = st.turn === E.BLACK;
+      api.interactive = !isTeacher && !task.result;
+      api.render();
+
+      const msg = box.querySelector('#ctMsg');
+      if (task.result === 'ok') { msg.className = 'gameinfo verdict ok'; msg.textContent = Sky.t('tCorrect').replace('%1', task.answer || ''); }
+      else if (task.result === 'fail') { msg.className = 'gameinfo verdict no'; msg.textContent = Sky.t('tWrong').replace('%1', task.answer || ''); }
+      else if (isTeacher) msg.textContent = Sky.t('tWaiting');
+
+      function onMove(moves) {
+        const apply = async m => {
+          const san = E.toSAN(st, m);
+          const clean = s => s.replace(/[+#]/g, '');
+          const ok = (task.solutions || []).some(s => clean(s) === clean(san));
+          api.interactive = false;
+          api.animateMove(m, () => { E.make(st, m); api.lastMove = m; api.render(); });
+          msg.className = 'gameinfo verdict ' + (ok ? 'ok' : 'no');
+          msg.textContent = ok ? Sky.t('tCorrect').replace('%1', san) : Sky.t('tWrong').replace('%1', san);
+          await Sky.db.update('chess_tasks', task.id, { result: ok ? 'ok' : 'fail', answer: san });
+          loadTeacherTasks();
+        };
+        if (moves.length > 1 && moves[0].promotion)
+          askPromotion(box.querySelector('#ctPromo'), t => apply(moves.find(m => m.promotion === t)));
+        else apply(moves[0]);
+      }
+    }
+  );
+}
+
+/* ============ живая партия ============ */
+let liveGame = null, liveState = null, liveUnsub = null;
+/* Свою сторону храним в переменной вкладки, а не вычисляем по id
+   игрока. В локальном режиме обе вкладки — один и тот же профиль
+   (localStorage у браузера общий), и по id их не различить: тогда
+   вторая вкладка не смогла бы сесть за чёрных. */
+let liveSide = E.WHITE;
+
+const liveBoard = makeBoard($('#lvBoard'), { onMove: onLiveMove });
+liveBoard.canMove = () => {
+  if (!liveGame || !liveState) return false;
+  if (!liveGame.white_id || !liveGame.black_id) return false;   // соперник ещё не пришёл
+  return liveSide === liveState.turn;
+};
+
+function renderLiveNote() {
+  $('#liveNote').textContent = Sky.t(Sky.db.isCloud() ? 'liveCloud' : 'liveLocal');
+}
+
+function makeCode() {
+  const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // без похожих 0/O и 1/I
+  let s = '';
+  for (let i = 0; i < 6; i++) s += abc[Math.floor(Math.random() * abc.length)];
+  return s;
+}
+
+$('#lvCreate').addEventListener('click', async () => {
+  const me = Sky.db.me();
+  if (!me) return Sky.auth.openAuth();
+  const game = await Sky.db.insert('chess_games', {
+    code: makeCode(), white_id: me.id, black_id: null,
+    fen: E.START_FEN, moves: [], status: 'play'
+  });
+  enterLive(game, E.WHITE);
+});
+
+$('#lvJoin').addEventListener('click', async () => {
+  const me = Sky.db.me();
+  if (!me) return Sky.auth.openAuth();
+  const code = $('#lvCode').value.trim().toUpperCase();
+  if (!code) return;
+  const rows = await Sky.db.list('chess_games', { code });
+  const game = rows[0];
+  if (!game) return Sky.toast(Sky.t('noGame'));
+
+  /* Свободную сторону занимаем; в локальном режиме за чёрных может
+     сесть тот же профиль из второй вкладки — иначе вдвоём за одним
+     компьютером сыграть было бы нельзя. */
+  if (!game.black_id && (game.white_id !== me.id || !Sky.db.isCloud())) {
+    const updated = await Sky.db.update('chess_games', game.id, { black_id: me.id });
+    return enterLive(updated || Object.assign(game, { black_id: me.id }), E.BLACK);
+  }
+  if (game.white_id === me.id) return enterLive(game, E.WHITE);
+  if (game.black_id === me.id) return enterLive(game, E.BLACK);
+  Sky.toast(Sky.t('gameFull'));
+});
+
+function enterLive(game, side) {
+  liveGame = game;
+  liveSide = side;
+  liveState = E.create(game.fen);
+  liveBoard.state = liveState;
+  liveBoard.selected = -1;
+  liveBoard.lastMove = null;
+  liveBoard.flipped = (side === E.BLACK);
+  liveBoard.interactive = true;
+  $('#liveSetup').classList.add('hidden');
+  $('#liveGame').classList.remove('hidden');
+  $('#lvCodeShow').textContent = game.code;
+  renderLive();
+
+  if (liveUnsub) liveUnsub();
+  liveUnsub = Sky.db.subscribe('chess_games', async () => {
+    const rows = await Sky.db.list('chess_games', { code: liveGame.code });
+    const fresh = rows[0];
+    if (!fresh) return;
+    /* перерисовываем, только если что-то реально изменилось */
+    if (fresh.fen === liveGame.fen && fresh.black_id === liveGame.black_id) return;
+    liveGame = fresh;
+    liveState = E.create(fresh.fen);
+    liveBoard.state = liveState;
+    liveBoard.selected = -1;
+    renderLive();
+  });
+}
+
+function renderLive() {
+  liveBoard.render();
+  const info = $('#lvStatus');
+  info.className = 'gameinfo';
+  const mySide = liveSide;
+  const sideText = Sky.t(mySide === E.WHITE ? 'youWhite' : 'youBlack');
+
+  const rows = [];
+  const sans = liveGame.moves || [];
+  for (let i = 0; i < sans.length; i += 2)
+    rows.push(`<b>${i / 2 + 1}.</b> <span>${sans[i]}</span>` + (sans[i + 1] ? `<span>${sans[i + 1]}</span>` : ''));
+  $('#lvMoves').innerHTML = rows.join('<br>');
+
+  if (!liveGame.black_id) { info.textContent = Sky.t('waitJoin'); return; }
+
+  const st = E.status(liveState);
+  if (st === 'checkmate') {
+    const won = liveState.turn !== mySide;
+    info.textContent = won ? Sky.t('youWin') : Sky.t('youLose');
+    info.className = 'gameinfo verdict ' + (won ? 'ok' : 'no');
+  } else if (st === 'stalemate') info.textContent = Sky.t('stalemate');
+  else if (st === 'material')    info.textContent = Sky.t('drawMat');
+  else if (st === 'fifty')       info.textContent = Sky.t('drawFifty');
+  else info.textContent = sideText + ' · ' + (st === 'check' ? Sky.t('checkMsg') + ' ' : '') +
+        (liveState.turn === mySide ? Sky.t('yourMove') : Sky.t('waitOpp'));
+}
+
+function onLiveMove(moves) {
+  const apply = m => liveBoard.animateMove(m, async () => {
+    const san = E.toSAN(liveState, m);
+    E.make(liveState, m);
+    liveBoard.lastMove = m;
+    const moveList = (liveGame.moves || []).concat([san]);
+    const fen = E.fen(liveState);
+    liveGame = Object.assign({}, liveGame, { fen, moves: moveList });
+    renderLive();
+    await Sky.db.update('chess_games', liveGame.id, {
+      fen, moves: moveList, status: E.status(liveState), updated_at: new Date().toISOString()
+    });
+  });
+  if (moves.length > 1 && moves[0].promotion)
+    askPromotion($('#lvPromo'), t => apply(moves.find(m => m.promotion === t)));
+  else apply(moves[0]);
+}
+
+$('#lvFlip').addEventListener('click', () => { liveBoard.flipped = !liveBoard.flipped; liveBoard.render(); });
+$('#lvLeave').addEventListener('click', () => {
+  if (liveUnsub) { liveUnsub(); liveUnsub = null; }
+  liveGame = null; liveState = null;
+  $('#liveGame').classList.add('hidden');
+  $('#liveSetup').classList.remove('hidden');
+});
+
+/* ============ старт ============ */
+document.addEventListener('langchange', () => {
+  renderLessons();
+  if (pState) loadPuzzle(pIndex);
+  if (gState) renderGame();
+  renderLiveNote();
+  loadTeacherTasks();
+});
+document.addEventListener('authchange', () => { loadTeacherTasks(); });
+
+renderLessons();
+loadPuzzle(0);
+newGame();
+renderLiveNote();
+Sky.db.ready.then(loadTeacherTasks);
+</script>
+</body>
+</html>

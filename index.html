@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SkyySchool — учиться легко</title>
+<meta name="description" content="Подготовка к ЕГЭ и ОГЭ, шахматы, развивающие игры для младших, режим дня и занятия с учителями.">
+<meta name="theme-color" content="#f6faff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon-512.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/sky.css">
+<style>
+.hero{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:30px;align-items:center;
+  padding:14px 0 6px;
+}
+.hero .cloud{width:150px;opacity:.95;animation:float 5s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+@media(max-width:760px){.hero{grid-template-columns:1fr}.hero .cloud{width:96px}}
+.today-card{
+  background:linear-gradient(135deg,var(--sky-500),var(--sky-700));
+  color:#fff;border:none;
+}
+:root[data-theme="dark"] .today-card{background:linear-gradient(135deg,#1a6fd8,#0d3a70)}
+.today-card .eyebrow,.today-card .lead{color:rgba(255,255,255,.82)}
+.today-card .ring .bg{stroke:rgba(255,255,255,.22)}
+.today-card .ring .fg{stroke:#fff}
+.today-card .ring .mid{color:#fff}
+</style>
+</head>
+<body>
+<header id="appHeader"></header>
+
+<main class="wrap">
+
+  <section class="hero rise">
+    <div>
+      <h1 data-i18n="h1"></h1>
+      <p class="lead" style="margin-top:10px" data-i18n="lead"></p>
+      <div class="actions" id="heroActions"></div>
+    </div>
+    <div class="cloud" id="heroCloud"></div>
+  </section>
+
+  <!-- сегодня -->
+  <div class="grid g2 section">
+    <div class="panel today-card rise" style="display:flex;gap:20px;align-items:center">
+      <div class="ring" id="goalRing">
+        <svg viewBox="0 0 96 96"><circle class="bg" cx="48" cy="48" r="40"/><circle class="fg" cx="48" cy="48" r="40"/></svg>
+        <div class="mid" id="goalMid">0%</div>
+      </div>
+      <div style="min-width:0">
+        <div class="eyebrow" data-i18n="todayGoal"></div>
+        <div class="count" id="goalNow" style="margin:4px 0 4px">0</div>
+        <p class="lead" style="font-size:13px" id="goalNote"></p>
+      </div>
+    </div>
+    <div class="panel rise">
+      <div class="eyebrow" data-i18n="untilExam"></div>
+      <div class="count" id="examDays" style="margin:6px 0 4px">—</div>
+      <p class="lead" style="font-size:13px" id="examNote"></p>
+      <div id="examExtra" style="margin-top:14px"></div>
+    </div>
+  </div>
+
+  <div class="stats section rise">
+    <div class="stat accent"><b id="stSolved">0</b><span data-i18n="solved"></span></div>
+    <div class="stat"><b id="stAcc">0%</b><span data-i18n="accuracy"></span></div>
+    <div class="stat ok"><b id="stStreak">0</b><span data-i18n="streak"></span></div>
+    <div class="stat"><b id="stBest">0</b><span data-i18n="best"></span></div>
+  </div>
+
+  <!-- модули -->
+  <div class="section">
+    <div class="section-head"><h2 data-i18n="modules"></h2></div>
+    <div class="tiles" id="moduleTiles"></div>
+  </div>
+
+  <!-- что повторить -->
+  <div class="section">
+    <div class="section-head">
+      <h2 data-i18n="repeat"></h2>
+      <span class="lead" style="font-size:12px" data-i18n="repeatNote"></span>
+    </div>
+    <div class="tiles" id="subjectCards"></div>
+  </div>
+
+  <!-- ошибки -->
+  <div class="section">
+    <div class="section-head"><h2 data-i18n="weak"></h2></div>
+    <div class="panel" id="weakPanel"><div class="list" id="weakList"></div></div>
+  </div>
+
+</main>
+
+<footer id="appFooter"></footer>
+
+<script src="assets/config.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/db.js"></script>
+<script src="assets/auth.js"></script>
+<script src="data/bank-math.js"></script>
+<script src="data/bank-informatics.js"></script>
+<script src="data/bank-russian.js"></script>
+<script src="data/bank-physics.js"></script>
+<script src="data/bank-biology.js"></script>
+<script src="data/bank-chemistry.js"></script>
+<script src="data/bank-geography.js"></script>
+<script src="data/bank-social.js"></script>
+<script src="data/bank-history.js"></script>
+<script src="data/bank-english.js"></script>
+<script src="data/bank-polish.js"></script>
+<script src="data/bank-spanish.js"></script>
+<script src="data/bank-german.js"></script>
+<script>
+'use strict';
+Sky.init({
+  h1:{ru:'Учиться легко, когда понятно зачем',en:'Learning is easy when you see the point'},
+  lead:{ru:'Подготовка к ЕГЭ и ОГЭ с разбором каждого решения, шахматы с нуля, развивающие игры для младших и режим дня, который держит всё это вместе.',
+        en:'Exam preparation with a walkthrough for every problem, chess from scratch, learning games for younger kids and a daily routine that holds it all together.'},
+  startNow:{ru:'Начать заниматься',en:'Start practising'},
+  findTeacher:{ru:'Найти учителя',en:'Find a teacher'},
+
+  todayGoal:{ru:'Решено сегодня',en:'Solved today'},
+  untilExam:{ru:'До экзамена',en:'Until the exam'},
+  solved:{ru:'решено всего',en:'solved overall'},
+  accuracy:{ru:'верных ответов',en:'correct answers'},
+  streak:{ru:'подряд сейчас',en:'current streak'},
+  best:{ru:'лучшая серия',en:'best streak'},
+
+  noExam:{ru:'Дата не задана. Поставьте её на странице «План» — появится обратный отсчёт и посильный темп на каждый день.',
+          en:'No date set. Add it on the Plan page and you get a countdown and a realistic daily pace.'},
+  examPast:{ru:'Дата уже прошла. Поставьте новую на странице «План».',en:'That date has passed. Set a new one on the Plan page.'},
+  setExam:{ru:'Поставить дату',en:'Set the date'},
+  goalOf:{ru:'из %1 по плану на день',en:'of %1 planned for today'},
+  goalDone:{ru:'Цель на сегодня выполнена. Дальше — по желанию.',en:'Today’s goal is done. Anything more is a bonus.'},
+  goalStart:{ru:'Ещё ничего не решено сегодня. Начните с пяти минут.',en:'Nothing solved today yet. Five minutes is a fine start.'},
+
+  modules:{ru:'Разделы',en:'Sections'},
+  mLearn:{ru:'Тренажёр',en:'Trainer'},
+  mLearnD:{ru:'Шесть предметов ЕГЭ и ОГЭ. У каждого задания подсказка и полный разбор.',
+           en:'Six exam subjects. Every problem comes with a hint and a full walkthrough.'},
+  mKids:{ru:'Детям',en:'For kids'},
+  mKidsD:{ru:'«Три в ряд», где ходы зарабатываются правильными ответами, счёт, память и логика.',
+          en:'A match-3 game where moves are earned by correct answers, plus counting, memory and logic.'},
+  mChess:{ru:'Шахматы',en:'Chess'},
+  mChessD:{ru:'Уроки, задачи с разбором, игра против бота и партия с учителем.',
+           en:'Lessons, puzzles with explanations, a game against the bot and play with a teacher.'},
+  mTeach:{ru:'Учителя',en:'Teachers'},
+  mTeachD:{ru:'Каталог преподавателей, домашние задания и переписка по ним.',
+           en:'A directory of teachers, homework assignments and messages about them.'},
+  mLife:{ru:'Режим дня',en:'Daily life'},
+  mLifeD:{ru:'Сон, расписание, питание и экранное время — в одном месте и на графиках.',
+          en:'Sleep, schedule, meals and screen time — in one place, on charts.'},
+  mPlan:{ru:'План',en:'Plan'},
+  mPlanD:{ru:'Дата экзамена, цель на день, список дел и напоминание.',
+          en:'Exam date, a daily goal, a to-do list and a reminder.'},
+  mTools:{ru:'Инструменты',en:'Tools'},
+  mToolsD:{ru:'Калькулятор, браузер для справочников и песочница Python — прямо на сайте.',
+           en:'A calculator, a reference browser and a Python sandbox — right on the site.'},
+
+  repeat:{ru:'Что повторить',en:'What to review'},
+  repeatNote:{ru:'по методу интервального повторения',en:'using spaced repetition'},
+  due:{ru:'доступно сейчас',en:'available now'},
+  allDone:{ru:'всё повторено',en:'all reviewed'},
+  ofTotal:{ru:'%1 заданий',en:'%1 problems'},
+  weak:{ru:'Работа над ошибками',en:'Your mistakes'},
+  noWeakT:{ru:'Ошибок пока нет',en:'No mistakes yet'},
+  noWeakD:{ru:'Как только они появятся, задания соберутся здесь и будут возвращаться чаще остальных — пока не начнут получаться.',
+           en:'As soon as there are some, those problems gather here and come back more often than the rest — until they stick.'},
+  times:{ru:'ошибок: %1',en:'mistakes: %1'},
+  practise:{ru:'Решать',en:'Practise'}
+});
+
+const BANKS = window.BANKS || {};
+const $ = s => document.querySelector(s);
+
+document.getElementById('heroCloud').innerHTML = Sky.logoSvg('');
+
+const MODULES = [
+  { href:'trainer.html',  cls:'learn', ico:'📚', t:'mLearn', d:'mLearnD' },
+  { href:'kids.html',     cls:'kids',  ico:'🎈', t:'mKids',  d:'mKidsD' },
+  { href:'chess.html',    cls:'chess', ico:'♞', t:'mChess', d:'mChessD' },
+  { href:'teachers.html', cls:'teach', ico:'🎓', t:'mTeach', d:'mTeachD' },
+  { href:'life.html',     cls:'life',  ico:'🌙', t:'mLife',  d:'mLifeD' },
+  { href:'plan.html',     cls:'plan',  ico:'🗓', t:'mPlan',  d:'mPlanD' },
+  { href:'tools.html',    cls:'tools', ico:'🧮', t:'mTools', d:'mToolsD' }
+];
+
+function renderHero() {
+  $('#heroActions').innerHTML =
+    `<a class="btn big" href="trainer.html">${Sky.t('startNow')}</a>` +
+    `<a class="btn ghost big" href="teachers.html">${Sky.t('findTeacher')}</a>`;
+}
+
+function renderModules() {
+  $('#moduleTiles').innerHTML = MODULES.map(m =>
+    `<a class="tile ${m.cls}" href="${m.href}">
+       <div class="ico">${m.ico}</div>
+       <h3>${Sky.t(m.t)}</h3>
+       <p>${Sky.t(m.d)}</p>
+     </a>`).join('');
+}
+
+function renderToday() {
+  const s = Sky.stats();
+  $('#stSolved').textContent = s.solved;
+  $('#stAcc').textContent = Sky.pct(s.right, s.solved) + '%';
+  $('#stStreak').textContent = s.streak;
+  $('#stBest').textContent = s.best;
+
+  const plan = Sky.get('plan', {});
+  const goal = plan.goal || 10;
+  const done = Sky.todayCount();
+  const share = Math.min(100, Math.round(done / goal * 100));
+
+  $('#goalNow').textContent = done;
+  $('#goalNote').textContent = done >= goal ? Sky.t('goalDone')
+    : done === 0 ? Sky.t('goalStart')
+    : Sky.t('goalOf').replace('%1', goal);
+  $('#goalMid').textContent = share + '%';
+
+  const r = 40, c = 2 * Math.PI * r;
+  const fg = $('#goalRing .fg');
+  fg.style.strokeDasharray = c;
+  fg.style.strokeDashoffset = c * (1 - share / 100);
+
+  const d = Sky.daysLeft(plan.exam);
+  const extra = $('#examExtra');
+  if (d === null) {
+    $('#examDays').textContent = '—';
+    $('#examNote').textContent = Sky.t('noExam');
+    extra.innerHTML = `<a class="btn ghost small" href="plan.html">${Sky.t('setExam')}</a>`;
+  } else if (d < 0) {
+    $('#examDays').textContent = '—';
+    $('#examNote').textContent = Sky.t('examPast');
+    extra.innerHTML = `<a class="btn ghost small" href="plan.html">${Sky.t('setExam')}</a>`;
+  } else {
+    $('#examDays').textContent = d;
+    $('#examNote').textContent = plan.examName ||
+      (Sky.lang === 'ru' ? Sky.plural(d, 'день', 'дня', 'дней') + ' на подготовку' : 'days to prepare');
+    extra.innerHTML = '';
+  }
+}
+
+function renderSubjects() {
+  const box = $('#subjectCards');
+  box.innerHTML = '';
+  for (const bank of Object.values(BANKS)) {
+    const ids = bank.tasks.map(t => t.id);
+    const due = Sky.dueIds(bank.id, ids).length;
+    const st = Sky.stats().bySubject[bank.id];
+    const a = document.createElement('a');
+    a.className = 'tile learn';
+    a.href = 'trainer.html?subject=' + bank.id;
+    a.innerHTML =
+      `<div class="ico">${bank.icon}</div><h3></h3><p></p>
+       <div class="foot"><span class="tag ${due ? '' : 'ok'}"></span></div>`;
+    a.querySelector('h3').textContent = Sky.L(bank.name);
+    a.querySelector('p').textContent = Sky.t('ofTotal').replace('%1', ids.length) +
+      (st ? ' · ' + Sky.pct(st.right, st.n) + '% ' + Sky.t('accuracy') : '');
+    a.querySelector('.tag').textContent = due ? due + ' ' + Sky.t('due') : Sky.t('allDone');
+    box.appendChild(a);
+  }
+}
+
+function renderWeak() {
+  const srs = Sky.srs(), rows = [];
+  for (const bank of Object.values(BANKS)) {
+    for (const task of bank.tasks) {
+      const rec = srs[bank.id + ':' + task.id];
+      if (rec && rec.fails > 0) rows.push({ bank, task, fails: rec.fails });
+    }
+  }
+  rows.sort((a, b) => b.fails - a.fails);
+
+  const panel = $('#weakPanel'), list = $('#weakList');
+  if (!rows.length) {
+    panel.innerHTML = `<div class="empty"><div class="big">🌤</div>
+      <b>${Sky.t('noWeakT')}</b><p>${Sky.t('noWeakD')}</p></div>`;
+    return;
+  }
+  panel.innerHTML = '<div class="list" id="weakList"></div>';
+  const box = $('#weakList');
+  for (const r of rows.slice(0, 8)) {
+    const el = document.createElement('div');
+    el.className = 'item';
+    el.innerHTML = `<span class="tag no">${r.fails}</span>
+      <div class="txt"><b></b><span></span></div>
+      <a class="btn small ghost" href="trainer.html?subject=${r.bank.id}&mode=weak"></a>`;
+    el.querySelector('b').textContent = Sky.L(r.task.topic);
+    el.querySelector('span.txt span, .txt span').textContent =
+      Sky.L(r.bank.name) + ' · ' + Sky.t('times').replace('%1', r.fails);
+    el.querySelector('a').textContent = Sky.t('practise');
+    box.appendChild(el);
+  }
+}
+
+function renderAll() { renderHero(); renderModules(); renderToday(); renderSubjects(); renderWeak(); }
+document.addEventListener('langchange', renderAll);
+document.addEventListener('statschange', renderAll);
+renderAll();
+</script>
+</body>
+</html>

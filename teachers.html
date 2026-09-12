@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Учителя — SkyySchool</title>
+<meta name="theme-color" content="#f6faff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon-512.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/sky.css">
+<style>
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}
+
+.tcard{
+  background:var(--card);border:1.5px solid var(--line);border-radius:var(--r);
+  padding:17px;display:flex;flex-direction:column;gap:12px;transition:border-color .15s,transform .15s;
+}
+.tcard:hover{border-color:var(--accent);transform:translateY(-2px)}
+.tcard.picked{border-color:var(--accent);box-shadow:0 0 0 3px var(--m-learn-soft)}
+
+.tcard .top{display:flex;gap:12px;align-items:flex-start}
+.tcard .ava{
+  width:50px;height:50px;border-radius:15px;flex:none;display:grid;place-items:center;
+  font-size:25px;background:var(--m-learn-soft);
+}
+.tcard h3{font-size:16px;font-weight:900;line-height:1.25}
+.tcard .role{font-size:11.5px;color:var(--muted);font-weight:800;margin-top:2px}
+.tcard .style{font-size:13px;line-height:1.55;color:var(--ink);flex:1}
+
+.tmeta{display:flex;flex-direction:column;gap:7px;font-size:11.5px;color:var(--muted);font-weight:700}
+.tmeta .line{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.strict{font-family:'JetBrains Mono',monospace;letter-spacing:1px;color:var(--accent)}
+.stars{color:var(--warn);letter-spacing:1px}
+.stars .none{color:var(--muted);letter-spacing:0;font-family:inherit}
+
+.tags{display:flex;gap:5px;flex-wrap:wrap}
+.tag-goal{
+  font-size:10.5px;font-weight:800;padding:3px 8px;border-radius:99px;
+  background:var(--panel-2);border:1px solid var(--line);color:var(--muted);
+}
+
+.tcard .actions{display:flex;gap:8px;margin-top:2px}
+.tcard .actions .btn{flex:1}
+
+.current{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.current .ava{
+  width:56px;height:56px;border-radius:16px;flex:none;display:grid;place-items:center;
+  font-size:28px;background:var(--m-learn-soft);
+}
+.current .who{flex:1;min-width:190px}
+.current .who b{font-size:17px;display:block}
+.current .who span{font-size:12.5px;color:var(--muted);display:block;margin-top:3px;line-height:1.5}
+
+.rate-row{display:flex;gap:6px;justify-content:center;margin:8px 0 14px}
+.rate-row button{
+  font-size:29px;line-height:1;background:none;border:none;cursor:pointer;
+  color:var(--line);transition:color .12s,transform .12s;padding:2px;
+}
+.rate-row button:hover,.rate-row button.on{color:var(--warn);transform:scale(1.12)}
+
+.empty-filter{
+  text-align:center;padding:34px 16px;color:var(--muted);font-size:13.5px;
+  border:1.5px dashed var(--line);border-radius:var(--r);
+}
+</style>
+</head>
+<body>
+<header id="appHeader"></header>
+
+<main class="wrap">
+  <h1 data-i18n="h1"></h1>
+  <p class="lead" data-i18n="lead"></p>
+
+  <!-- выбранный сейчас -->
+  <div class="section">
+    <div class="panel current" id="currentBlock"></div>
+  </div>
+
+  <!-- каталог -->
+  <div class="section">
+    <div class="section-head">
+      <h2 data-i18n="catalog"></h2>
+      <span class="lead" style="font-size:12px" id="foundNote"></span>
+    </div>
+
+    <div class="filters">
+      <div class="field" id="subjField" hidden>
+        <label data-i18n="fSubject"></label>
+        <select id="fSubj"></select>
+      </div>
+      <div class="field">
+        <label data-i18n="fGoal"></label>
+        <select id="fGoal"></select>
+      </div>
+      <div class="field">
+        <label data-i18n="fStyle"></label>
+        <select id="fStyle"></select>
+      </div>
+      <div class="field">
+        <label data-i18n="fLang"></label>
+        <select id="fLang"></select>
+      </div>
+    </div>
+
+    <div class="tgrid" id="tList"></div>
+  </div>
+</main>
+
+<footer id="appFooter"></footer>
+
+<script src="assets/config.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/db.js"></script>
+<script src="assets/auth.js"></script>
+<script src="data/ai-teachers.js"></script>
+<script src="assets/ai-teachers.js"></script>
+<script>
+'use strict';
+Sky.init({
+  h1:{ru:'Учителя',en:'Teachers'},
+  lead:{ru:'Учитель задаёт не то, ЧТО вам объяснят, а КАК. Один и тот же разбор Сократ выстроит вопросами, а Строгий Пётр — списком того, за что снимут балл. Выбирайте под задачу и меняйте когда угодно.',
+        en:'A teacher decides not WHAT you are told but HOW. Socrates builds the same explanation out of questions; Strict Peter turns it into a list of what would cost you marks. Pick one for the job and change it whenever you like.'},
+  catalog:{ru:'Кого выбрать',en:'Who to pick'},
+
+  fSubject:{ru:'Предмет',en:'Subject'},
+  fGoal:{ru:'Цель',en:'Goal'},
+  fStyle:{ru:'Стиль',en:'Style'},
+  fLang:{ru:'Язык ответа',en:'Answer language'},
+  fAny:{ru:'Любая',en:'Any'},
+  fAnyM:{ru:'Любой',en:'Any'},
+
+  goalEge:{ru:'ЕГЭ',en:'Final exam'},
+  goalOge:{ru:'ОГЭ',en:'Mid exam'},
+  goalImprove:{ru:'Подтянуть',en:'Catch up'},
+  goalSelf:{ru:'Для себя',en:'For myself'},
+  goalOlympiad:{ru:'Олимпиады',en:'Olympiads'},
+
+  rolePhilosopher:{ru:'Философ',en:'Philosopher'},
+  roleExaminer:{ru:'Экзаменатор',en:'Examiner'},
+  roleFriend:{ru:'Друг',en:'Friend'},
+  roleScientist:{ru:'Учёный',en:'Scientist'},
+  roleCoach:{ru:'Коуч',en:'Coach'},
+  roleKid:{ru:'Для малышей',en:'For little ones'},
+
+  universal:{ru:'все предметы',en:'all subjects'},
+  strictL:{ru:'Строгость',en:'Strictness'},
+  ratingL:{ru:'Оценка',en:'Rating'},
+  noRating:{ru:'пока нет оценок',en:'no ratings yet'},
+  ratingN:{ru:'%1 (%2)',en:'%1 (%2)'},
+
+  pick:{ru:'Выбрать',en:'Choose'},
+  picked:{ru:'Ваш учитель',en:'Your teacher'},
+  rateBtn:{ru:'Оценить',en:'Rate'},
+  yourTeacher:{ru:'Сейчас с вами',en:'Working with you'},
+  changeHint:{ru:'Разборы в тренажёре пишет он. Поменять можно в любой момент — прогресс не пострадает.',
+              en:'Explanations in the trainer come from them. Change any time — your progress is unaffected.'},
+
+  rateTitle:{ru:'Как вам %1?',en:'How is %1?'},
+  rateComment:{ru:'Что понравилось или нет (необязательно)',en:'What worked or did not (optional)'},
+  rateSave:{ru:'Отправить',en:'Send'},
+  rateThanks:{ru:'Спасибо, оценка учтена',en:'Thanks, your rating counted'},
+  teachRateLocal:{ru:'Оценки учителей хранятся в общей базе — работает только при подключённом Supabase.',
+                  en:'Teacher ratings live in the shared database — this needs Supabase connected.'},
+  teachRateAuth:{ru:'Чтобы оценить учителя, войдите в аккаунт.',en:'Sign in to rate a teacher.'},
+
+  foundN:{ru:'подходит: %1',en:'matching: %1'},
+  emptyFilter:{ru:'Под такие условия никто не подходит. Снимите часть фильтров.',
+               en:'Nobody matches these filters. Try removing some.'}
+});
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const GOALS = ['ege','oge','improve','self','olympiad'];
+const ROLES = ['philosopher','examiner','friend','scientist','coach','kid'];
+const goalLabel = g => Sky.t('goal' + g[0].toUpperCase() + g.slice(1));
+const roleLabel = r => Sky.t('role' + r[0].toUpperCase() + r.slice(1));
+
+let TEACHERS = [];
+let RATINGS = {};
+
+/* ---------- фильтры ----------
+   Предмет заполняется из самих учителей, а не из списка предметов
+   платформы: все шесть базовых универсальны, и выпадающий список с
+   одним пунктом «любой» — это элемент управления, который ничего не
+   делает. Поэтому пока среди учителей нет ни одного предметного,
+   фильтр просто скрыт; он появится, как только появится предметный. */
+function fillFilters() {
+  const subjects = [...new Set(TEACHERS.map(t => t.subject).filter(Boolean))];
+  $('#subjField').hidden = subjects.length === 0;
+  fillSelect($('#fSubj'), [['all', Sky.t('fAnyM')]].concat(subjects.map(s => [s, s])));
+
+  fillSelect($('#fGoal'),  [['all', Sky.t('fAny')]].concat(GOALS.map(g => [g, goalLabel(g)])));
+  fillSelect($('#fStyle'), [['all', Sky.t('fAnyM')]].concat(ROLES.map(r => [r, roleLabel(r)])));
+
+  const langs = [...new Set(TEACHERS.flatMap(t => t.languages || []))];
+  fillSelect($('#fLang'), [['all', Sky.t('fAnyM')]].concat(langs.map(l => [l, l.toUpperCase()])));
+}
+
+function fillSelect(sel, pairs) {
+  const keep = sel.value;
+  sel.innerHTML = '';
+  for (const [v, label] of pairs) {
+    const o = document.createElement('option');
+    o.value = v; o.textContent = label;
+    sel.appendChild(o);
+  }
+  if (keep && [...sel.options].some(o => o.value === keep)) sel.value = keep;
+}
+
+function matches(t) {
+  const subj = $('#fSubj').value, goal = $('#fGoal').value;
+  const style = $('#fStyle').value, lang = $('#fLang').value;
+
+  /* Универсальный учитель подходит под любой предмет — он и правда
+     объясняет что угодно, прятать его при выборе предмета неверно. */
+  if (subj !== 'all' && t.subject && t.subject !== subj) return false;
+  if (goal !== 'all' && !(t.goals || []).includes(goal)) return false;
+  if (style !== 'all' && t.role !== style) return false;
+  if (lang !== 'all' && !(t.languages || []).includes(lang)) return false;
+  return true;
+}
+
+/* ---------- карточка ---------- */
+function starsHtml(id) {
+  const r = RATINGS[id];
+  if (!r || !r.count) return `<span class="stars"><span class="none">${Sky.t('noRating')}</span></span>`;
+  const full = Math.round(r.avg);
+  return `<span class="stars">${'★'.repeat(full)}${'☆'.repeat(5 - full)}` +
+         ` <span class="none">${Sky.t('ratingN').replace('%1', r.avg.toFixed(1)).replace('%2', r.count)}</span></span>`;
+}
+
+function card(t) {
+  const mine = t.id === SkyTeachers.selectedId();
+  const el = document.createElement('div');
+  el.className = 'tcard' + (mine ? ' picked' : '');
+  el.innerHTML =
+    `<div class="top">
+       <div class="ava">${esc(t.emoji)}</div>
+       <div>
+         <h3>${esc(Sky.L(t.name))}</h3>
+         <div class="role">${esc(roleLabel(t.role))} · ${esc(t.subject || Sky.t('universal'))}</div>
+       </div>
+     </div>
+     <p class="style">${esc(Sky.L(t.style))}</p>
+     <div class="tags">${(t.goals || []).map(g => `<span class="tag-goal">${esc(goalLabel(g))}</span>`).join('')}</div>
+     <div class="tmeta">
+       <div class="line"><span>${Sky.t('strictL')}</span>
+            <span class="strict">${SkyTeachers.strictnessLabel(t.strictness)}</span></div>
+       <div class="line"><span>${Sky.t('ratingL')}</span>${starsHtml(t.id)}</div>
+     </div>
+     <div class="actions">
+       <button class="btn${mine ? ' ghost' : ''}" data-pick="${esc(t.id)}"${mine ? ' disabled' : ''}>
+         ${mine ? Sky.t('picked') : Sky.t('pick')}</button>
+       <button class="btn ghost" data-rate="${esc(t.id)}">${Sky.t('rateBtn')}</button>
+     </div>`;
+  return el;
+}
+
+function renderList() {
+  const list = $('#tList');
+  list.innerHTML = '';
+  const shown = TEACHERS.filter(matches);
+  $('#foundNote').textContent = Sky.t('foundN').replace('%1', shown.length);
+
+  if (!shown.length) {
+    list.innerHTML = `<div class="empty-filter">${Sky.t('emptyFilter')}</div>`;
+    return;
+  }
+  for (const t of shown) list.appendChild(card(t));
+}
+
+function renderCurrent() {
+  const t = SkyTeachers.selected();
+  if (!t) { $('#currentBlock').innerHTML = ''; return; }
+  $('#currentBlock').innerHTML =
+    `<div class="ava">${esc(t.emoji)}</div>
+     <div class="who">
+       <b>${esc(Sky.L(t.name))} — ${esc(Sky.t('yourTeacher').toLowerCase())}</b>
+       <span>${esc(Sky.t('changeHint'))}</span>
+     </div>`;
+}
+
+/* ---------- оценка учителя ---------- */
+function openRate(t) {
+  let stars = 0;
+  Sky.modal(
+    `<h2 style="margin-bottom:14px">${esc(Sky.t('rateTitle').replace('%1', Sky.L(t.name)))}</h2>
+     <div class="rate-row" id="rateRow">
+       ${[1,2,3,4,5].map(n => `<button type="button" data-n="${n}">★</button>`).join('')}
+     </div>
+     <div class="field"><label>${Sky.t('rateComment')}</label>
+       <textarea id="rateComment" rows="3"></textarea></div>
+     <button class="btn full big" id="rateSave" disabled>${Sky.t('rateSave')}</button>`,
+    (box, close) => {
+      const row = box.querySelector('#rateRow');
+      row.addEventListener('click', e => {
+        const b = e.target.closest('button[data-n]');
+        if (!b) return;
+        stars = +b.dataset.n;
+        [...row.children].forEach(x => x.classList.toggle('on', +x.dataset.n <= stars));
+        box.querySelector('#rateSave').disabled = false;
+      });
+      box.querySelector('#rateSave').addEventListener('click', async () => {
+        const btn = box.querySelector('#rateSave');
+        btn.disabled = true;
+        const res = await SkyTeachers.rate(t.id, stars, box.querySelector('#rateComment').value.trim());
+        if (res && res.error) { Sky.toast(res.error, 4200); btn.disabled = false; return; }
+        RATINGS = await SkyTeachers.ratings();
+        renderList();
+        Sky.toast(Sky.t('rateThanks'));
+        close();
+      });
+    }
+  );
+}
+
+/* ---------- события ---------- */
+$('#tList').addEventListener('click', async e => {
+  const pick = e.target.closest('button[data-pick]');
+  if (pick) {
+    await SkyTeachers.select(pick.dataset.pick);
+    renderCurrent();
+    renderList();
+    Sky.toast(Sky.t('picked') + ': ' + Sky.L(SkyTeachers.selected().name));
+    return;
+  }
+  const rate = e.target.closest('button[data-rate]');
+  if (rate) {
+    const t = SkyTeachers.get(rate.dataset.rate);
+    if (t) openRate(t);
+  }
+});
+
+['#fSubj','#fGoal','#fStyle','#fLang'].forEach(sel =>
+  $(sel).addEventListener('change', renderList));
+
+document.addEventListener('langchange', () => {
+  fillFilters();
+  renderCurrent();
+  renderList();
+});
+
+/* ---------- запуск ---------- */
+(async function start() {
+  TEACHERS = await SkyTeachers.all();
+  RATINGS = await SkyTeachers.ratings();
+  await SkyTeachers.syncFromProfile();
+  fillFilters();
+  renderCurrent();
+  renderList();
+})();
+</script>
+</body>
+</html>

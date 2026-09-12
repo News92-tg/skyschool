@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Домашние задания — SkyySchool</title>
+<meta name="theme-color" content="#f6faff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon-512.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/sky.css">
+<style>
+.pickable{max-height:330px;overflow:auto;border:1px solid var(--line);border-radius:var(--r);padding:9px;background:var(--panel-2)}
+.pick{display:flex;gap:10px;align-items:flex-start;padding:9px 11px;border-radius:11px;cursor:pointer;transition:.14s;width:100%;text-align:left}
+.pick:hover{background:var(--panel)}
+.pick.on{background:var(--m-teach-soft);outline:1.5px solid var(--m-teach)}
+.pick .box{width:20px;height:20px;border-radius:6px;border:2px solid var(--line-2);flex-shrink:0;margin-top:2px;display:grid;place-items:center;color:#fff;font-size:11px;font-weight:900}
+.pick.on .box{background:var(--m-teach);border-color:var(--m-teach)}
+.pick .body{min-width:0}
+.pick .body b{display:block;font-size:13px;font-weight:800}
+.pick .body span{font-size:11.5px;color:var(--muted);display:block;line-height:1.45;margin-top:2px}
+</style>
+</head>
+<body>
+<header id="appHeader"></header>
+
+<main class="wrap">
+  <h1 data-i18n="h1"></h1>
+  <p class="lead" id="subLead"></p>
+
+  <div id="gate" class="section"></div>
+
+  <div id="teacherView" class="section hidden">
+    <div class="section-head">
+      <h2 data-i18n="given"></h2>
+      <button class="btn teach small" id="btnNew" data-i18n="newHw"></button>
+    </div>
+    <div class="list" id="hwTeacher"></div>
+  </div>
+
+  <div id="studentView" class="section hidden">
+    <div class="section-head"><h2 data-i18n="mine"></h2></div>
+    <div class="list" id="hwStudent"></div>
+  </div>
+</main>
+
+<footer id="appFooter"></footer>
+
+<script src="assets/config.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/db.js"></script>
+<script src="assets/auth.js"></script>
+<script src="data/bank-math.js"></script>
+<script src="data/bank-informatics.js"></script>
+<script src="data/bank-russian.js"></script>
+<script src="data/bank-physics.js"></script>
+<script src="data/bank-biology.js"></script>
+<script src="data/bank-chemistry.js"></script>
+<script src="data/bank-geography.js"></script>
+<script src="data/bank-social.js"></script>
+<script src="data/bank-history.js"></script>
+<script src="data/bank-english.js"></script>
+<script src="data/bank-polish.js"></script>
+<script src="data/bank-spanish.js"></script>
+<script src="data/bank-german.js"></script>
+<script>
+'use strict';
+Sky.init({
+  h1:{ru:'Домашние задания',en:'Homework'},
+  leadT:{ru:'Соберите задание из базы, выберите ученика и срок. Результат придёт сюда же, вместе с тем, где именно ученик ошибся.',
+         en:'Build an assignment from the task bank, pick a student and a due date. The result comes back here, including exactly where they went wrong.'},
+  leadS:{ru:'Задания от ваших учителей. Решайте прямо здесь — учитель увидит результат и разбор ошибок.',
+         en:'Assignments from your teachers. Solve them right here — your teacher sees the result and where you slipped.'},
+
+  given:{ru:'Выданные задания',en:'Assignments you set'},
+  mine:{ru:'Мои задания',en:'My assignments'},
+  newHw:{ru:'Новое задание',en:'New assignment'},
+
+  needAuth:{ru:'Войдите, чтобы увидеть задания',en:'Sign in to see assignments'},
+  needAuthD:{ru:'Домашние задания привязаны к профилю: учитель выдаёт их конкретному ученику.',
+             en:'Homework is tied to a profile: a teacher assigns it to a specific student.'},
+  noStudentsT:{ru:'Пока нет учеников',en:'No students yet'},
+  noStudentsD:{ru:'Ученики выбирают учителя в каталоге. Как только вас выберут, вы сможете выдавать задания.',
+               en:'Students pick a teacher in the directory. Once someone picks you, you can set assignments.'},
+  toCatalog:{ru:'Открыть каталог',en:'Open the directory'},
+  noHwT:{ru:'Заданий пока нет',en:'No assignments yet'},
+  noHwTD:{ru:'Нажмите «Новое задание», выберите ученика и отметьте задачи из базы.',
+          en:'Press "New assignment", pick a student and tick problems from the bank.'},
+  noHwSD:{ru:'Когда учитель выдаст задание, оно появится здесь. А пока можно заниматься в тренажёре самостоятельно.',
+          en:'When a teacher sets you homework it shows up here. Meanwhile you can practise in the trainer.'},
+  toTrainer:{ru:'В тренажёр',en:'To the trainer'},
+  toTeachers:{ru:'Найти учителя',en:'Find a teacher'},
+
+  hwTitle:{ru:'Название',en:'Title'},
+  hwTitlePh:{ru:'Например: повторить проценты',en:'e.g. revise percentages'},
+  hwStudent:{ru:'Кому',en:'For'},
+  hwSubject:{ru:'Предмет',en:'Subject'},
+  hwDue:{ru:'Срок',en:'Due'},
+  hwNote:{ru:'Комментарий',en:'Note'},
+  hwNotePh:{ru:'На что обратить внимание',en:'What to pay attention to'},
+  hwPick:{ru:'Задачи (отметьте нужные)',en:'Problems (tick the ones you want)'},
+  hwPicked:{ru:'выбрано: %1',en:'selected: %1'},
+  hwCreate:{ru:'Выдать задание',en:'Set the assignment'},
+  needPick:{ru:'Отметьте хотя бы одну задачу',en:'Tick at least one problem'},
+  needTitle:{ru:'Введите название',en:'Enter a title'},
+  hwDone:{ru:'Задание выдано',en:'Assignment set'},
+
+  statusNew:{ru:'не начато',en:'not started'},
+  statusDone:{ru:'сдано',en:'submitted'},
+  dueOn:{ru:'до %1',en:'due %1'},
+  overdue:{ru:'просрочено',en:'overdue'},
+  tasksN:{ru:'задач: %1',en:'problems: %1'},
+  solve:{ru:'Решать',en:'Solve'},
+  reviewIt:{ru:'Посмотреть',en:'Review'},
+  result:{ru:'%1 из %2',en:'%1 of %2'},
+  feedback:{ru:'Комментарий учителя',en:'Teacher’s note'},
+  leaveFb:{ru:'Оставить комментарий',en:'Leave a note'},
+  fbSaved:{ru:'Комментарий сохранён',en:'Note saved'},
+  submitted:{ru:'Работа сдана. Верных ответов: %1 из %2',en:'Submitted. Correct: %1 of %2'},
+  finishHw:{ru:'Сдать работу',en:'Submit'},
+  whatWrong:{ru:'Где ошибся',en:'Where it went wrong'},
+  allRight:{ru:'Все ответы верные.',en:'Every answer is correct.'},
+  del:{ru:'Удалить',en:'Delete'}
+});
+
+const $ = s => document.querySelector(s);
+const esc = Sky.auth.esc;
+const BANKS = window.BANKS || {};
+
+/* быстрый доступ к задаче по её id */
+const TASK_BY_ID = {};
+for (const b of Object.values(BANKS)) for (const t of b.tasks) TASK_BY_ID[t.id] = { task: t, bank: b };
+
+let hw = [], subs = [], people = [], links = [];
+
+async function load() {
+  const me = Sky.db.me();
+  const gate = $('#gate');
+  $('#teacherView').classList.add('hidden');
+  $('#studentView').classList.add('hidden');
+
+  if (!me) {
+    gate.innerHTML = `<div class="panel"><div class="empty"><div class="big">🔐</div>
+      <b>${Sky.t('needAuth')}</b><p>${Sky.t('needAuthD')}</p>
+      <div class="actions" style="justify-content:center"><button class="btn" id="gIn">${Sky.t('signIn')}</button></div>
+      </div></div>`;
+    $('#gIn').addEventListener('click', () => Sky.auth.openAuth());
+    $('#subLead').textContent = '';
+    return;
+  }
+  gate.innerHTML = '';
+
+  people = await Sky.db.list('profiles');
+  links = await Sky.db.list('links');
+  const isT = me.role === 'teacher';
+  $('#subLead').textContent = Sky.t(isT ? 'leadT' : 'leadS');
+
+  hw = await Sky.db.list('homework', isT ? { teacher_id: me.id } : { student_id: me.id });
+  subs = await Sky.db.list('submissions');
+
+  if (isT) { $('#teacherView').classList.remove('hidden'); renderTeacher(); }
+  else { $('#studentView').classList.remove('hidden'); renderStudent(); }
+}
+
+const nameOf = id => (people.find(p => p.id === id) || {}).name || '—';
+const profOf = id => people.find(p => p.id === id) || { name: '—' };
+const subFor = hwId => subs.find(s => s.homework_id === hwId);
+
+function dueTag(h) {
+  if (!h.due_date) return '';
+  const left = Sky.daysLeft(h.due_date);
+  const cls = left < 0 ? 'no' : left <= 1 ? 'warn' : 'gray';
+  const txt = left < 0 ? Sky.t('overdue') : Sky.t('dueOn').replace('%1', h.due_date);
+  return `<span class="tag ${cls}">${txt}</span>`;
+}
+
+/* ---------- вид учителя ---------- */
+function renderTeacher() {
+  const me = Sky.db.me();
+  const myStudents = links.filter(l => l.teacher_id === me.id);
+  const box = $('#hwTeacher');
+
+  if (!myStudents.length) {
+    box.innerHTML = `<div class="panel"><div class="empty"><div class="big">🎒</div>
+      <b>${Sky.t('noStudentsT')}</b><p>${Sky.t('noStudentsD')}</p>
+      <div class="actions" style="justify-content:center">
+        <a class="btn ghost" href="teachers.html">${Sky.t('toCatalog')}</a></div></div></div>`;
+    $('#btnNew').disabled = true;
+    return;
+  }
+  $('#btnNew').disabled = false;
+
+  if (!hw.length) {
+    box.innerHTML = `<div class="panel"><div class="empty"><div class="big">📝</div>
+      <b>${Sky.t('noHwT')}</b><p>${Sky.t('noHwTD')}</p></div></div>`;
+    return;
+  }
+
+  box.innerHTML = '';
+  hw.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).forEach(h => {
+    const s = subFor(h.id);
+    const st = profOf(h.student_id);
+    const el = document.createElement('div');
+    el.className = 'item';
+    el.innerHTML =
+      `${Sky.avatar(st.name, 'sm', st.emoji)}
+       <div class="txt">
+         <b>${esc(h.title)}</b>
+         <span>${esc(st.name)} · ${Sky.t('tasksN').replace('%1', (h.task_ids || []).length)}</span>
+       </div>
+       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+         ${dueTag(h)}
+         ${s ? `<span class="tag ok">${Sky.t('result').replace('%1', s.correct).replace('%2', s.total)}</span>`
+             : `<span class="tag gray">${Sky.t('statusNew')}</span>`}
+       </div>`;
+    const act = document.createElement('button');
+    act.className = 'btn small ghost';
+    act.textContent = Sky.t('reviewIt');
+    act.addEventListener('click', () => openReview(h, s));
+    el.appendChild(act);
+    box.appendChild(el);
+  });
+}
+
+/* ---------- вид ученика ---------- */
+function renderStudent() {
+  const box = $('#hwStudent');
+  if (!hw.length) {
+    box.innerHTML = `<div class="panel"><div class="empty"><div class="big">🌤</div>
+      <b>${Sky.t('noHwT')}</b><p>${Sky.t('noHwSD')}</p>
+      <div class="actions" style="justify-content:center">
+        <a class="btn" href="trainer.html">${Sky.t('toTrainer')}</a>
+        <a class="btn ghost" href="teachers.html">${Sky.t('toTeachers')}</a></div></div></div>`;
+    return;
+  }
+  box.innerHTML = '';
+  hw.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).forEach(h => {
+    const s = subFor(h.id);
+    const t = profOf(h.teacher_id);
+    const el = document.createElement('div');
+    el.className = 'item';
+    el.innerHTML =
+      `${Sky.avatar(t.name, 'sm', t.emoji)}
+       <div class="txt">
+         <b>${esc(h.title)}</b>
+         <span>${esc(t.name)} · ${Sky.t('tasksN').replace('%1', (h.task_ids || []).length)}</span>
+       </div>
+       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+         ${dueTag(h)}
+         ${s ? `<span class="tag ok">${Sky.t('result').replace('%1', s.correct).replace('%2', s.total)}</span>` : ''}
+       </div>`;
+    const act = document.createElement('button');
+    act.className = 'btn small' + (s ? ' ghost' : '');
+    act.textContent = Sky.t(s ? 'reviewIt' : 'solve');
+    act.addEventListener('click', () => s ? openReview(h, s) : solveHw(h));
+    el.appendChild(act);
+    box.appendChild(el);
+  });
+}
+
+/* ---------- создание задания ---------- */
+$('#btnNew').addEventListener('click', () => {
+  const me = Sky.db.me();
+  const myStudents = links.filter(l => l.teacher_id === me.id);
+  const picked = new Set();
+  let subject = Object.keys(BANKS)[0];
+
+  Sky.modal(
+    `<h2>${Sky.t('newHw')}</h2>
+     <div class="field" style="margin:16px 0 12px">
+       <label>${Sky.t('hwTitle')}</label>
+       <input type="text" id="hTitle" placeholder="${Sky.t('hwTitlePh')}">
+     </div>
+     <div class="row" style="margin-bottom:12px">
+       <div class="field"><label>${Sky.t('hwStudent')}</label><select id="hStudent"></select></div>
+       <div class="field"><label>${Sky.t('hwDue')}</label><input type="date" id="hDue"></div>
+     </div>
+     <div class="field" style="margin-bottom:12px">
+       <label>${Sky.t('hwSubject')}</label><select id="hSubject"></select>
+     </div>
+     <div style="margin-bottom:12px">
+       <label style="font-size:11px;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:7px">
+         ${Sky.t('hwPick')} <span id="hCount" style="color:var(--m-teach)"></span></label>
+       <div class="pickable" id="hTasks"></div>
+     </div>
+     <div class="field" style="margin-bottom:18px">
+       <label>${Sky.t('hwNote')}</label>
+       <textarea id="hNote" placeholder="${Sky.t('hwNotePh')}"></textarea>
+     </div>
+     <button class="btn teach full big" id="hGo">${Sky.t('hwCreate')}</button>`,
+    (box, close) => {
+      box.querySelector('#hStudent').innerHTML = myStudents.map(l =>
+        `<option value="${l.student_id}">${esc(nameOf(l.student_id))}</option>`).join('');
+      box.querySelector('#hSubject').innerHTML = Object.values(BANKS).map(b =>
+        `<option value="${b.id}">${b.icon} ${esc(Sky.L(b.name))}</option>`).join('');
+
+      const drawTasks = () => {
+        const bank = BANKS[subject];
+        const host = box.querySelector('#hTasks');
+        host.innerHTML = '';
+        bank.tasks.forEach(t => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'pick' + (picked.has(t.id) ? ' on' : '');
+          b.innerHTML = `<span class="box">${picked.has(t.id) ? '✓' : ''}</span>
+            <span class="body"><b>${esc(Sky.L(t.topic))}</b><span>${esc(Sky.L(t.text).slice(0, 95))}…</span></span>`;
+          b.addEventListener('click', () => {
+            if (picked.has(t.id)) picked.delete(t.id); else picked.add(t.id);
+            drawTasks();
+            box.querySelector('#hCount').textContent = picked.size ? Sky.t('hwPicked').replace('%1', picked.size) : '';
+          });
+          host.appendChild(b);
+        });
+      };
+      box.querySelector('#hSubject').addEventListener('change', e => { subject = e.target.value; drawTasks(); });
+      drawTasks();
+
+      box.querySelector('#hGo').addEventListener('click', async () => {
+        const title = box.querySelector('#hTitle').value.trim();
+        if (!title) return Sky.toast(Sky.t('needTitle'));
+        if (!picked.size) return Sky.toast(Sky.t('needPick'));
+        await Sky.db.insert('homework', {
+          teacher_id: me.id,
+          student_id: box.querySelector('#hStudent').value,
+          title, subject,
+          task_ids: [...picked],
+          due_date: box.querySelector('#hDue').value || null,
+          note: box.querySelector('#hNote').value.trim()
+        });
+        close();
+        Sky.toast(Sky.t('hwDone'));
+        load();
+      });
+    }
+  );
+});
+
+/* ---------- решение задания учеником ---------- */
+function solveHw(h) {
+  const ids = (h.task_ids || []).filter(id => TASK_BY_ID[id]);
+  const answers = {};
+  let pos = 0;
+
+  Sky.modal('', (box, close) => {
+    const draw = () => {
+      if (pos >= ids.length) {
+        const correct = ids.filter(id => answers[id] === TASK_BY_ID[id].task.answer).length;
+        box.innerHTML =
+          `<h2>${esc(h.title)}</h2>
+           <div class="verdict ok" style="margin:16px 0">${Sky.t('submitted').replace('%1', correct).replace('%2', ids.length)}</div>
+           <button class="btn full big" id="hFin">${Sky.t('finishHw')}</button>`;
+        box.querySelector('#hFin').addEventListener('click', async () => {
+          await Sky.db.insert('submissions', {
+            homework_id: h.id, student_id: Sky.db.me().id,
+            answers, total: ids.length, correct
+          });
+          close();
+          load();
+        });
+        return;
+      }
+
+      const id = ids[pos];
+      const { task, bank } = TASK_BY_ID[id];
+      if (!task.__order) task.__order = Sky.shuffle(task.options.map((_, i) => i));
+      const picked = answers[id];
+
+      box.innerHTML =
+        `<div class="meta">
+           <span class="tag teach">${esc(Sky.L(task.topic))}</span>
+           <span class="tag gray">${pos + 1} / ${ids.length}</span>
+         </div>
+         ${h.note && pos === 0 ? `<div class="note">${esc(h.note)}</div>` : ''}
+         <div class="question">${esc(Sky.L(task.text))}</div>
+         <div class="options" id="sOpts"></div>
+         <div class="actions">
+           <button class="btn ghost" id="sHint">💡</button>
+           <button class="btn teach" id="sNext" ${picked === undefined ? 'disabled' : ''}>${Sky.t('next')}</button>
+         </div>
+         <div class="note hidden" id="sHintBox"></div>`;
+
+      const opts = box.querySelector('#sOpts');
+      task.__order.forEach((oi, shown) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'opt';
+        b.setAttribute('aria-pressed', String(picked === oi));
+        b.innerHTML = `<span class="k">${'ABCDEF'[shown]}</span><span></span>`;
+        b.lastChild.textContent = Sky.L(task.options[oi]);
+        b.addEventListener('click', () => { answers[id] = oi; draw(); });
+        opts.appendChild(b);
+      });
+
+      box.querySelector('#sHint').addEventListener('click', () => {
+        const hb = box.querySelector('#sHintBox');
+        hb.textContent = Sky.L(task.hint); hb.classList.remove('hidden');
+      });
+      box.querySelector('#sNext').addEventListener('click', () => {
+        Sky.record(bank.id, task.id, answers[id] === task.answer);
+        pos++; draw();
+      });
+    };
+    draw();
+  });
+}
+
+/* ---------- разбор сданной работы ---------- */
+function openReview(h, s) {
+  const me = Sky.db.me();
+  const isT = me.role === 'teacher';
+  const ids = (h.task_ids || []).filter(id => TASK_BY_ID[id]);
+
+  let rows = '';
+  if (s) {
+    const wrong = ids.filter(id => s.answers[id] !== TASK_BY_ID[id].task.answer);
+    rows = wrong.length
+      ? `<div class="eyebrow" style="margin:18px 0 8px">${Sky.t('whatWrong')}</div>` +
+        wrong.map(id => {
+          const t = TASK_BY_ID[id].task;
+          const gave = s.answers[id];
+          return `<div class="item" style="align-items:flex-start;flex-direction:column;gap:5px">
+            <b style="font-size:13px">${esc(Sky.L(t.topic))}</b>
+            <span style="font-size:12.5px;color:var(--muted)">${esc(Sky.L(t.text).slice(0, 130))}</span>
+            <span class="tag no">${esc(gave === undefined ? '—' : Sky.L(t.options[gave]))}</span>
+            <span class="tag ok">${esc(Sky.L(t.options[t.answer]))}</span>
+          </div>`;
+        }).join('')
+      : `<div class="verdict ok" style="margin-top:16px">${Sky.t('allRight')}</div>`;
+  }
+
+  Sky.modal(
+    `<h2>${esc(h.title)}</h2>
+     <div class="meta" style="margin-top:10px">
+       <span class="tag gray">${Sky.t('tasksN').replace('%1', ids.length)}</span>
+       ${dueTag(h)}
+       ${s ? `<span class="tag ok">${Sky.t('result').replace('%1', s.correct).replace('%2', s.total)}</span>`
+           : `<span class="tag gray">${Sky.t('statusNew')}</span>`}
+     </div>
+     ${h.note ? `<div class="note">${esc(h.note)}</div>` : ''}
+     ${rows}
+     ${s && s.feedback ? `<div class="ai"><h4>${Sky.t('feedback')}</h4>${esc(s.feedback)}</div>` : ''}
+     ${isT && s ? `<div class="field" style="margin-top:18px">
+         <label>${Sky.t('leaveFb')}</label>
+         <textarea id="rFb">${esc(s.feedback || '')}</textarea></div>
+       <button class="btn teach full" id="rSave" style="margin-top:10px">${Sky.t('save')}</button>` : ''}
+     ${isT ? `<button class="btn ghost full" id="rDel" style="margin-top:9px">${Sky.t('del')}</button>` : ''}`,
+    (box, close) => {
+      const save = box.querySelector('#rSave');
+      if (save) save.addEventListener('click', async () => {
+        await Sky.db.update('submissions', s.id, { feedback: box.querySelector('#rFb').value.trim() });
+        Sky.toast(Sky.t('fbSaved'));
+        close(); load();
+      });
+      const dl = box.querySelector('#rDel');
+      if (dl) dl.addEventListener('click', async () => {
+        await Sky.db.remove('homework', h.id);
+        close(); load();
+      });
+    }
+  );
+}
+
+document.addEventListener('authchange', load);
+document.addEventListener('langchange', load);
+Sky.db.ready.then(load);
+</script>
+</body>
+</html>
