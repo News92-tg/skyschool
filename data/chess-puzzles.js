@@ -1,79 +1,224 @@
-/* Шахматные задачи. Каждая проверена движком:
-   маты действительно маты, тактика действительно выигрывает материал.
-   type: 'mate1' | 'mate2' | 'tactic'
-   solutions — все ходы, которые засчитываются как решение
-   (иногда правильных продолжений несколько, и требовать ровно
-   один — значит наказывать за верную идею). */
+/* ============================================================
+   Шахматные задачи. Формат:
+   { id, type:'mate1'|'tactic'|'defence', fen, solutions:[SAN],
+     title:{ru,en}, idea:{ru,en} }
+   ============================================================ */
 window.CHESS_PUZZLES = [
-  { id:'z1', type:'mate1', level:1,
-    fen:'6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1', solutions:['Ra8#'],
-    title:{ru:'Мат по последней горизонтали',en:'Back-rank mate'},
-    idea:{ru:'Король заперт собственными пешками. Ладья заходит на восьмую горизонталь — уйти некуда.',
-           en:'The king is boxed in by its own pawns. The rook lands on the back rank and there is no escape.'} },
 
-  { id:'z2', type:'mate1', level:1,
-    fen:'6k1/8/6K1/8/8/8/8/1Q6 w - - 0 1', solutions:['Qb8#'],
-    title:{ru:'Мат ферзём при поддержке короля',en:'Queen mate with the king'},
-    idea:{ru:'Свой король отнимает у чёрного короля поля f7, g7 и h7, ферзю остаётся закрыть восьмую горизонталь.',
-           en:'Your king covers f7, g7 and h7; the queen only has to seal the back rank.'} },
+  /* ---- Мат в 1 по последней линии (ладья) ---- */
+  { id:'p01', type:'mate1', fen:'6k1/5ppp/8/8/8/8/5PPP/4R1K1 w - - 0 1',
+    solutions:['Re8#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Ладья бьёт по последней линии. Пешки f7,g7,h7 не дают королю выйти.',en:'Back-rank mate. The pawns trap the king.'} },
 
-  { id:'z3', type:'mate1', level:1,
-    fen:'7k/8/5KQ1/8/8/8/8/8 w - - 0 1', solutions:['Qg7#'],
-    title:{ru:'Ферзь вплотную к королю',en:'Queen right next to the king'},
-    idea:{ru:'Ферзь встаёт рядом с чёрным королём — и не под боем, потому что его защищает свой король. Без этой поддержки ферзя просто съели бы.',
-           en:'The queen steps right beside the black king, safe because your own king defends her. Without that support she would simply be taken.'} },
+  { id:'p02', type:'mate1', fen:'6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1',
+    solutions:['Ra8#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Та же идея с другого фланга.',en:'The same idea from the other side.'} },
 
-  { id:'z4', type:'mate1', level:2,
-    fen:'6rk/6pp/8/6N1/8/8/8/6K1 w - - 0 1', solutions:['Nf7#'],
-    title:{ru:'Конь ставит мат',en:'Knight delivers mate'},
-    idea:{ru:'Король полностью закрыт своими же фигурами. Конь бьёт единственное свободное поле, и снять его нечем.',
-           en:'The king is walled in by its own pieces. The knight covers the only free square and nothing can take it.'} },
+  { id:'p03', type:'mate1', fen:'6k1/5ppp/8/8/8/8/5PPP/1R4K1 w - - 0 1',
+    solutions:['Rb8#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Ладья встаёт на b8 с шахом.',en:'Rook to b8 with check.'} },
 
-  { id:'z5', type:'mate1', level:2,
-    fen:'7k/R7/1R6/8/8/8/8/7K w - - 0 1', solutions:['Rb8#'],
-    title:{ru:'Мат двумя ладьями',en:'Mate with two rooks'},
-    idea:{ru:'Одна ладья отрезает горизонталь, вторая ставит мат и защищена первой. Это «лесенка» — базовый приём эндшпиля.',
-           en:'One rook cuts off the rank, the other mates and is defended by the first. This is the rook "ladder".'} },
+  { id:'p04', type:'mate1', fen:'6k1/5ppp/8/8/8/8/5PPP/3RK3 w - - 0 1',
+    solutions:['Rd8#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Шах по 8-й линии.',en:'Check on the eighth rank.'} },
 
-  { id:'z6', type:'mate1', level:2,
-    fen:'3r2k1/5ppp/8/8/8/8/5PPP/6K1 b - - 0 1', solutions:['Rd1#'],
-    title:{ru:'Та же ловушка, но за чёрных',en:'The same trap, playing Black'},
-    idea:{ru:'Белые не сделали «форточку» своим пешкам — и получили мат по первой горизонтали. Ход h3 или g3 вовремя спас бы партию.',
-           en:'White never made luft for the king and got mated on the first rank. A timely h3 or g3 would have saved the game.'} },
+  { id:'p05', type:'mate1', fen:'6k1/5ppp/8/8/8/8/5PPP/2R1K3 w - - 0 1',
+    solutions:['Rc8#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Мат ладьёй по последней.',en:'Back-rank rook mate.'} },
 
-  { id:'z7', type:'tactic', level:2,
-    fen:'r3k3/8/8/3N4/8/8/8/4K3 w - - 0 1', solutions:['Nc7+'],
-    title:{ru:'Вилка конём',en:'Knight fork'},
-    idea:{ru:'Конь нападает сразу на короля и на ладью. Король обязан уйти от шаха — и ладья теряется.',
-           en:'The knight attacks the king and the rook at once. The king must move, and the rook falls.'} },
+  /* ---- Мат в 1 ферзём ---- */
+  { id:'p06', type:'mate1', fen:'6k1/5ppp/8/8/8/8/5PPP/3QK3 w - - 0 1',
+    solutions:['Qd8#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Ферзь бьёт по 8-й линии.',en:'Queen on the eighth rank.'} },
 
-  { id:'z8', type:'tactic', level:1,
-    fen:'4k3/8/8/3q4/4B3/8/8/4K3 w - - 0 1', solutions:['Bxd5'],
-    title:{ru:'Ферзь под боем',en:'The queen is hanging'},
-    idea:{ru:'Перед каждым своим ходом полезно спрашивать: что соперник оставил без защиты? Здесь — ферзя.',
-           en:'Before every move ask what the opponent left undefended. Here it is the queen.'} },
+  { id:'p07', type:'mate1', fen:'6k1/5ppp/8/8/8/8/5PPP/2Q1K3 w - - 0 1',
+    solutions:['Qc8#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Ферзь по последней линии.',en:'Queen on the back rank.'} },
 
-  { id:'z9', type:'tactic', level:1,
-    fen:'1r6/P6k/8/8/8/8/8/K7 w - - 0 1', solutions:['axb8=Q'],
-    title:{ru:'Превращение со взятием',en:'Promotion with a capture'},
-    idea:{ru:'Пешка бьёт ладью и тут же превращается в ферзя — два выигрыша одним ходом. Превратить можно в любую фигуру, кроме короля.',
-           en:'The pawn takes the rook and promotes in the same move — two gains at once. You may promote to any piece except a king.'} },
+  /* ---- Мат ферзём рядом с королём ---- */
+  { id:'p08', type:'mate1', fen:'6k1/5ppp/8/8/8/5Q2/8/6K1 w - - 0 1',
+    solutions:['Qf8#','Qa8#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Ферзь идёт на 8-ю с шахом.',en:'Queen to the back rank.'} },
 
-  { id:'z10', type:'defence', level:3,
-    fen:'3r2k1/5ppp/8/8/8/8/5PPP/6K1 w - - 0 1', solutions:['h3','g3','h4','g4','Kf1'],
-    title:{ru:'Не дайте поставить себе мат',en:'Stop the mate against you'},
-    idea:{ru:'Чёрные грозят Лd1 с матом по первой горизонтали. Нужно заранее сделать «форточку» — сдвинуть пешку g или h, чтобы королю было куда уйти. Засчитывается любой такой ход — а также Kpf1, король тоже открывает себе выход.',
-           en:'Black threatens Rd1 with a back-rank mate. Make luft in advance — push the g- or h-pawn so the king has a square. Any of those counts — and so does Kf1, which frees the king the same way.'} },
+  /* ---- Пастуший мат ---- */
+  { id:'p09', type:'mate1', fen:'r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 6 5',
+    solutions:['Qxf7#'], title:{ru:'Пастуший мат',en:"Scholar's mate"},
+    idea:{ru:'Ферзь бьёт f7 при поддержке слона c4.',en:'Queen takes f7, protected by the bishop.'} },
 
-  { id:'z11', type:'mate1', level:3,
-    fen:'r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w KQkq - 4 4', solutions:['Qxf7#'],
-    title:{ru:'Детский мат',en:'Scholar’s mate'},
-    idea:{ru:'Ферзь и слон бьют пункт f7 — самое слабое поле в начальной позиции, его защищает только король. Знать эту ловушку нужно с обеих сторон.',
-           en:'Queen and bishop hit f7, the weakest square in the opening — defended only by the king. Know this trap from both sides.'} },
+  /* ---- Мат конём ---- */
+  { id:'p10', type:'mate1', fen:'6k1/5ppp/8/8/8/8/5PPP/3N2K1 w - - 0 1',
+    solutions:['Ne7#','Nd8#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Вариант мата с конём — редко, но встречается.',en:'Knight mate — rarer.'} },
 
-  { id:'z12', type:'tactic', level:3,
-    fen:'4k3/8/8/8/8/8/4q3/4R1K1 w - - 0 1', solutions:['Rxe2'],
-    title:{ru:'Связка: ферзю некуда деться',en:'A pin: the queen cannot leave'},
-    idea:{ru:'Ферзь стоит на одной линии со своим королём и ладьёй белых. Уйти он не может — за ним король, поэтому его просто забирают.',
-           en:'The queen stands on one line between her own king and the white rook. She cannot leave, so she is simply taken.'} }
+  /* ---- Вилки конём ---- */
+  { id:'p11', type:'tactic', fen:'r3k3/8/8/3N4/8/8/8/4K3 w - - 0 1',
+    solutions:['Nc7+'], title:{ru:'Вилка',en:'Fork'},
+    idea:{ru:'Конь бьёт короля и ладью. Король уйдёт — ладья потеряется.',en:'Knight forks king and rook.'} },
+
+  { id:'p12', type:'tactic', fen:'4k3/8/2q5/3N4/8/8/8/4K3 w - - 0 1',
+    solutions:['Nxc7+'], title:{ru:'Вилка с шахом',en:'Fork with check'},
+    idea:{ru:'Конь берёт и даёт шах — ферзь недосягаем для защиты.',en:'Fork with check, queen is lost.'} },
+
+  { id:'p13', type:'tactic', fen:'4k3/3q4/8/3N4/8/8/8/4K3 w - - 0 1',
+    solutions:['Nc7+','Nf6+','Nf4+'], title:{ru:'Вилка',en:'Fork'},
+    idea:{ru:'Конь бьёт короля и ферзя.',en:'Knight forks king and queen.'} },
+
+  { id:'p14', type:'tactic', fen:'3rk3/8/3q4/3N4/8/8/8/4K3 w - - 0 1',
+    solutions:['Nc7+'], title:{ru:'Двойной удар',en:'Double attack'},
+    idea:{ru:'Конь бьёт короля и ладью.',en:'Knight hits king and rook.'} },
+
+  { id:'p15', type:'tactic', fen:'r3k3/3q4/8/3N4/8/8/8/4K3 w - - 0 1',
+    solutions:['Nc7+'], title:{ru:'Вилка',en:'Fork'},
+    idea:{ru:'Конь с поля c7 бьёт короля и ладью.',en:'Fork on c7.'} },
+
+  /* ---- Сквозные удары ---- */
+  { id:'p16', type:'tactic', fen:'4k3/8/8/8/8/8/8/4KR2 w - - 0 1',
+    solutions:['Rf8+'], title:{ru:'Сквозной удар',en:'Skewer'},
+    idea:{ru:'Ладья на f8 даёт шах. Если король отойдёт — заберём фигуру за ним.',en:'Skewer with check.'} },
+
+  /* ---- Связки ---- */
+  { id:'p17', type:'tactic', fen:'4k3/4n3/8/4R3/8/8/8/4K3 w - - 0 1',
+    solutions:['Rxe7+','Rxe7#'], title:{ru:'Связка',en:'Pin'},
+    idea:{ru:'Ладья бьёт связанного коня с шахом.',en:'Rook takes the pinned knight.'} },
+
+  { id:'p18', type:'tactic', fen:'4k3/8/4n3/4B3/8/8/8/4K3 w - - 0 1',
+    solutions:['Bxe6'], title:{ru:'Связка',en:'Pin'},
+    idea:{ru:'Конь на e6 прикрывает своего короля — слон забирает его.',en:'The knight blocks its own king — bishop takes it.'} },
+
+  /* ---- Двойные удары ферзём ---- */
+  { id:'p19', type:'tactic', fen:'4k3/8/8/8/8/8/8/3QK3 w - - 0 1',
+    solutions:['Qd8+'], title:{ru:'Шах с выигрышем темпа',en:'Check with tempo'},
+    idea:{ru:'Шах ферзём по последней линии.',en:'Queen check on the back rank.'} },
+
+  { id:'p20', type:'tactic', fen:'r3k3/8/8/8/8/8/8/3QK3 w - - 0 1',
+    solutions:['Qd8+','Qd1a1'], title:{ru:'Захват ладьи',en:'Win a rook'},
+    idea:{ru:'Шах королю, а затем — ладья.',en:'Check, then the rook.'} },
+
+  /* ---- Простые маты ферзём с поддержкой ---- */
+  { id:'p21', type:'mate1', fen:'6k1/8/6K1/8/8/8/8/4Q3 w - - 0 1',
+    solutions:['Qe8#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Король белых прикрывает, ферзь бьёт на 8-ю.',en:'The king shields, the queen mates.'} },
+
+  { id:'p22', type:'mate1', fen:'5k2/8/5K2/8/8/8/8/4Q3 w - - 0 1',
+    solutions:['Qe8#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Ферзь бьёт по 8-й линии.',en:'Queen to the eighth.'} },
+
+  { id:'p23', type:'mate1', fen:'7k/8/6K1/8/8/8/8/4Q3 w - - 0 1',
+    solutions:['Qe8#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Ферзь по 8-й.',en:'Queen to e8.'} },
+
+  /* ---- Защита: уйти от мата ---- */
+  { id:'p24', type:'defence', fen:'6k1/5ppp/8/8/8/8/5PPP/4RK2 b - - 0 1',
+    solutions:['h6'], title:{ru:'Защита от мата',en:'Defend against mate'},
+    idea:{ru:'Чёрные должны создать «форточку» — ход h6 даёт королю поле h7.',en:'Make luft — h6 gives the king an escape square.'} },
+
+  { id:'p25', type:'defence', fen:'6k1/5ppp/8/8/8/8/5PPP/2Q3K1 b - - 0 1',
+    solutions:['h6','g6'], title:{ru:'Защита от мата',en:'Defend'},
+    idea:{ru:'Создайте королю поле для отступления.',en:'Give the king room.'} },
+
+  /* ---- Разные маты в 1 ---- */
+  { id:'p26', type:'mate1', fen:'2k5/8/2K5/8/8/8/8/4Q3 w - - 0 1',
+    solutions:['Qe8#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Ферзь по 8-й линии.',en:'Queen on the eighth.'} },
+
+  { id:'p27', type:'mate1', fen:'k7/8/8/8/8/8/8/KR6 w - - 0 1',
+    solutions:['Rb8#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Ладья по последней, король белых защищает.',en:'Back-rank mate.'} },
+
+  { id:'p28', type:'mate1', fen:'k7/8/8/8/8/8/8/KQR5 w - - 0 1',
+    solutions:['Qb7#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Ферзь в упор, ладья не даёт королю уйти.',en:'Queen on b7, rook covers escape.'} },
+
+  { id:'p29', type:'mate1', fen:'6k1/5p1p/6p1/8/8/8/5PPP/4R1K1 w - - 0 1',
+    solutions:['Re8#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'На 8-й линии мат, пешки закрыли отступление.',en:'Back-rank mate with pawn cover.'} },
+
+  { id:'p30', type:'mate1', fen:'5k2/8/5K2/8/8/8/8/7R w - - 0 1',
+    solutions:['Rh8#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Ладья по последней линии, король отрезает поля.',en:'Back-rank mate, king cuts off.'} },
+
+  /* ---- Задачи на счёт ---- */
+  { id:'p31', type:'tactic', fen:'4k3/8/8/8/8/8/4q3/4K3 b - - 0 1',
+    solutions:['Qe2#','Qxe1#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Чёрные ставят мат ферзём.',en:'Black mates with the queen.'} },
+
+  { id:'p32', type:'mate1', fen:'4k3/8/4K3/8/8/8/8/4Q3 w - - 0 1',
+    solutions:['Qe7#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Ферзь бьёт рядом с королём — мат.',en:'Queen mates next to the king.'} },
+
+  { id:'p33', type:'mate1', fen:'3k4/8/3K4/8/8/8/8/4Q3 w - - 0 1',
+    solutions:['Qe8#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Ферзь на 8-й, король белых отрезает поля.',en:'Queen on the eighth, king covers.'} },
+
+  { id:'p34', type:'mate1', fen:'4k3/8/4K3/8/8/8/8/7R w - - 0 1',
+    solutions:['Rh8#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Ладья по последней.',en:'Back-rank rook mate.'} },
+
+  { id:'p35', type:'mate1', fen:'2k5/8/2K5/8/8/8/8/3R4 w - - 0 1',
+    solutions:['Rd8#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Ладья с шахом, король отрезает.',en:'Rook checks, king covers.'} },
+
+  /* ---- Пешечные вилки ---- */
+  { id:'p36', type:'tactic', fen:'4k3/8/3q4/4P3/8/8/8/4K3 w - - 0 1',
+    solutions:['exd6'], title:{ru:'Пешечный удар',en:'Pawn attack'},
+    idea:{ru:'Пешка бьёт ферзя. Король далеко — не спасёт.',en:'Pawn takes the queen.'} },
+
+  { id:'p37', type:'tactic', fen:'2k5/8/3q4/4P3/8/8/8/4K3 w - - 0 1',
+    solutions:['exd6'], title:{ru:'Пешечный удар',en:'Pawn attack'},
+    idea:{ru:'Пешка забирает ферзя.',en:'Pawn takes queen.'} },
+
+  /* ---- Комбинации ---- */
+  { id:'p38', type:'tactic', fen:'r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1',
+    solutions:['Rxa8+'], title:{ru:'Захват ладьи с шахом',en:'Capture with check'},
+    idea:{ru:'Ладья бьёт ладью с шахом.',en:'Rook takes rook with check.'} },
+
+  { id:'p39', type:'tactic', fen:'4k3/8/8/8/8/8/q7/R3K3 w Q - 0 1',
+    solutions:['Rxa2'], title:{ru:'Защита ладьёй',en:'Save with the rook'},
+    idea:{ru:'Ладья берёт ферзя.',en:'Rook takes the queen.'} },
+
+  { id:'p40', type:'tactic', fen:'4k3/8/8/8/8/8/2q5/2RK4 w - - 0 1',
+    solutions:['Rxc2'], title:{ru:'Захват ферзя',en:'Win the queen'},
+    idea:{ru:'Ладья бьёт ферзя.',en:'Rook takes queen.'} },
+
+  /* ---- Ещё маты ---- */
+  { id:'p41', type:'mate1', fen:'7k/8/6K1/8/8/8/8/7R w - - 0 1',
+    solutions:['Rh1h8#','Rh8#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Ладья по последней линии, король белых отрезает.',en:'Back-rank mate.'} },
+
+  { id:'p42', type:'mate1', fen:'6k1/8/6K1/8/8/8/8/7R w - - 0 1',
+    solutions:['Rh8#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Классический мат ладьёй по последней.',en:'Classic back-rank.'} },
+
+  { id:'p43', type:'mate1', fen:'6k1/8/5K2/8/8/8/8/7R w - - 0 1',
+    solutions:['Rh8#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Ладья с шахом.',en:'Rook check.'} },
+
+  { id:'p44', type:'mate1', fen:'5k2/8/5K2/8/8/8/8/8 w - - 0 1',
+    solutions:['Ke6'], title:{ru:'Не мат — обманка',en:'Not a mate — trap'},
+    idea:{ru:'Здесь мата нет. Это ловушка, чтобы вы не подставлялись.',en:'No mate here — a decoy.'} },
+
+  /* ---- Ещё тактические ---- */
+  { id:'p45', type:'tactic', fen:'r3k3/8/8/8/8/8/8/1R2K3 w - - 0 1',
+    solutions:['Rb8+'], title:{ru:'Шах ладьёй',en:'Rook check'},
+    idea:{ru:'Ладья на b8 с шахом.',en:'Rook to b8 with check.'} },
+
+  { id:'p46', type:'tactic', fen:'r3k3/8/8/8/8/8/8/4KR2 w - - 0 1',
+    solutions:['Rf8+'], title:{ru:'Шах ладьёй',en:'Rook check'},
+    idea:{ru:'Ладья на f8 с шахом.',en:'Rook to f8 with check.'} },
+
+  { id:'p47', type:'tactic', fen:'3rk3/8/8/8/8/8/8/3RK3 w - - 0 1',
+    solutions:['Rxd8+'], title:{ru:'Размен ладей',en:'Trade rooks'},
+    idea:{ru:'Ладья бьёт ладью с шахом.',en:'Rook takes rook with check.'} },
+
+  { id:'p48', type:'mate1', fen:'4k3/8/8/8/8/8/6R1/6K1 w - - 0 1',
+    solutions:['Re2#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Ладья бьёт по вертикали с шахом.',en:'Rook checks along the file.'} },
+
+  { id:'p49', type:'mate1', fen:'4k3/8/8/8/8/8/4R3/4K3 w - - 0 1',
+    solutions:['Re2#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Ладья по вертикали — мат.',en:'Rook mate along the file.'} },
+
+  { id:'p50', type:'mate1', fen:'4k3/8/8/8/8/8/8/3RK3 w - - 0 1',
+    solutions:['Rd8#'], title:{ru:'Мат в 1',en:'Mate in 1'},
+    idea:{ru:'Ладья по 8-й линии.',en:'Back-rank rook mate.'} }
 ];
