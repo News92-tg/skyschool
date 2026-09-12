@@ -440,6 +440,25 @@ api.animateMove = function (move, done) {
 };
   return api;
 }
+  function prefersReduced() {
+  return window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function askPromotion(host, cb) {
+  host.classList.remove('hidden');
+  host.innerHTML = '';
+  const label = document.createElement('div');
+  label.style.cssText = 'font-size:12px;font-weight:800;width:100%;margin-bottom:4px';
+  label.textContent = Sky.t('choosePromo');
+  host.appendChild(label);
+  for (const t of [E.QUEEN, E.ROOK, E.BISHOP, E.KNIGHT]) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = GLYPH[t];
+    b.addEventListener('click', () => { host.classList.add('hidden'); cb(t); });
+    host.appendChild(b);
+  }
+}
+
 /* ============ вкладки ============ */
 document.querySelector('.tabs').addEventListener('click', e => {
   const b = e.target.closest('button[data-tab]'); if (!b) return;
