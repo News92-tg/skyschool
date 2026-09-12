@@ -6,9 +6,9 @@
    • «облако» — если в config.js заполнены SUPABASE_URL и ANON_KEY.
      Настоящие аккаунты, данные видны с любого устройства.
 
-   • «локально» — пока ключи не заполнены. Всё лежит в этом браузере,
-     роль переключается кнопкой. Сайт полностью рабочий, просто учитель
-     и ученик должны быть за одним устройством.
+   • «локально» — пока ключи не заполнены. Всё лежит в этом браузере.
+     Сайт полностью рабочий, просто учитель и ученик должны быть
+     за одним устройством.
 
    Вызовы одинаковые в обоих режимах, поэтому страницы про режим ничего
    не знают: заполнили ключи — сайт стал сетевым, ничего не переписывая.
@@ -30,9 +30,7 @@ Sky.db = (function () {
   const TABLES = ['profiles','links','homework','submissions','messages','chess_tasks','chess_games',
                   'teachers_ai','teacher_reviews','photo_checks','chess_sessions','task_attempts'];
 
-  /* ---------- подключение библиотеки Supabase по требованию ----------
-     Грузим её только когда ключи заданы: иначе лишние 40 КБ на каждой
-     странице ради кода, который не выполнится. */
+  /* ---------- подключение библиотеки Supabase по требованию ---------- */
   function loadScript(src) {
     return new Promise((resolve, reject) => {
       const s = document.createElement('script');
@@ -56,8 +54,6 @@ Sky.db = (function () {
         document.dispatchEvent(new CustomEvent('authchange'));
       });
     } catch (e) {
-      /* сеть недоступна или ключи неверны — не роняем сайт,
-         честно откатываемся в локальный режим */
       console.warn('[SkyySchool] Supabase недоступен, работаю локально:', e.message);
       mode = 'local';
       sb = null;
@@ -74,36 +70,16 @@ Sky.db = (function () {
   function localTable(name) { return Sky.get('tbl_' + name, []); }
   function saveTable(name, rows) {
     Sky.set('tbl_' + name, rows);
-    /* другие вкладки узнают об изменении через событие storage —
-       благодаря этому в локальном режиме можно играть в шахматы
-       и переписываться между двумя вкладками одного браузера */
     document.dispatchEvent(new CustomEvent('dbchange', { detail: { table: name } }));
   }
 
+  /* Демо-профили убраны осознанно: платформа пока полностью
+     локальная и не показывает каталог учителей. Когда появятся
+     AI-учителя (таблица teachers_ai), их будет подтягивать
+     отдельный модуль. Пустая seed-функция оставлена, чтобы
+     boot() не менялся. */
   function seedLocal() {
-    if (localTable('profiles').length) return;
-    /* Демонстрационные учителя. Это не выдуманные отзывы и не реальные
-       люди — просто заготовки профилей, чтобы раздел не был пустым.
-       Помечены demo:true, и интерфейс так их и подписывает. */
-    const demo = [
-      { id:'t-anna',  name:'Анна Петровна', role:'teacher', emoji:'👩‍🏫', demo:true,
-        subjects:['math','physics'], rate:'от 1200 ₽/час', exp:'12 лет',
-        bio:{ru:'Готовлю к ЕГЭ по математике и физике. Разбираю задачи так, чтобы решение можно было повторить самому.',
-              en:'Prepares students for the maths and physics exams. Explains problems so you can redo them on your own.'} },
-      { id:'t-oleg',  name:'Олег Смирнов', role:'teacher', emoji:'♞', demo:true,
-        subjects:['chess'], rate:'от 900 ₽/час', exp:'КМС, 8 лет',
-        bio:{ru:'Шахматы с нуля и до первого разряда. Разбираем ваши партии и учимся считать варианты.',
-              en:'Chess from scratch to club level. We review your games and learn to calculate lines.'} },
-      { id:'t-marina',name:'Марина Ильина', role:'teacher', emoji:'📖', demo:true,
-        subjects:['russian','biology'], rate:'от 1000 ₽/час', exp:'15 лет',
-        bio:{ru:'Русский язык и биология, ОГЭ и ЕГЭ. Много практики и работа над типичными ошибками.',
-              en:'Russian language and biology for both exams. Lots of practice and work on common mistakes.'} },
-      { id:'t-denis', name:'Денис Ковалёв', role:'teacher', emoji:'💻', demo:true,
-        subjects:['informatics','math'], rate:'от 1500 ₽/час', exp:'6 лет',
-        bio:{ru:'Информатика: Python, алгоритмы, разбор задач ЕГЭ. Пишем код на каждом занятии.',
-              en:'Computer science: Python, algorithms, exam problems. We write code every lesson.'} }
-    ];
-    saveTable('profiles', demo);
+    return;
   }
 
   function uid() { return 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
@@ -176,8 +152,7 @@ Sky.db = (function () {
       }
       return { ok: true, needsConfirm: !data.session };
     }
-    /* локально: профиль просто создаётся, пароль не хранится и не нужен —
-       на одном устройстве проверять его не у кого */
+    /* локально: профиль просто создаётся, пароль не хранится */
     const rec = { id: uid(), email, name: meta.name, role: meta.role, emoji: meta.emoji || null };
     const rows = localTable('profiles');
     rows.push(rec);
@@ -211,7 +186,9 @@ Sky.db = (function () {
     document.dispatchEvent(new CustomEvent('authchange'));
   }
 
-  /* быстрый вход в локальном режиме: выбрать существующий профиль */
+  /* быстрый вход в локальном режиме: выбрать существующий профиль.
+     Сейчас UI быстрого входа убран, но функция оставлена — понадобится,
+     когда на одном устройстве будут работать несколько детей/родителей. */
   function becomeLocal(id) {
     const found = localTable('profiles').find(p => p.id === id);
     if (!found) return false;
@@ -225,11 +202,7 @@ Sky.db = (function () {
   const isTeacher = () => !!profile && profile.role === 'teacher';
   const isStudent = () => !!profile && profile.role === 'student';
 
-  /* ---------- живые обновления ----------
-     В облаке — подписка Supabase Realtime.
-     Локально — событие storage: изменения из соседней вкладки того же
-     браузера. Этого хватает, чтобы вдвоём играть в шахматы на одном
-     компьютере в двух окнах. */
+  /* ---------- живые обновления ---------- */
   function subscribe(table, cb) {
     if (mode === 'cloud' && sb) {
       const ch = sb.channel('rt-' + table + '-' + Math.random().toString(36).slice(2))
