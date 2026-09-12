@@ -487,7 +487,7 @@ font-variant-emoji:text;
 /* Клетка, по которой сейчас летит фигура, поднимается над соседями,
    иначе фигура уезжает ПОД них и анимация выглядит сломанной. */
 .sqr.flying{z-index:6}
-.piece.moving{will-change:transform}
+.piece.moving{ pointer-events: none; will-change: transform; }
 /* Съеденная фигура не исчезает мгновенно, а сжимается — так видно,
    что именно её только что забрали. */
 .piece.taken{animation:takePiece .22s ease-in forwards;pointer-events:none}
