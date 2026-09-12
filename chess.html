@@ -438,6 +438,8 @@ api.animateMove = function (move, done) {
     finish();
   }, { once: true });
 };
+  return api;
+}
 /* ============ вкладки ============ */
 document.querySelector('.tabs').addEventListener('click', e => {
   const b = e.target.closest('button[data-tab]'); if (!b) return;
