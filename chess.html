@@ -391,69 +391,53 @@ function makeBoard(el, opts) {
      Если что-то пошло не так (нет элемента, пользователь свернул
      вкладку), done() всё равно вызывается: партия не должна зависать
      из-за анимации. */
-  const ANIM_MS = 210;
+ const ANIM_MS = 200;
 
-  api.animateMove = function (move, done) {
-    const finish = (() => { let called = false; return () => { if (!called) { called = true; done(); } }; })();
+api.animateMove = function (move, done) {
+  const finish = (() => {
+    let called = false;
+    return () => { if (!called) { called = true; done(); } };
+  })();
 
-    if (prefersReduced()) return finish();
+  if (prefersReduced()) return finish();
 
-    const fromCell = el.querySelector(`[data-sq="${move.from}"]`);
-    const toCell   = el.querySelector(`[data-sq="${move.to}"]`);
-    const piece    = fromCell && fromCell.querySelector('.piece');
-    if (!fromCell || !toCell || !piece) return finish();
+  const fromCell = el.querySelector(`[data-sq="${move.from}"]`);
+  const toCell   = el.querySelector(`[data-sq="${move.to}"]`);
+  const piece    = fromCell && fromCell.querySelector('.piece');
+  if (!fromCell || !toCell || !piece) return finish();
 
-    const a = fromCell.getBoundingClientRect();
-    const b = toCell.getBoundingClientRect();
-    const dx = b.left - a.left, dy = b.top - a.top;
-    if (!dx && !dy) return finish();
+  const a = fromCell.getBoundingClientRect();
+  const b = toCell.getBoundingClientRect();
+  const dx = b.left - a.left, dy = b.top - a.top;
+  if (!dx && !dy) return finish();
 
-    /* Съеденную фигуру сжимаем — видно, что забрали именно её.
-       При взятии на проходе съеденная пешка стоит НЕ на поле, куда мы
-       идём, а на клетку назад по ходу движения — иначе анимация
-       «съедала» бы пустую клетку. */
-    let victimSq = move.to;
-    if (String(move.flags || '').includes('e')) {
-      victimSq = (move.piece & 8) ? move.to + 16 : move.to - 16;
-    }
-    const victim = el.querySelector(`[data-sq="${victimSq}"] .piece`);
-    if (move.captured && victim && victim !== piece) victim.classList.add('taken');
-
-    fromCell.classList.add('flying');
-    piece.classList.add('moving');
-    piece.style.transition = `transform ${ANIM_MS}ms cubic-bezier(.3,.85,.4,1)`;
-    /* смещение задаём в следующем кадре, иначе браузер применит его
-       сразу вместе с transition и анимации не будет */
-    requestAnimationFrame(() => {
-      piece.style.transform = `translate(${dx}px, ${dy}px)`;
-    });
-
-    let timer = setTimeout(finish, ANIM_MS + 60);
-    piece.addEventListener('transitionend', () => { clearTimeout(timer); finish(); }, { once: true });
-  };
-
-  return api;
-}
-
-function prefersReduced() {
-  return window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
-
-function askPromotion(host, cb) {
-  host.classList.remove('hidden');
-  host.innerHTML = '';
-  const label = document.createElement('div');
-  label.style.cssText = 'font-size:12px;font-weight:800;width:100%;margin-bottom:4px';
-  label.textContent = Sky.t('choosePromo');
-  host.appendChild(label);
-  for (const t of [E.QUEEN, E.ROOK, E.BISHOP, E.KNIGHT]) {
-    const b = document.createElement('button');
-    b.type = 'button'; b.textContent = GLYPH[t];
-    b.addEventListener('click', () => { host.classList.add('hidden'); cb(t); });
-    host.appendChild(b);
+  let victimSq = move.to;
+  if (String(move.flags || '').includes('e')) {
+    victimSq = (move.piece & 8) ? move.to + 16 : move.to - 16;
   }
-}
+  const victim = el.querySelector(`[data-sq="${victimSq}"] .piece`);
+  if (move.captured && victim && victim !== piece) victim.classList.add('taken');
 
+  piece.style.transition = 'none';
+  piece.style.transform = '';
+  fromCell.classList.add('flying');
+  piece.classList.add('moving');
+
+  requestAnimationFrame(() => {
+    piece.style.transition = `transform ${ANIM_MS}ms cubic-bezier(.2,.85,.3,1)`;
+    piece.style.transform = `translate(${dx}px, ${dy}px)`;
+  });
+
+  let timer = setTimeout(finish, ANIM_MS + 80);
+  piece.addEventListener('transitionend', function onEnd() {
+    clearTimeout(timer);
+    piece.style.transition = '';
+    piece.style.transform = '';
+    piece.classList.remove('moving');
+    fromCell.classList.remove('flying');
+    finish();
+  }, { once: true });
+};
 /* ============ вкладки ============ */
 document.querySelector('.tabs').addEventListener('click', e => {
   const b = e.target.closest('button[data-tab]'); if (!b) return;
