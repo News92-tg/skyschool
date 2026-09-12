@@ -112,6 +112,7 @@
         <div class="captured" id="gCapBottom"></div>
         <div class="promo hidden" id="gPromo"></div>
         <div class="review hidden" id="gReview"></div>
+        <div id="teacherBubble" class="hidden"></div>
         <div class="movelist" id="gMoves" style="margin-top:12px"></div>
         <div class="actions">
           <button class="btn ghost small" id="gUndo" data-i18n="undo"></button>
@@ -184,6 +185,7 @@
 <script src="assets/chess-review.js"></script>
 <script src="data/ai-teachers.js"></script>
 <script src="assets/ai-teachers.js"></script>
+  <script src="assets/chess-teacher-ui.js"></script>
 <script src="data/chess-lessons.js"></script>
 <script src="data/chess-puzzles.js"></script>
 <script>
@@ -654,7 +656,7 @@ function reviewMove(fenBefore, san, ply) {
   }, 0);
 }
 
-function renderReview(r, words) {
+function renderReview(r, words) {if (window.ChessTeacherUI) ChessTeacherUI.reactToMove(r.quality);
   const box = $('#gReview');
   const mark = ChessReview.MARKS[r.quality] || ChessReview.MARKS.good;
   const title = Sky.t('q' + r.quality[0].toUpperCase() + r.quality.slice(1));
