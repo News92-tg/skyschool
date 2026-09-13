@@ -7,19 +7,23 @@
 document.write('<script src="data/chess-puzzles-base.js"><\/script>');
 document.write('<script src="data/chess-puzzles-batch01.js"><\/script>');
 
-/* Критично: сохраняем исходный набор СРАЗУ после загрузки data-файлов.
-   Некоторые UI-модули могут валидировать/фильтровать массив позднее.
-   Восстановление должно иметь неизменяемый источник, иначе после
-   destructive filter восстановить задачи уже невозможно. */
+/* Критично: сохраняем исходный набор сразу после загрузки data-файлов.
+   UI-модули могут позже фильтровать массив. Восстанавливаем именно
+   ТОТ ЖЕ объект массива, чтобы const PUZZLES в chess.html тоже увидел
+   восстановленные задачи. */
 if (Array.isArray(window.CHESS_PUZZLES)) {
   window.__CHESS_PUZZLES_RAW_BACKUP__ = window.CHESS_PUZZLES.slice();
 }
 
-/* На случай изменения набора сторонним модулем после bootstrap. */
 setTimeout(() => {
   const backup = window.__CHESS_PUZZLES_RAW_BACKUP__;
   if (!Array.isArray(backup) || !backup.length) return;
-  if (!Array.isArray(window.CHESS_PUZZLES) || !window.CHESS_PUZZLES.length) {
+
+  if (Array.isArray(window.CHESS_PUZZLES)) {
+    if (!window.CHESS_PUZZLES.length) {
+      window.CHESS_PUZZLES.push(...backup);
+    }
+  } else {
     window.CHESS_PUZZLES = backup.slice();
   }
 }, 0);
