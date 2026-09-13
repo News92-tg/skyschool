@@ -3,6 +3,16 @@
 (function () {
   const has = key => Object.prototype.hasOwnProperty.call(window, key) && window[key] != null;
 
+  function restoreRawPuzzles() {
+    const backup = window.__CHESS_PUZZLES_RAW_BACKUP__;
+    if (!Array.isArray(backup) || !backup.length) return false;
+    if (!Array.isArray(window.CHESS_PUZZLES) || !window.CHESS_PUZZLES.length) {
+      window.CHESS_PUZZLES = backup.slice();
+      return true;
+    }
+    return false;
+  }
+
   function loadOnce(src) {
     return new Promise(resolve => {
       const existing = document.querySelector('script[data-chess-repair="' + src + '"]');
@@ -23,10 +33,17 @@
   }
 
   async function repair() {
-    if (!Array.isArray(window.CHESS_LESSONS)) await loadOnce('data/chess-lessons.js?v=repair2');
-    if (!Array.isArray(window.CHESS_PUZZLES)) await loadOnce('data/chess-puzzles.js?v=repair2');
+    restoreRawPuzzles();
 
-    /* Уроки: если основной старт не успел отрисовать список, повторяем. */
+    if (!Array.isArray(window.CHESS_LESSONS)) await loadOnce('data/chess-lessons.js?v=repair3');
+    if (!Array.isArray(window.CHESS_PUZZLES) || !window.CHESS_PUZZLES.length) {
+      restoreRawPuzzles();
+      if (!Array.isArray(window.CHESS_PUZZLES) || !window.CHESS_PUZZLES.length) {
+        await loadOnce('data/chess-puzzles.js?v=repair3');
+        restoreRawPuzzles();
+      }
+    }
+
     try {
       const lessonList = document.querySelector('#lessonList');
       if (Array.isArray(window.CHESS_LESSONS) && lessonList && !lessonList.children.length && typeof window.renderLessons === 'function') {
@@ -34,36 +51,23 @@
       }
     } catch (_) {}
 
-    /* Задачи: наличие текста в pCount ещё не означает, что доска реально
-       получила 64 клетки. После нескольких UI-обёрток именно это и
-       происходило: метаданные были, а #pBoard оставался пустым. */
     try {
       const board = document.querySelector('#pBoard');
-      if (Array.isArray(window.CHESS_PUZZLES) && board &&
+      const count = document.querySelector('#pCount');
+      if (Array.isArray(window.CHESS_PUZZLES) && window.CHESS_PUZZLES.length && board &&
           typeof window.loadPuzzle === 'function' &&
-          board.querySelectorAll('.sqr').length !== 64) {
+          (board.querySelectorAll('.sqr').length !== 64 || !String(count?.textContent || '').trim())) {
         window.loadPuzzle(0);
       }
     } catch (_) {}
 
-    /* Если на вкладку задач переключились позже, принудительно
-       перерисовываем текущую доску, но не сбрасываем номер задачи. */
     try {
-      const board = document.querySelector('#pBoard');
-      if (board && typeof window.puzzleBoard !== 'undefined' && board.closest('#tab-puzzles') && !board.__chessRepairBound) {
-        board.__chessRepairBound = true;
-        const tabs = document.querySelector('.tabs');
-        tabs?.addEventListener('click', e => {
-          const b = e.target.closest('button[data-tab="puzzles"]');
-          if (!b) return;
-          setTimeout(() => {
-            try { window.puzzleBoard?.render(); } catch (_) {}
-          }, 0);
-        });
+      const board = document.querySelector('#gBoard');
+      if (typeof window.newGame === 'function' && board && !board.children.length) {
+        window.newGame();
       }
     } catch (_) {}
 
-    /* Тренер. */
     try {
       if (window.ChessTeacherUI && document.querySelector('#chessTeacherPicker')) {
         const host = document.querySelector('#chessTeacherPicker');
@@ -71,7 +75,6 @@
       }
     } catch (_) {}
 
-    /* Запасной вариант для вкладки тренера. */
     try {
       const tabs = document.querySelector('.tabs');
       const main = document.querySelector('.wrap');
