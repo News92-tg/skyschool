@@ -18,9 +18,10 @@
     'assets/chess-new-game-fix.js?v=2',
     'assets/chess-lesson-outcomes.js?v=2',
     'assets/chess-puzzle-bootstrap-fix.js?v=2',
-    'assets/chess-final-ui.js?v=3',
-    'assets/chess-runtime-hotfix.js?v=1',
-    'assets/chess-interaction-rescue.js?v=1'
+    'assets/chess-final-ui.js?v=4',
+    'assets/chess-runtime-hotfix.js?v=2',
+    'assets/chess-interaction-rescue.js?v=2',
+    'assets/chess-deadsite-rescue.js?v=1'
   ];
 
   function loadSequentially(index) {
@@ -40,7 +41,7 @@
   if (!head.querySelector('link[data-chess-layout="1"]')) {
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = 'assets/chess-layout.css?v=6';
+    link.href = 'assets/chess-layout.css?v=7';
     link.dataset.chessLayout = '1';
     head.appendChild(link);
   }
