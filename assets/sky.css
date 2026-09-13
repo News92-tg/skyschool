@@ -478,8 +478,6 @@ h3{font-size:16px;font-weight:800}
   user-select:none;
 }
 .sqr{
-   font-family:"Segoe UI Symbol","Apple Symbols","Noto Sans Symbols 2","DejaVu Sans",sans-serif;
-font-variant-emoji:text;
   position:relative;display:grid;place-items:center;
   font-size:min(6.4vw,40px);line-height:1;cursor:pointer;
   transition:background .12s;
