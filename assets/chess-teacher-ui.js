@@ -7,4 +7,4 @@ document.write('<script src="assets/chess-puzzle-coach.js?v=8"><\/script>');
 document.write('<script src="assets/chess-layout.js?v=3"><\/script>');
 document.write('<script src="assets/chess-review-ui.js?v=2"><\/script>');
 document.write('<script src="assets/chess-game-visibility.js?v=2"><\/script>');
-document.write('<script src="assets/chess-boot-repair.js?v=1"><\/script>');
+document.write('<script src="assets/chess-boot-repair.js?v=2"><\/script>');
