@@ -5,6 +5,19 @@
   const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const tx=(ru,en)=>window.Sky&&Sky.lang==='en'?en:ru;
 
+  function addStyles(){
+    if($('#trainer-access-styles')) return;
+    const style=document.createElement('style');
+    style.id='trainer-access-styles';
+    style.textContent=`
+      .trainer-select-link{display:block;margin-top:6px;color:var(--m-chess);font-size:10px;font-weight:900;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+      .trainer-select-link:hover{color:var(--ink)}
+      #tab-trainer .trainer-picker-section{margin-top:0}
+      #tab-trainer .tui-picker{width:100%}
+    `;
+    document.head.appendChild(style);
+  }
+
   function ensureTrainerTab(){
     const main=$('.wrap'), tabs=$('.tabs'), host=$('#chessTeacherPicker');
     if(!main||!tabs||!host) return null;
@@ -30,6 +43,7 @@
       main.appendChild(section);
     }
     if(section){
+      section.classList.add('chess-trainer-selection');
       const title=$('.trainer-title',section), sub=$('.trainer-subtitle',section);
       if(title) title.textContent=tx('Выберите своего тренера','Choose your coach');
       if(sub) sub.textContent=tx('Тренер будет комментировать ваши ходы после каждой партии — своим тоном и со своим характером.','Your coach will comment on your moves after every game — with a distinct tone and personality.');
@@ -38,8 +52,7 @@
   }
 
   function showSection(name){
-    const names=['lessons','puzzles','game','teacher','live','trainer'];
-    names.forEach(n=>{
+    ['lessons','puzzles','game','teacher','live','trainer'].forEach(n=>{
       const sec=$('#tab-'+n);
       if(sec) sec.classList.toggle('hidden',n!==name);
     });
@@ -64,17 +77,12 @@
     const host=$('#chessTeacherPicker');
     if(!host)return;
     if(window.ChessTeacherUI && !host.querySelector('.tui-card')){
-      try{ ChessTeacherUI.renderPicker('#chessTeacherPicker'); }catch(e){}
+      try{window.ChessTeacherUI.renderPicker('#chessTeacherPicker');}catch(e){}
     }
     const grid=$('.tui-picker',host);
     if(grid)grid.classList.add('trainer-grid');
     $$('.tui-card',host).forEach(card=>{
       card.classList.add('trainer-card');
-      if(!card.hasAttribute('title')){
-        const id=card.dataset.id;
-        const t=window.ChessTeacherUI&&ChessTeacherUI.TEACHERS&&ChessTeacherUI.TEACHERS[id];
-        if(t) card.title=(Sky&&Sky.lang==='en'?t.style.en:t.style.ru)||'';
-      }
     });
   }
 
@@ -83,12 +91,15 @@
     if(!game)return;
     const coach=$('.game-mode-btn[data-game-mode="coach"]',game);
     if(coach && !coach.querySelector('.trainer-select-link')){
-      const wrap=coach.querySelector('span:last-child') || coach;
-      const link=document.createElement('button');
-      link.type='button';
+      const wrap=coach.querySelector('.game-mode-desc')?.parentElement || coach;
+      const link=document.createElement('span');
       link.className='trainer-select-link';
+      link.setAttribute('role','button');
+      link.setAttribute('tabindex','0');
       link.textContent=tx('Выбрать тренера','Choose coach');
-      link.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();ensureTrainerTab();decoratePicker();showSection('trainer');});
+      const open=()=>{ensureTrainerTab();decoratePicker();showSection('trainer');};
+      link.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();open();});
+      link.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();open();}});
       wrap.appendChild(link);
     }
   }
@@ -98,13 +109,16 @@
     if(!game||!window.ChessTeacherUI)return;
     const card=$('.game-mode-btn[data-game-mode="coach"]',game);
     if(!card)return;
-    let name=tx('Выбрать тренера','Choose coach');
-    try{ const t=ChessTeacherUI.getTeacher(); if(t) name=tx('Тренер: '+t.name.ru,'Coach: '+t.name.en); }catch(e){}
     const link=$('.trainer-select-link',card);
-    if(link) link.textContent=name;
+    if(!link)return;
+    try{
+      const t=ChessTeacherUI.getTeacher();
+      link.textContent=t ? tx('Тренер: '+t.name.ru,'Coach: '+t.name.en) : tx('Выбрать тренера','Choose coach');
+    }catch(e){link.textContent=tx('Выбрать тренера','Choose coach');}
   }
 
   function init(){
+    addStyles();
     const section=ensureTrainerTab();
     if(!section)return;
     bindTabs();
@@ -112,7 +126,7 @@
     addCoachShortcut();
     refreshModeLabel();
     window.addEventListener('chessTeacherChanged',()=>{decoratePicker();refreshModeLabel();});
-    document.addEventListener('langchange',()=>setTimeout(()=>{ensureTrainerTab();decoratePicker();refreshModeLabel();},0));
+    document.addEventListener('langchange',()=>setTimeout(()=>{ensureTrainerTab();decoratePicker();addCoachShortcut();refreshModeLabel();},0));
   }
 
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(init,0),{once:true});
