@@ -41,7 +41,10 @@
 <main class="wrap">
   <h1 data-i18n="h1"></h1>
   <p class="lead" data-i18n="lead"></p>
-
+<div class="section" style="margin-top:8px">
+  <div class="section-head"><h2>Выберите тренера</h2></div>
+  <div id="chessTeacherPicker"></div>
+</div>
   <div class="tabs section" role="tablist" style="margin-top:26px">
     <button type="button" data-tab="lessons" aria-selected="true" data-i18n="tabLessons"></button>
     <button type="button" data-tab="puzzles" aria-selected="false" data-i18n="tabPuzzles"></button>
@@ -112,7 +115,6 @@
         <div class="captured" id="gCapBottom"></div>
         <div class="promo hidden" id="gPromo"></div>
         <div class="review hidden" id="gReview"></div>
-        <div id="teacherBubble" class="hidden"></div>
         <div class="movelist" id="gMoves" style="margin-top:12px"></div>
         <div class="actions">
           <button class="btn ghost small" id="gUndo" data-i18n="undo"></button>
@@ -661,24 +663,25 @@ function reviewMove(fenBefore, san, ply) {
   }, 0);
 }
 
-function renderReview(r, words) {if (window.ChessTeacherUI) ChessTeacherUI.reactToMove(r.quality);
+function renderReview(r, words) {
   const box = $('#gReview');
   const mark = ChessReview.MARKS[r.quality] || ChessReview.MARKS.good;
   const title = Sky.t('q' + r.quality[0].toUpperCase() + r.quality.slice(1));
   const note = ChessReview.shortNote(r, Sky.lang);
+  const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+  const teacherHtml = window.ChessTeacherUI ? ChessTeacherUI.renderFor(r.quality) : '';
 
   box.className = 'review ' + mark.cls;
   box.innerHTML =
-    `<div class="rv-head"><span class="rv-icon">${mark.icon}</span>
-       <b>${r.move} — ${title}</b></div>
-     <div class="rv-note">${note.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</div>` +
-    (words
-      ? `<div class="rv-words">${words.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</div>`
-      : '') +
-    `<div class="rv-by">${Sky.t('revEngine')}</div>`;
+    teacherHtml +
+    '<div class="rv-head"><span class="rv-icon">' + mark.icon + '</span>' +
+      '<b>' + r.move + ' — ' + title + '</b></div>' +
+    '<div class="rv-note">' + esc(note) + '</div>' +
+    (words ? '<div class="rv-words">' + esc(words) + '</div>' : '') +
+    '<div class="rv-by">' + Sky.t('revEngine') + '</div>';
   box.classList.remove('hidden');
 }
-
 function botMove() {
   const res = AI.bestMove(gState, gLevel);
   if (!res) { gBusy = false; renderGame(); return; }
