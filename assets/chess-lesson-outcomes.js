@@ -31,8 +31,7 @@
       #lessonList .outcome-tab:hover{border-color:var(--line-2)}
       #lessonList .outcome-tab.is-active{border-color:var(--m-chess);background:var(--m-chess-soft);color:var(--m-chess)}
       #lessonList .outcome-view{padding-top:1px}
-      #lessonList .outcome-board{width:min(100%,220px);margin:0 auto;overflow:hidden;border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-sm)}
-      #lessonList .outcome-board .board{width:100%!important;max-width:100%!important;aspect-ratio:1!important;margin:0!important}
+      #lessonList .outcome-board{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));width:min(100%,220px);aspect-ratio:1;margin:0 auto;overflow:hidden;border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-sm)}
       #lessonList .outcome-board .sqr{aspect-ratio:1;min-width:0}
       #lessonList .outcome-board .piece{font-size:clamp(20px,4vw,30px)}
       #lessonList .outcome-status{display:flex;align-items:center;gap:6px;margin-top:8px;padding:7px 8px;border-radius:9px;font-size:9.5px;line-height:1.35}
