@@ -1,16 +1,22 @@
 /* SkyySchool — безопасный bootstrap-repair для chess.html. */
 'use strict';
 (function () {
-  const has = key => Object.prototype.hasOwnProperty.call(window, key) && window[key] != null;
-
   function restoreRawPuzzles() {
     const backup = window.__CHESS_PUZZLES_RAW_BACKUP__;
     if (!Array.isArray(backup) || !backup.length) return false;
-    if (!Array.isArray(window.CHESS_PUZZLES) || !window.CHESS_PUZZLES.length) {
-      window.CHESS_PUZZLES = backup.slice();
-      return true;
+
+    /* Не заменяем объект массива: chess.html хранит на него ссылку
+       в const PUZZLES. Восстанавливаем содержимое существующего массива. */
+    if (Array.isArray(window.CHESS_PUZZLES)) {
+      if (!window.CHESS_PUZZLES.length) {
+        window.CHESS_PUZZLES.push(...backup);
+        return true;
+      }
+      return false;
     }
-    return false;
+
+    window.CHESS_PUZZLES = backup.slice();
+    return true;
   }
 
   function loadOnce(src) {
@@ -35,7 +41,9 @@
   async function repair() {
     restoreRawPuzzles();
 
-    if (!Array.isArray(window.CHESS_LESSONS)) await loadOnce('data/chess-lessons.js?v=repair3');
+    if (!Array.isArray(window.CHESS_LESSONS)) {
+      await loadOnce('data/chess-lessons.js?v=repair3');
+    }
     if (!Array.isArray(window.CHESS_PUZZLES) || !window.CHESS_PUZZLES.length) {
       restoreRawPuzzles();
       if (!Array.isArray(window.CHESS_PUZZLES) || !window.CHESS_PUZZLES.length) {
