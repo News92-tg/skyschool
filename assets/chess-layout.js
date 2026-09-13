@@ -50,10 +50,20 @@
     },true);
   }
 
+  function loadFinalPolish(){
+    if(document.querySelector('script[data-chess-final-polish]'))return;
+    const s=document.createElement('script');
+    s.src='assets/chess-final-polish.js?v=1';
+    s.async=false;
+    s.dataset.chessFinalPolish='1';
+    document.head.appendChild(s);
+  }
+
   function init(){
     moveTabsTop();
     bind();
     removeStandaloneCoachUI();
+    loadFinalPolish();
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(init,0),{once:true});
