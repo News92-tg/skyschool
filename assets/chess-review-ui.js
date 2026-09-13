@@ -371,7 +371,46 @@
     return '−' + amount + ' ' + tx('п.', 'p.');
   }
 
-  function buildNextText(quality) {
+  function bestTeacherLine(teacherId) {
+    const lines = {
+      'coach-fire': tx(
+        'Точный удар. Ты взял инициативу и сыграл именно то, что требовала позиция.',
+        'A precise strike. You seized the initiative and played exactly what the position required.'
+      ),
+      'coach-calm': tx(
+        'Точный выбор. Это лучший ход в позиции — здесь улучшать уже нечего, запомни идею.',
+        'Precise choice. This is the best move in the position — there is nothing to improve here. Remember the idea.'
+      ),
+      'coach-prof': tx(
+        'Верно. Ты нашёл лучший ход и не оставил движку лучшего продолжения.',
+        'Correct. You found the best move and left the engine no better continuation.'
+      ),
+      'coach-friend': tx(
+        'Отлично! Ты нашёл лучший ход. Запомни эту идею — она сработала именно здесь.',
+        'Excellent! You found the best move. Remember the idea — it worked exactly here.'
+      ),
+      'coach-strict': tx(
+        'Принято. Это лучший ход позиции. Требовать более сильного продолжения здесь бессмысленно.',
+        'Accepted. This is the best move in the position. There is no stronger continuation to demand here.'
+      ),
+      'coach-romantic': tx(
+        'Красиво и точно. Лучший ход найден — теперь запомни, что сделало эту идею рабочей.',
+        'Beautiful and precise. You found the best move — now remember what made the idea work.'
+      )
+    };
+    return lines[teacherId] || tx(
+      'Лучший ход найден. Теперь запомни идею этой позиции.',
+      'Best move found. Now remember the idea of this position.'
+    );
+  }
+
+  function buildNextText(quality, wasBest) {
+    if (wasBest) {
+      return tx(
+        'Лучший ход уже найден. Не ищи ошибку там, где её нет: разберись, почему именно этот ход работает, и попробуй воспроизвести идею в похожей позиции.',
+        'You already found the best move. Do not hunt for an error where there is none: understand why this move works and reproduce the idea in a similar position.'
+      );
+    }
     if (quality === 'blunder' || quality === 'mistake') {
       return tx(
         'Разбери этот ход дома. Найди момент, где решение пошло не туда, и проверь похожие позиции.',
@@ -386,8 +425,8 @@
     }
     if (quality === 'good') {
       return tx(
-        'Хорошо. Но перед окончательным решением всегда проверь: есть ли ещё сильнее?',
-        'Good. Before committing, always check: is there an even stronger move?'
+        'Хорошо. Перед окончательным решением полезно быстро проверить, нет ли более сильного форсированного хода.',
+        'Good. Before committing, it is useful to quickly check for a stronger forcing move.'
       );
     }
     return tx(
@@ -404,7 +443,11 @@
     const note = ChessReview.shortNote(r, (window.Sky && Sky.lang) || 'ru');
     const title = qualityTitle(r.quality);
 
-    const teacherHtml = window.ChessTeacherUI
+    const teacherId = window.ChessTeacherUI && ChessTeacherUI.getSelected
+      ? ChessTeacherUI.getSelected()
+      : null;
+
+    let teacherHtml = window.ChessTeacherUI
       ? ChessTeacherUI.renderFor(r.quality)
       : '';
 
@@ -448,16 +491,33 @@
       terminal = `<div class="rv-terminal"><span>✓</span><span>${tx('Мат. Партия закончена.', 'Checkmate. The game is over.')}</span></div>`;
     }
 
-    const nextText = buildNextText(r.quality);
+    const nextText = buildNextText(r.quality, !!r.wasBest);
 
     /* В игре с ботом категория задачи не известна — кнопку «5 задач на тему»
        не показываем, чтобы не отправлять ученика на случайную тему. */
     const topicButton = '';
 
-    const teacherWords = words || tx(
+    let teacherWords = words || tx(
       'Тренер формулирует разбор…',
       'The coach is preparing the explanation…'
     );
+
+    /* Важное правило: если ученик уже сыграл лучший ход, тренер не должен
+       продолжать критиковать ход словами из общего шаблона quality=good. */
+    if (r.wasBest && teacherId) {
+      teacherWords = bestTeacherLine(teacherId);
+      if (teacherHtml && r.quality === 'good') {
+        /* renderFor() оставляем для лица/роли/стиля, а текст ниже будет
+           точным контекстным комментарием. */
+        try {
+          const tmp = document.createElement('div');
+          tmp.innerHTML = teacherHtml;
+          const line = tmp.querySelector('.tui-line');
+          if (line) line.textContent = teacherWords;
+          teacherHtml = tmp.innerHTML;
+        } catch (_) {}
+      }
+    }
 
     const friendly = window.ChessTeacherUI &&
       ChessTeacherUI.getSelected &&
