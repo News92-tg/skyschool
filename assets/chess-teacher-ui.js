@@ -19,12 +19,12 @@
     'assets/chess-lesson-outcomes.js?v=2',
     'assets/chess-puzzle-bootstrap-fix.js?v=2',
     'assets/chess-final-ui.js?v=3',
-    'assets/chess-runtime-hotfix.js?v=1'
+    'assets/chess-runtime-hotfix.js?v=1',
+    'assets/chess-interaction-rescue.js?v=1'
   ];
 
   function loadSequentially(index) {
     if (index >= scripts.length) return;
-
     const src = scripts[index];
     const script = document.createElement('script');
     script.src = src;
