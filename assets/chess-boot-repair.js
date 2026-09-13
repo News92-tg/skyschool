@@ -20,38 +20,53 @@
     });
   }
 
-  function ensureData(){
-    const jobs=[];
-    if(!Array.isArray(window.CHESS_LESSONS)) jobs.push(loadOnce('data/chess-lessons.js?v=repair4'));
-    if(!Array.isArray(window.CHESS_PUZZLES)||!window.CHESS_PUZZLES.length) jobs.push(loadOnce('data/chess-puzzles.js?v=repair4'));
-    return Promise.all(jobs);
+  function restorePuzzleArray() {
+    const backup=window.__CHESS_PUZZLES_RAW_BACKUP__;
+    if(!Array.isArray(backup)||!backup.length)return false;
+    if(Array.isArray(window.CHESS_PUZZLES)){
+      if(!window.CHESS_PUZZLES.length){window.CHESS_PUZZLES.push(...backup);return true;}
+      return false;
+    }
+    window.CHESS_PUZZLES=backup.slice();
+    return true;
+  }
+
+  async function ensureData(){
+    if(!Array.isArray(window.CHESS_LESSONS))await loadOnce('data/chess-lessons.js?v=repair5');
+    restorePuzzleArray();
+    if(!Array.isArray(window.CHESS_PUZZLES)||!window.CHESS_PUZZLES.length){
+      await loadOnce('data/chess-puzzles.js?v=repair5');
+      restorePuzzleArray();
+    }
   }
 
   function renderFallbacks(){
     try{
-      const lessonList=document.querySelector('#lessonList');
-      if(Array.isArray(window.CHESS_LESSONS)&&lessonList&&!lessonList.children.length&&typeof window.renderLessons==='function') window.renderLessons();
+      const list=document.querySelector('#lessonList');
+      if(Array.isArray(window.CHESS_LESSONS)&&list&&!list.children.length&&typeof window.renderLessons==='function')window.renderLessons();
     }catch(_){}
-
     try{
       const board=document.querySelector('#pBoard');
-      if(Array.isArray(window.CHESS_PUZZLES)&&window.CHESS_PUZZLES.length&&board&&typeof window.loadPuzzle==='function'&&board.querySelectorAll('.sqr').length!==64) window.loadPuzzle(0);
+      if(Array.isArray(window.CHESS_PUZZLES)&&window.CHESS_PUZZLES.length&&board&&typeof window.loadPuzzle==='function'&&board.querySelectorAll('.sqr').length!==64)window.loadPuzzle(0);
     }catch(_){}
-
     try{
       const board=document.querySelector('#gBoard');
-      if(typeof window.newGame==='function'&&board&&!board.children.length) window.newGame();
+      if(typeof window.newGame==='function'&&board&&!board.children.length)window.newGame();
     }catch(_){}
   }
 
-  async function repair(){ await ensureData(); renderFallbacks(); }
+  async function repair(){
+    await ensureData();
+    renderFallbacks();
+    window.dispatchEvent(new CustomEvent('chessDataReady'));
+  }
 
   function start(){
     let attempts=0;
-    const run=()=>{ attempts++; repair().catch(()=>{}); if(attempts<8)setTimeout(run,200); };
+    const run=()=>{attempts++;repair().catch(()=>{});if(attempts<8)setTimeout(run,220);};
     run();
   }
 
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start,{once:true});
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
   else start();
 })();
