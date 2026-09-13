@@ -687,23 +687,52 @@ h3{font-size:16px;font-weight:800}
 .pye-console .err{color:#ff9b9b}
 .pye-console .muted{color:#8fa6c9}
 .pye-run{margin-top:10px}
-.tui-bubble{
-  display:flex;gap:12px;padding:12px 14px;border-radius:14px;
-  background:var(--panel-2);border:1px solid var(--line);margin-top:12px;
-  animation:tuiRise .25s cubic-bezier(.2,.8,.3,1);
-}
-.tui-face{width:52px;height:52px;flex:none;border-radius:50%;overflow:hidden}
-.tui-face svg{width:100%;height:100%;display:block}
-.tui-name{font-weight:900;font-size:13px;line-height:1.2}
-.tui-line{font-size:13px;line-height:1.45;color:var(--ink);margin-top:3px}
-.tui-note{font-size:12px;color:var(--muted);margin-top:6px}
-@keyframes tuiRise{from{opacity:0;transform:translateY(8px)}}
-.sqr .piece{
+/* ---------- панель выбора шахматного тренера ---------- */
+.tui-picker{
   display:grid;
-  place-items:center;
-  width:100%;
-  height:100%;
-  line-height:1;
-  font-size:inherit;
-  filter:drop-shadow(0 1px 1px rgba(0,0,0,.3));
+  grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+  gap:10px;
+}
+.tui-card{
+  display:flex;gap:12px;align-items:center;min-width:0;
+  padding:12px;border:1px solid var(--line);border-radius:var(--r-sm);
+  background:var(--panel);box-shadow:var(--shadow-sm);
+  cursor:pointer;text-align:left;
+  transition:transform .15s, border-color .15s, background .15s;
+}
+.tui-card:hover{transform:translateY(-2px);border-color:var(--line-2)}
+.tui-card:active{transform:translateY(0)}
+.tui-card.active{border-color:var(--m-chess);background:var(--m-chess-soft)}
+
+.tui-card-info{min-width:0;flex:1}
+.tui-card-info b{display:block;font-size:13px;font-weight:900;line-height:1.2;color:var(--ink)}
+.tui-card-info span{display:block;font-size:11px;color:var(--muted);margin-top:3px;line-height:1.25}
+.tui-card-info small{display:block;font-size:10px;letter-spacing:1px;color:var(--warn);margin-top:4px;line-height:1}
+
+.tui-face{width:48px;height:48px;flex:none;border-radius:50%;overflow:hidden}
+.tui-face svg{display:block;width:100%;height:100%}
+
+/* карточка учителя в блоке разбора хода (под доской) */
+.tui-inline{
+  display:flex;gap:11px;align-items:flex-start;
+  padding:10px 12px;margin-bottom:10px;
+  background:var(--panel);
+  border:1px solid var(--line);border-left-width:4px;border-radius:12px;
+}
+.tui-inline[data-quality="brilliant"]{border-left-color:#8b5cf6}
+.tui-inline[data-quality="good"]{border-left-color:var(--ok)}
+.tui-inline[data-quality="inaccuracy"]{border-left-color:var(--warn)}
+.tui-inline[data-quality="mistake"]{border-left-color:#e07a3f}
+.tui-inline[data-quality="blunder"]{border-left-color:var(--no)}
+.tui-inline .tui-text{min-width:0;flex:1}
+.tui-inline .tui-name{font-weight:900;font-size:13px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.tui-role{font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+.tui-line{font-size:13px;line-height:1.5;margin-top:4px;color:var(--ink)}
+
+@media (max-width:600px){
+  .tui-picker{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tui-card{gap:10px;padding:10px}
+}
+@media (max-width:360px){
+  .tui-picker{grid-template-columns:1fr}
 }
