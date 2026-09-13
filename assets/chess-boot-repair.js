@@ -1,7 +1,4 @@
-/* SkyySchool — аварийное восстановление загрузки chess.html.
-   Не меняет шахматную логику. Если один из bootstrap-скриптов стартовал
-   раньше data-массивов или упал при инициализации, повторяет только
-   безопасную часть старта после появления данных. */
+/* SkyySchool — безопасный bootstrap-repair для chess.html. */
 'use strict';
 (function () {
   const has = key => Object.prototype.hasOwnProperty.call(window, key) && window[key] != null;
@@ -26,32 +23,47 @@
   }
 
   async function repair() {
-    /* Данные критичны для первого рендера страницы. */
-    if (!Array.isArray(window.CHESS_LESSONS)) await loadOnce('data/chess-lessons.js?v=repair1');
-    if (!Array.isArray(window.CHESS_PUZZLES)) await loadOnce('data/chess-puzzles.js?v=repair1');
+    if (!Array.isArray(window.CHESS_LESSONS)) await loadOnce('data/chess-lessons.js?v=repair2');
+    if (!Array.isArray(window.CHESS_PUZZLES)) await loadOnce('data/chess-puzzles.js?v=repair2');
 
-    /* Основной inline-script уже мог успеть завершиться с исключением.
-       Функции в классическом script всё равно находятся в глобальной
-       области, поэтому их можно безопасно запустить повторно. */
+    /* Уроки: если основной старт не успел отрисовать список, повторяем. */
     try {
-      if (Array.isArray(window.CHESS_LESSONS) && document.querySelector('#lessonList') && !document.querySelector('#lessonList').children.length && typeof window.renderLessons === 'function') {
+      const lessonList = document.querySelector('#lessonList');
+      if (Array.isArray(window.CHESS_LESSONS) && lessonList && !lessonList.children.length && typeof window.renderLessons === 'function') {
         window.renderLessons();
       }
     } catch (_) {}
 
+    /* Задачи: наличие текста в pCount ещё не означает, что доска реально
+       получила 64 клетки. После нескольких UI-обёрток именно это и
+       происходило: метаданные были, а #pBoard оставался пустым. */
     try {
-      if (Array.isArray(window.CHESS_PUZZLES) && document.querySelector('#pBoard') && typeof window.loadPuzzle === 'function') {
-        const count = document.querySelector('#pCount');
-        if (!count || !String(count.textContent || '').trim()) window.loadPuzzle(0);
+      const board = document.querySelector('#pBoard');
+      if (Array.isArray(window.CHESS_PUZZLES) && board &&
+          typeof window.loadPuzzle === 'function' &&
+          board.querySelectorAll('.sqr').length !== 64) {
+        window.loadPuzzle(0);
       }
     } catch (_) {}
 
+    /* Если на вкладку задач переключились позже, принудительно
+       перерисовываем текущую доску, но не сбрасываем номер задачи. */
     try {
-      if (typeof window.newGame === 'function' && document.querySelector('#gBoard') && !document.querySelector('#gBoard').children.length) {
-        window.newGame();
+      const board = document.querySelector('#pBoard');
+      if (board && typeof window.puzzleBoard !== 'undefined' && board.closest('#tab-puzzles') && !board.__chessRepairBound) {
+        board.__chessRepairBound = true;
+        const tabs = document.querySelector('.tabs');
+        tabs?.addEventListener('click', e => {
+          const b = e.target.closest('button[data-tab="puzzles"]');
+          if (!b) return;
+          setTimeout(() => {
+            try { window.puzzleBoard?.render(); } catch (_) {}
+          }, 0);
+        });
       }
     } catch (_) {}
 
+    /* Тренер. */
     try {
       if (window.ChessTeacherUI && document.querySelector('#chessTeacherPicker')) {
         const host = document.querySelector('#chessTeacherPicker');
@@ -103,7 +115,7 @@
     const run = () => {
       attempts++;
       repair();
-      if (attempts < 8) setTimeout(run, 180);
+      if (attempts < 10) setTimeout(run, 180);
     };
     run();
   }
