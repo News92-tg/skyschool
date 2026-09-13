@@ -160,14 +160,14 @@ window.ChessTeacherUI = (function () {
     return text(d.name);
   }
 
-  /* ---------- Стабильный интерфейс ---------- */
   function ensureStyles(){
     if(document.getElementById('chess-teacher-ui-extra-v2')) return;
     const style=document.createElement('style');
     style.id='chess-teacher-ui-extra-v2';
     style.textContent=`
       html{scrollbar-gutter:stable;}
-      #tab-game .board-wrap,#tab-puzzles .board-wrap,#tab-live .board-wrap{grid-template-columns:minmax(0,1fr) 310px;}
+      #tab-game > .row > .field:first-child{flex:2 1 600px;min-width:420px;}
+      #tab-game .board-wrap,#tab-puzzles .board-wrap,#tab-live .board-wrap{grid-template-columns:minmax(0,760px) 310px;}
       #tab-game .board,#tab-puzzles .board,#tab-live .board{width:min(100%,760px);justify-self:start;min-width:0;}
       .sqr{aspect-ratio:1;min-width:0;}
       .difficulty-panel{margin-top:8px;padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--panel);box-shadow:var(--shadow-sm);}
@@ -181,7 +181,7 @@ window.ChessTeacherUI = (function () {
       .difficulty-card.is-active{border-color:var(--m-chess);background:var(--m-chess-soft);box-shadow:0 0 0 2px color-mix(in srgb,var(--m-chess) 13%,transparent);}
       .difficulty-card.is-active::after{content:'✓';position:absolute;right:7px;top:7px;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;background:var(--m-chess);color:#fff;font-size:10px;font-weight:900;}
       .difficulty-card.smart{grid-column:span 1;}
-      .difficulty-icon{font-size:18px;line-height:1;margin-bottom:7px;filter:grayscale(.1);}
+      .difficulty-icon{font-size:18px;line-height:1;margin-bottom:7px;}
       .difficulty-name{font-size:11px;font-weight:900;line-height:1.2;}
       .difficulty-desc{font-size:9.5px;color:var(--muted);line-height:1.35;margin-top:4px;min-height:39px;}
       .difficulty-human{display:flex;gap:2px;margin-top:7px;}
@@ -202,15 +202,15 @@ window.ChessTeacherUI = (function () {
       .tui-card{position:relative;}
       .tui-card[aria-pressed="true"]{border-color:var(--m-chess);background:var(--m-chess-soft);box-shadow:0 0 0 2px color-mix(in srgb,var(--m-chess) 11%,transparent);}
       .tui-card[aria-pressed="true"]::after{content:'✓';position:absolute;right:8px;top:8px;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;background:var(--m-chess);color:#fff;font-size:10px;font-weight:900;}
-      @media(max-width:900px){.difficulty-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.difficulty-card.smart{grid-column:1/-1;}.difficulty-desc{min-height:0;}.tui-current-badge{display:none;}}
-      @media(max-width:600px){#tab-game .board-wrap,#tab-puzzles .board-wrap,#tab-live .board-wrap{grid-template-columns:1fr;}#tab-game .board,#tab-puzzles .board,#tab-live .board{width:100%;}.difficulty-grid{grid-template-columns:1fr 1fr;}}
+      @media(max-width:900px){#tab-game > .row > .field:first-child{min-width:0;flex-basis:100%;}.difficulty-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.difficulty-card.smart{grid-column:1/-1;}.difficulty-desc{min-height:0;}.tui-current-badge{display:none;}#tab-game .board-wrap,#tab-puzzles .board-wrap,#tab-live .board-wrap{grid-template-columns:1fr;}}
+      @media(max-width:600px){.difficulty-grid{grid-template-columns:1fr 1fr;}#tab-game .board,#tab-puzzles .board,#tab-live .board{width:100%;}}
     `;
     document.head.appendChild(style);
   }
 
   function strictnessText(t){
     const labels=lang()==='en' ? ['Very relaxed','Relaxed','Balanced','Strict','Very strict'] : ['Очень мягкий','Мягкий','Средний','Строгий','Очень строгий'];
-    return (labels[Math.max(1,Math.min(5,t.strictness))-1] || labels[2]);
+    return labels[Math.max(1,Math.min(5,t.strictness))-1] || labels[2];
   }
 
   function renderCurrent(){
@@ -248,132 +248,63 @@ window.ChessTeacherUI = (function () {
       '<div class="tui-style-note">'+escapeHTML(lang()==='en'?'Style: ':'Манера: ')+escapeHTML(text(t.style))+'</div></div></div>';
   }
 
-  function refreshInlineReviews(){
-    document.querySelectorAll('.tui-inline[data-quality]').forEach(n=>n.outerHTML=renderFor(n.getAttribute('data-quality')));
-  }
+  function refreshInlineReviews(){ document.querySelectorAll('.tui-inline[data-quality]').forEach(n=>n.outerHTML=renderFor(n.getAttribute('data-quality'))); }
 
   function setSelected(id){
     if(!TEACHERS[id]) return false;
-    const previous=getSelected();
-    localStorage.setItem(STORE,id);
-    document.documentElement.dataset.chessTeacher=id;
+    const previous=getSelected(); localStorage.setItem(STORE,id); document.documentElement.dataset.chessTeacher=id;
     window.dispatchEvent(new CustomEvent('chessTeacherChanged',{detail:{id,teacher:TEACHERS[id],previousId:previous}}));
-    refreshCurrentTeachers();
-    refreshInlineReviews();
-    return true;
+    refreshCurrentTeachers(); refreshInlineReviews(); return true;
   }
 
   function updatePickerState(host){
     const selected=getSelected();
-    host.querySelectorAll('.tui-card').forEach(card=>{
-      const active=card.dataset.id===selected;
-      card.classList.toggle('active',active);
-      card.setAttribute('aria-pressed',String(active));
-    });
+    host.querySelectorAll('.tui-card').forEach(card=>{const active=card.dataset.id===selected;card.classList.toggle('active',active);card.setAttribute('aria-pressed',String(active));});
   }
 
   function renderPicker(hostSel){
     ensureStyles();
     const host=typeof hostSel==='string'?document.querySelector(hostSel):hostSel; if(!host) return;
+    const selected=getSelected();
     host.innerHTML='<div class="tui-picker" role="group" aria-label="Выбор шахматного тренера">'+Object.keys(TEACHERS).map(id=>{
-      const t=TEACHERS[id], active=id===getSelected();
-      return '<button type="button" class="tui-card'+(active?' active':'')+'" data-id="'+escapeHTML(id)+'" aria-pressed="'+String(active)+'" title="'+escapeHTML(text(t.style))+'">' +
-        '<div class="tui-face">'+FACES[id]+'</div><div class="tui-card-info"><b>'+escapeHTML(text(t.name))+'</b><span>'+escapeHTML(text(t.role))+'</span><small>'+escapeHTML(strictnessText(t))+'</small></div></button>';
+      const t=TEACHERS[id], active=id===selected;
+      return '<button type="button" class="tui-card'+(active?' active':'')+'" data-id="'+escapeHTML(id)+'" aria-pressed="'+String(active)+'" title="'+escapeHTML(text(t.style))+'"><div class="tui-face">'+FACES[id]+'</div><div class="tui-card-info"><b>'+escapeHTML(text(t.name))+'</b><span>'+escapeHTML(text(t.role))+'</span><small>'+escapeHTML(strictnessText(t))+'</small></div></button>';
     }).join('')+'</div>';
     const picker=host.querySelector('.tui-picker');
     picker.addEventListener('click',e=>{const card=e.target.closest('.tui-card');if(card&&picker.contains(card)){setSelected(card.dataset.id);updatePickerState(host);}});
-    picker.addEventListener('keydown',e=>{
-      const cards=Array.from(picker.querySelectorAll('.tui-card')), idx=cards.indexOf(document.activeElement); if(idx<0) return;
-      let next=idx; if(e.key==='ArrowRight')next=Math.min(cards.length-1,idx+1);else if(e.key==='ArrowLeft')next=Math.max(0,idx-1);else if(e.key==='ArrowDown')next=Math.min(cards.length-1,idx+3);else if(e.key==='ArrowUp')next=Math.max(0,idx-3);else return;
-      e.preventDefault();cards[next].focus();
-    });
-    document.documentElement.dataset.chessTeacher=getSelected();
-    refreshCurrentTeachers();
+    picker.addEventListener('keydown',e=>{const cards=Array.from(picker.querySelectorAll('.tui-card')),idx=cards.indexOf(document.activeElement);if(idx<0)return;let next=idx;if(e.key==='ArrowRight')next=Math.min(cards.length-1,idx+1);else if(e.key==='ArrowLeft')next=Math.max(0,idx-1);else if(e.key==='ArrowDown')next=Math.min(cards.length-1,idx+3);else if(e.key==='ArrowUp')next=Math.max(0,idx-3);else return;e.preventDefault();cards[next].focus();});
+    document.documentElement.dataset.chessTeacher=selected; refreshCurrentTeachers();
   }
 
-  /* ---------- Умный выбор сложности ---------- */
-  function difficultyCard(id, icon, title, description, smart){
+  function difficultyCard(id,icon,title,description,smart){
     const active=(getDifficultyMode()===id || (smart && getDifficultyMode()===ADAPTIVE));
     const humanCount=smart ? adaptiveLevel() : Number(id);
     const people=Array.from({length:4},(_,i)=>'<i class="'+(i<humanCount?'on':'')+'">●</i>').join('');
-    return '<button type="button" class="difficulty-card'+(active?' is-active':'')+(smart?' smart':'')+'" data-difficulty="'+id+'" aria-pressed="'+String(active)+'">' +
-      '<div class="difficulty-icon">'+icon+'</div><div class="difficulty-name">'+escapeHTML(title)+'</div><div class="difficulty-desc">'+escapeHTML(description)+'</div><div class="difficulty-human">'+people+'</div></button>';
+    return '<button type="button" class="difficulty-card'+(active?' is-active':'')+(smart?' smart':'')+'" data-difficulty="'+id+'" aria-pressed="'+String(active)+'"><div class="difficulty-icon">'+icon+'</div><div class="difficulty-name">'+escapeHTML(title)+'</div><div class="difficulty-desc">'+escapeHTML(description)+'</div><div class="difficulty-human">'+people+'</div></button>';
   }
 
   function renderDifficultyUI(){
     ensureStyles();
     const select=document.querySelector('#gLevel'); if(!select) return;
-    if(!select.querySelector('option[value="99"]')){
-      const o=document.createElement('option'); o.value=ADAPTIVE_ENGINE_LEVEL; o.textContent='Умный'; select.appendChild(o);
-    }
+    if(!select.querySelector('option[value="99"]')){const o=document.createElement('option');o.value=ADAPTIVE_ENGINE_LEVEL;o.textContent='Умный';select.appendChild(o);}
     const parent=select.parentElement; if(!parent) return;
     let panel=parent.querySelector('.difficulty-panel');
-    if(!panel){
-      select.style.display='none';
-      const oldLabel=parent.querySelector('label');
-      if(oldLabel) oldLabel.style.display='none';
-      panel=document.createElement('div');
-      panel.className='difficulty-panel';
-      parent.appendChild(panel);
-    }
+    if(!panel){select.style.display='none';const oldLabel=parent.querySelector('label');if(oldLabel)oldLabel.style.display='none';panel=document.createElement('div');panel.className='difficulty-panel';parent.appendChild(panel);}
     const l=lang();
-    panel.innerHTML='<div class="difficulty-head"><div><div class="difficulty-title">'+(l==='en'?'How strong should the bot be?':'Насколько сильным должен быть бот?')+'</div><div class="difficulty-sub">'+(l==='en'?'Choose Smart or lock one exact level.':'Выберите «Умный» режим или зафиксируйте конкретную сложность.')+'</div></div><div class="difficulty-now">'+(l==='en'?'Now: ':'Сейчас: ')+escapeHTML(getDifficultyMode()===ADAPTIVE?adaptiveLabel():text((DIFFICULTIES.find(d=>d.id===getDifficultyMode())||DIFFICULTIES[1]).name))+'</div></div>' +
-      '<div class="difficulty-grid">' +
-      difficultyCard(ADAPTIVE,'🧑',l==='en'?'Smart':'Умный',l==='en'?'Adjusts to your recent play.':'Подстраивается под вашу игру по последним ходам.',true) +
-      DIFFICULTIES.map(d=>difficultyCard(d.id,d.icon,text(d.name),text(d.desc),false)).join('') +
-      '</div>' +
-      '<div class="difficulty-live-note">'+(l==='en'?'Smart starts near Casual and moves up or down from the quality of your recent moves.':'«Умный» стартует около уровня «Любитель» и повышает или понижает силу по качеству последних ходов.')+'</div>';
-
-    panel.querySelectorAll('.difficulty-card').forEach(card=>card.addEventListener('click',()=>{
-      const mode=card.dataset.difficulty;
-      setDifficultyMode(mode===ADAPTIVE?ADAPTIVE:mode);
-      select.value=mode===ADAPTIVE?ADAPTIVE_ENGINE_LEVEL:mode;
-      renderDifficultyUI();
-    }));
+    panel.innerHTML='<div class="difficulty-head"><div><div class="difficulty-title">'+(l==='en'?'How strong should the bot be?':'Насколько сильным должен быть бот?')+'</div><div class="difficulty-sub">'+(l==='en'?'Choose Smart or lock one exact level.':'Выберите «Умный» режим или зафиксируйте конкретную сложность.')+'</div></div><div class="difficulty-now">'+(l==='en'?'Now: ':'Сейчас: ')+escapeHTML(getDifficultyMode()===ADAPTIVE?adaptiveLabel():text((DIFFICULTIES.find(d=>d.id===getDifficultyMode())||DIFFICULTIES[1]).name))+'</div></div><div class="difficulty-grid">'+difficultyCard(ADAPTIVE,'🧑‍🎓',l==='en'?'Smart':'Умный',l==='en'?'Adjusts to your recent play.':'Подстраивается под вашу игру по последним ходам.',true)+DIFFICULTIES.map(d=>difficultyCard(d.id,d.icon,text(d.name),text(d.desc),false)).join('')+'</div><div class="difficulty-live-note">'+(l==='en'?'Smart starts near Casual and moves up or down from the quality of your recent moves.':'«Умный» стартует около уровня «Любитель» и повышает или понижает силу по качеству последних ходов.')+'</div>';
+    panel.querySelectorAll('.difficulty-card').forEach(card=>card.addEventListener('click',()=>{const mode=card.dataset.difficulty;setDifficultyMode(mode===ADAPTIVE?ADAPTIVE:mode);select.value=mode===ADAPTIVE?ADAPTIVE_ENGINE_LEVEL:mode;renderDifficultyUI();}));
     select.value=getDifficultyMode()===ADAPTIVE?ADAPTIVE_ENGINE_LEVEL:getDifficultyMode();
   }
 
   function installAdaptiveHooks(){
     const AI=window.ChessAI;
-    if(AI && !AI.__skyAdaptiveWrapped){
-      const originalBestMove=AI.bestMove;
-      AI.bestMove=function(st,level){
-        const resolved=(String(level)===ADAPTIVE_ENGINE_LEVEL && getDifficultyMode()===ADAPTIVE) ? adaptiveLevel() : level;
-        const result=originalBestMove.call(this,st,resolved);
-        if(result) result.adaptiveLevel=resolved;
-        return result;
-      };
-      AI.__skyAdaptiveWrapped=true;
-    }
+    if(AI && !AI.__skyAdaptiveWrapped){const originalBestMove=AI.bestMove;AI.bestMove=function(st,level){const resolved=(String(level)===ADAPTIVE_ENGINE_LEVEL&&getDifficultyMode()===ADAPTIVE)?adaptiveLevel():level;const result=originalBestMove.call(this,st,resolved);if(result)result.adaptiveLevel=resolved;return result;};AI.__skyAdaptiveWrapped=true;}
     const review=window.ChessReview;
-    if(review && !review.__skyAdaptiveWrapped){
-      const originalReview=review.review;
-      review.review=function(){
-        const result=originalReview.apply(this,arguments);
-        const game=document.querySelector('#tab-game');
-        if(result && game && !game.classList.contains('hidden')){
-          writeAdaptiveResult(result.quality);
-          setTimeout(renderDifficultyUI,0);
-        }
-        return result;
-      };
-      review.__skyAdaptiveWrapped=true;
-    }
+    if(review && !review.__skyAdaptiveWrapped){const originalReview=review.review;review.review=function(){const result=originalReview.apply(this,arguments);const game=document.querySelector('#tab-game');if(result&&game&&!game.classList.contains('hidden')){writeAdaptiveResult(result.quality);setTimeout(renderDifficultyUI,0);}return result;};review.__skyAdaptiveWrapped=true;}
   }
 
-  function initEnhancements(){
-    ensureStyles();
-    document.documentElement.dataset.chessTeacher=getSelected();
-    renderDifficultyUI();
-    installAdaptiveHooks();
-    refreshCurrentTeachers();
-  }
-
-  window.addEventListener('chessTeacherChanged',()=>{
-    document.documentElement.dataset.chessTeacher=getSelected();
-    renderDifficultyUI();
-  });
-
+  function initEnhancements(){ensureStyles();document.documentElement.dataset.chessTeacher=getSelected();renderDifficultyUI();installAdaptiveHooks();refreshCurrentTeachers();}
+  window.addEventListener('chessTeacherChanged',()=>{document.documentElement.dataset.chessTeacher=getSelected();renderDifficultyUI();});
   setTimeout(initEnhancements,0);
 
   return {renderFor,renderCurrent,renderPicker,refreshCurrentTeachers,refreshInlineReviews,getSelected,setSelected,getTeacher:()=>TEACHERS[getSelected()],TEACHERS,FACES,renderDifficultyUI,adaptiveLevel};
