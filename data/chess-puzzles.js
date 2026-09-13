@@ -7,18 +7,19 @@
 document.write('<script src="data/chess-puzzles-base.js"><\/script>');
 document.write('<script src="data/chess-puzzles-batch01.js"><\/script>');
 
-/* Защита от стороннего очистителя набора задач.
-   Создаём независимую копию после загрузки всех партий и
-   восстанавливаем исходный массив, если другой модуль случайно
-   обнулил его при инициализации. */
+/* Критично: сохраняем исходный набор СРАЗУ после загрузки data-файлов.
+   Некоторые UI-модули могут валидировать/фильтровать массив позднее.
+   Восстановление должно иметь неизменяемый источник, иначе после
+   destructive filter восстановить задачи уже невозможно. */
+if (Array.isArray(window.CHESS_PUZZLES)) {
+  window.__CHESS_PUZZLES_RAW_BACKUP__ = window.CHESS_PUZZLES.slice();
+}
+
+/* На случай изменения набора сторонним модулем после bootstrap. */
 setTimeout(() => {
-  if (!Array.isArray(window.CHESS_PUZZLES)) return;
-  const backup = window.CHESS_PUZZLES.slice();
-  setTimeout(() => {
-    if (!Array.isArray(window.CHESS_PUZZLES)) window.CHESS_PUZZLES = [];
-    if (window.CHESS_PUZZLES.length !== backup.length) {
-      window.CHESS_PUZZLES.length = 0;
-      window.CHESS_PUZZLES.push(...backup);
-    }
-  }, 0);
+  const backup = window.__CHESS_PUZZLES_RAW_BACKUP__;
+  if (!Array.isArray(backup) || !backup.length) return;
+  if (!Array.isArray(window.CHESS_PUZZLES) || !window.CHESS_PUZZLES.length) {
+    window.CHESS_PUZZLES = backup.slice();
+  }
 }, 0);
