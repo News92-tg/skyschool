@@ -20,17 +20,15 @@ Sky.db = (function () {
   const CFG = window.SKY_CONFIG || {};
   const hasCloud = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 
-  let sb = null;                 // клиент Supabase
-  let profile = null;            // профиль текущего пользователя
+  let sb = null;
+  let profile = null;
   let mode = hasCloud ? 'cloud' : 'local';
   let readyResolve;
   const ready = new Promise(r => { readyResolve = r; });
 
-  /* таблицы, одинаковые в обоих режимах */
   const TABLES = ['profiles','links','homework','submissions','messages','chess_tasks','chess_games',
-                  'teachers_ai','teacher_reviews','photo_checks','chess_sessions','task_attempts'];
+                  'teachers_ai','teacher_reviews','photo_checks','chess_sessions','task_attempts','chess_custom_tasks'];
 
-  /* ---------- подключение библиотеки Supabase по требованию ---------- */
   function loadScript(src) {
     return new Promise((resolve, reject) => {
       const s = document.createElement('script');
@@ -63,28 +61,17 @@ Sky.db = (function () {
   async function loadProfile(user) {
     if (!sb || !user) { profile = null; return; }
     const { data } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
-    profile = data || { id: user.id, email: user.email, name: user.email.split('@')[0], role: 'student' };
+    profile = data || { id: user.id, email: user.email, name: (user.user_metadata && user.user_metadata.full_name) || user.email.split('@')[0], role: 'student' };
   }
 
-  /* ---------- локальный режим ---------- */
   function localTable(name) { return Sky.get('tbl_' + name, []); }
   function saveTable(name, rows) {
     Sky.set('tbl_' + name, rows);
     document.dispatchEvent(new CustomEvent('dbchange', { detail: { table: name } }));
   }
 
-  /* Демо-профили убраны осознанно: платформа пока полностью
-     локальная и не показывает каталог учителей. Когда появятся
-     AI-учителя (таблица teachers_ai), их будет подтягивать
-     отдельный модуль. Пустая seed-функция оставлена, чтобы
-     boot() не менялся. */
-  function seedLocal() {
-    return;
-  }
-
+  function seedLocal() { return; }
   function uid() { return 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
-
-  /* ---------- единый интерфейс ---------- */
 
   async function list(table, filter) {
     if (mode === 'cloud' && sb) {
@@ -136,8 +123,6 @@ Sky.db = (function () {
     return true;
   }
 
-  /* ---------- аккаунты ---------- */
-
   async function signUp(email, password, meta) {
     if (mode === 'cloud' && sb) {
       const { data, error } = await sb.auth.signUp({ email, password });
@@ -152,7 +137,6 @@ Sky.db = (function () {
       }
       return { ok: true, needsConfirm: !data.session };
     }
-    /* локально: профиль просто создаётся, пароль не хранится */
     const rec = { id: uid(), email, name: meta.name, role: meta.role, emoji: meta.emoji || null };
     const rows = localTable('profiles');
     rows.push(rec);
@@ -179,6 +163,16 @@ Sky.db = (function () {
     return { ok: true };
   }
 
+  async function signInGoogle() {
+    if (mode !== 'cloud' || !sb) return { error: Sky.lang === 'ru' ? 'Сначала подключите Supabase в assets/config.js' : 'Connect Supabase in assets/config.js first' };
+    const { data, error } = await sb.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.href }
+    });
+    if (error) return { error: error.message };
+    return { ok: true, url: data?.url || null };
+  }
+
   async function signOut() {
     if (mode === 'cloud' && sb) await sb.auth.signOut();
     profile = null;
@@ -186,9 +180,6 @@ Sky.db = (function () {
     document.dispatchEvent(new CustomEvent('authchange'));
   }
 
-  /* быстрый вход в локальном режиме: выбрать существующий профиль.
-     Сейчас UI быстрого входа убран, но функция оставлена — понадобится,
-     когда на одном устройстве будут работать несколько детей/родителей. */
   function becomeLocal(id) {
     const found = localTable('profiles').find(p => p.id === id);
     if (!found) return false;
@@ -202,7 +193,6 @@ Sky.db = (function () {
   const isTeacher = () => !!profile && profile.role === 'teacher';
   const isStudent = () => !!profile && profile.role === 'student';
 
-  /* ---------- живые обновления ---------- */
   function subscribe(table, cb) {
     if (mode === 'cloud' && sb) {
       const ch = sb.channel('rt-' + table + '-' + Math.random().toString(36).slice(2))
@@ -210,9 +200,7 @@ Sky.db = (function () {
         .subscribe();
       return () => sb.removeChannel(ch);
     }
-    const onStorage = e => {
-      if (e.key === 'sky_tbl_' + table) cb({ table, local: true });
-    };
+    const onStorage = e => { if (e.key === 'sky_tbl_' + table) cb({ table, local: true }); };
     const onLocal = e => { if (e.detail && e.detail.table === table) cb({ table, local: true }); };
     window.addEventListener('storage', onStorage);
     document.addEventListener('dbchange', onLocal);
@@ -222,7 +210,6 @@ Sky.db = (function () {
     };
   }
 
-  /* ---------- запуск ---------- */
   (async function boot() {
     if (hasCloud) await initCloud();
     if (mode === 'local') {
@@ -243,7 +230,7 @@ Sky.db = (function () {
     get mode() { return mode; },
     isCloud: () => mode === 'cloud',
     list, insert, update, remove, subscribe,
-    signUp, signIn, signOut, becomeLocal,
+    signUp, signIn, signInGoogle, signOut, becomeLocal,
     me, isTeacher, isStudent,
     allProfiles: () => list('profiles'),
     uid
