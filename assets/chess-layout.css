@@ -1,0 +1,83 @@
+/* Панель тренера */
+.trainer-section .section-head{display:block;margin-bottom:16px}
+.trainer-section .trainer-title{margin:0;font-size:18px;font-weight:900;line-height:1.2}
+.trainer-section .trainer-subtitle{margin:5px 0 0;color:var(--muted);font-size:11px;line-height:1.45;max-width:760px}
+.trainer-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.trainer-card{position:relative;display:flex;align-items:center;gap:12px;min-width:0;padding:14px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);box-shadow:var(--shadow-sm);text-align:left;cursor:pointer;transition:transform .15s ease,border-color .15s ease,background .15s ease}
+.trainer-card:hover{transform:translateY(-2px);border-color:var(--line-2)}
+.trainer-card.active{border-color:var(--m-chess);background:var(--m-chess-soft)}
+.trainer-card.active::after{content:'✓';position:absolute;top:9px;right:9px;width:18px;height:18px;display:grid;place-items:center;border-radius:50%;background:var(--m-chess);color:#fff;font-size:10px;font-weight:900}
+.trainer-card .tui-face{width:56px;height:56px;flex:0 0 56px;border-radius:50%;overflow:hidden}
+.trainer-card .tui-face svg{display:block;width:100%;height:100%}
+.trainer-card .tui-card-info{min-width:0;flex:1}
+.trainer-card .tui-card-info b{display:block;font-size:15px;font-weight:900;line-height:1.2;padding-right:18px}
+.trainer-card .tui-card-info span{display:block;margin-top:3px;color:var(--muted);font-size:12px;line-height:1.3;overflow-wrap:anywhere}
+.trainer-card .tui-card-info small{display:block;margin-top:6px;font-size:10px;line-height:1;letter-spacing:1px;color:var(--warn)}
+
+/* Вкладки сразу под шапкой */
+.chess-tabs{margin-top:0!important}
+
+/* Режим игры */
+#tab-game .game-mode-panel,#tab-game .difficulty-panel{padding:14px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);box-shadow:var(--shadow-sm)}
+#tab-game .game-mode-panel{margin-bottom:14px}
+#tab-game .game-mode-head,#tab-game .difficulty-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:12px}
+#tab-game .game-mode-title,#tab-game .difficulty-title{font-size:13px;font-weight:900;line-height:1.25}
+#tab-game .game-mode-sub,#tab-game .difficulty-sub{margin-top:4px;color:var(--muted);font-size:10.5px;line-height:1.4}
+#tab-game .game-mode-current,#tab-game .difficulty-now{padding:6px 9px;border-radius:999px;background:var(--m-chess-soft);color:var(--m-chess);font-size:9px;font-weight:900;white-space:nowrap}
+#tab-game .game-mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+#tab-game .game-mode-btn{position:relative;display:flex;align-items:center;gap:10px;min-width:0;min-height:62px;padding:12px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);text-align:left;cursor:pointer;transition:transform .15s ease,border-color .15s ease,background .15s ease}
+#tab-game .game-mode-btn:hover{transform:translateY(-1px);border-color:var(--line-2)}
+#tab-game .game-mode-btn.is-active{border:2px solid var(--m-chess);background:var(--m-chess-soft)}
+#tab-game .game-mode-btn.is-active::after{content:'✓';position:absolute;top:8px;right:8px;width:18px;height:18px;display:grid;place-items:center;border-radius:50%;background:var(--m-chess);color:#fff;font-size:10px;font-weight:900}
+#tab-game .game-mode-icon{flex:0 0 24px;width:24px;font-size:20px;line-height:1;text-align:center}
+#tab-game .game-mode-icon{font-size:0}
+#tab-game .game-mode-icon::before{content:'♞';font-size:20px}
+#tab-game .game-mode-btn[data-game-mode='solo'] .game-mode-icon::before{content:'♟'}
+#tab-game .game-mode-name{display:block;font-size:13px;font-weight:900;line-height:1.2}
+#tab-game .game-mode-desc{display:block;margin-top:3px;color:var(--muted);font-size:11px;line-height:1.3}
+
+/* Уровни бота */
+#tab-game .difficulty-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+#tab-game .difficulty-card{position:relative;min-width:0;min-height:100px;padding:12px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);text-align:left;cursor:pointer;transition:transform .15s ease,border-color .15s ease,background .15s ease}
+#tab-game .difficulty-card:hover{transform:translateY(-1px);border-color:var(--line-2)}
+#tab-game .difficulty-card.is-active{border:2px solid var(--m-chess);background:var(--m-chess-soft)}
+#tab-game .difficulty-card.is-active::after{content:'✓';position:absolute;top:8px;right:8px;width:18px;height:18px;display:grid;place-items:center;border-radius:50%;background:var(--m-chess);color:#fff;font-size:10px;font-weight:900}
+#tab-game .difficulty-icon{font-size:0;line-height:1;margin-bottom:8px}
+#tab-game .difficulty-icon::before{content:'♟';font-size:18px}
+#tab-game .difficulty-card.smart .difficulty-icon::before{content:'♙'}
+#tab-game .difficulty-name{display:block;font-size:13px;font-weight:900;line-height:1.2}
+#tab-game .difficulty-desc{min-height:30px;margin-top:4px;color:var(--muted);font-size:11px;line-height:1.35}
+#tab-game .difficulty-human{display:flex;gap:3px;margin-top:8px}
+#tab-game .difficulty-human i{font-style:normal;font-size:10px;opacity:.22}
+#tab-game .difficulty-human i.on{opacity:1;color:var(--warn)}
+#tab-game .difficulty-live-note{margin-top:8px;color:var(--muted);font-size:10px;line-height:1.35}
+
+/* Кнопки партии */
+#tab-game .game-action-row{display:flex;gap:8px;margin-top:10px}
+#tab-game #gNewProxy{flex:2;min-width:0}
+#tab-game #gSurrender{display:none;flex:1;min-width:0}
+#tab-game.game-running #gSurrender{display:block}
+#tab-game .game-surrender{background:var(--no-soft)!important;color:var(--no)!important;border-color:var(--line)!important}
+
+/* Доска и боковая колонка */
+#tab-game .board-wrap,#tab-puzzles .board-wrap{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:24px;align-items:start}
+#tab-game .board,#tab-puzzles .board{width:100%;max-width:none;aspect-ratio:1}
+#tab-game .side,#tab-puzzles .side{min-width:0}
+
+/* Задачи */
+#tab-puzzles .puzzle-side-card{padding:14px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);box-shadow:var(--shadow-sm)}
+#tab-puzzles #pMsg:empty{display:none}
+
+@media(max-width:900px){
+  #tab-game .board-wrap,#tab-puzzles .board-wrap{grid-template-columns:1fr}
+  #tab-game .side,#tab-puzzles .side{width:100%}
+  #tab-game .difficulty-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:600px){
+  .trainer-grid{grid-template-columns:1fr}
+  #tab-game .game-mode-grid{grid-template-columns:1fr}
+  #tab-game .game-action-row{flex-direction:column}
+  #tab-game #gNewProxy,#tab-game #gSurrender{flex:none;width:100%}
+  #tab-game .difficulty-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #tab-game .difficulty-card{min-height:96px}
+}
