@@ -10,7 +10,7 @@
   const PANEL_ID = 'pCoachReview';
   let lastPuzzleKey = '';
   let lastAttemptSan = '';
-  let renderedForKey = '';
+  let lastRenderedAttempt = '';
 
   const $ = id => document.getElementById(id);
   const tx = (ru, en) => window.Sky && Sky.lang === 'en' ? en : ru;
@@ -123,26 +123,6 @@
     button.disabled = !lastAttemptSan;
   }
 
-  function renderEmpty() {
-    const panel = ensurePanel();
-    if (!panel) return;
-    const t = getTeacher();
-    const name = t && t.name ? (t.name.ru || '') : tx('Тренер', 'Coach');
-    panel.classList.remove('hidden');
-    panel.innerHTML = `
-      <div class="pcr-head">
-        <div class="pcr-face">${getTeacherFace()}</div>
-        <div class="pcr-head-copy">
-          <div class="pcr-name">${esc(name)}</div>
-          <div class="pcr-role">${tx('Готов разобрать ваш ход', 'Ready to review your move')} · ${esc(t ? strictText(t) : '')}</div>
-        </div>
-      </div>
-      <div class="pcr-verdict">
-        <div class="pcr-verdict-title">${tx('Сделайте ход', 'Make a move')}</div>
-        <div class="pcr-verdict-text">${tx('После попытки я покажу оценку движка, лучший вариант и объяснение выбранного тренера.', 'After your attempt you will see the engine verdict, the best line and your coach’s explanation.')}</div>
-      </div>`;
-  }
-
   function qualityTitle(q) {
     const map = {
       brilliant:['Блестящий ход','Brilliant move'],
@@ -207,13 +187,23 @@
     const msg = $('pMsg');
     if (!msg) return;
     const text = String(msg.textContent || '').trim();
+    let candidate = '';
     const match = text.match(/\(([^)]+)\)/);
-    if (match && match[1]) lastAttemptSan = match[1].trim();
+    if (match && match[1]) candidate = match[1].trim();
     else {
-      const ok = text.match(/✓[^A-Za-zА-Яа-я0-9]*[^ ]+\s+([A-Za-zА-Яа-я0-9+#=\-]+)/i);
-      if (ok && ok[1]) lastAttemptSan = ok[1].trim();
+      const ok = text.match(/✓.*?\s([A-Za-zА-Яа-я][A-Za-zА-Яа-я0-9+#=\-]*)$/i);
+      if (ok && ok[1]) candidate = ok[1].trim();
     }
-    ensureActions();
+    if (candidate && candidate !== lastAttemptSan) {
+      lastAttemptSan = candidate;
+      ensureActions();
+      if (candidate !== lastRenderedAttempt) {
+        lastRenderedAttempt = candidate;
+        setTimeout(analyzeCurrent, 80);
+      }
+    } else {
+      ensureActions();
+    }
   }
 
   function refresh() {
@@ -222,7 +212,7 @@
     if (key && key !== lastPuzzleKey) {
       lastPuzzleKey = key;
       lastAttemptSan = '';
-      renderedForKey = '';
+      lastRenderedAttempt = '';
       const panel = ensurePanel();
       if (panel) panel.classList.add('hidden');
     }
