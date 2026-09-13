@@ -18,7 +18,8 @@
     'assets/chess-new-game-fix.js?v=2',
     'assets/chess-lesson-outcomes.js?v=2',
     'assets/chess-puzzle-bootstrap-fix.js?v=2',
-    'assets/chess-final-ui.js?v=3'
+    'assets/chess-final-ui.js?v=3',
+    'assets/chess-runtime-hotfix.js?v=1'
   ];
 
   function loadSequentially(index) {
