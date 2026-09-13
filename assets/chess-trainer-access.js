@@ -6,6 +6,33 @@
   const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const tx=(ru,en)=>window.Sky&&Sky.lang==='en'?en:ru;
 
+  function addStyles(){
+    if($('#trainer-access-styles'))return;
+    const style=document.createElement('style');
+    style.id='trainer-access-styles';
+    style.textContent=`
+      .chess-trainer-source{display:none!important}
+      .trainer-select-link{display:inline-flex;align-items:center;margin-top:5px;padding:3px 7px;border:1px solid var(--line);border-radius:999px;background:var(--panel-2);color:var(--m-chess);font-size:9px;font-weight:900;cursor:pointer}
+      .trainer-select-link:hover{border-color:var(--m-chess);background:var(--m-chess-soft)}
+      .trainer-chooser{min-width:min(720px,calc(100vw - 40px))}
+      .trainer-chooser-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px}
+      .trainer-chooser-head h2{margin:0;font-size:18px;line-height:1.2}
+      .trainer-chooser-head p{margin:5px 0 0;max-width:520px;color:var(--muted);font-size:11px;line-height:1.45}
+      .trainer-chooser-current{flex:0 0 auto;padding:6px 9px;border-radius:999px;background:var(--m-chess-soft);color:var(--m-chess);font-size:9px;font-weight:900;white-space:nowrap}
+      .trainer-chooser .tui-picker{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+      .trainer-chooser .tui-card{min-width:0}
+      .trainer-chooser .tui-card.active{box-shadow:0 0 0 2px var(--m-chess-soft)}
+      .pcr-change-coach{margin-left:auto;flex:0 0 auto;padding:5px 8px!important;font-size:9px!important}
+      @media(max-width:600px){
+        .trainer-chooser{min-width:0}
+        .trainer-chooser-head{display:block}
+        .trainer-chooser-current{display:inline-block;margin-top:8px}
+        .trainer-chooser .tui-picker{grid-template-columns:1fr}
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   function cleanStandalone(){
     $$('.tabs button[data-tab="trainer"]').forEach(b=>b.remove());
     $('#tab-trainer')?.remove();
@@ -100,7 +127,7 @@
       const head=panel.querySelector('.pcr-head');
       if(head)head.appendChild(button);
     }
-    button.textContent=tx('Сменить тренера','Change coach');
+    button.textContent=tx('Сменить','Change');
   }
 
   function syncShortcuts(){
@@ -110,6 +137,7 @@
   }
 
   function init(){
+    addStyles();
     syncShortcuts();
     const panel=document.querySelector('#tab-puzzles');
     if(panel&&!panel.__coachAccessObserver){
