@@ -10,104 +10,6 @@ window.ChessTeacherUI = (function () {
   const STORE = 'sky_chess_teacher';
   const DEFAULT = 'coach-fire';
 
-  /* ---------- X10 KILLCRITIC: фирменный акцент панели ---------- */
-  function ensureBrandStyles() {
-    if (document.getElementById('x10-killcritic-styles')) return;
-
-    const style = document.createElement('style');
-    style.id = 'x10-killcritic-styles';
-    style.textContent = `
-      .tui-picker-head-x10 {
-        display:flex;
-        align-items:center;
-        justify-content:space-between;
-        gap:20px;
-        margin-bottom:14px;
-      }
-      .tui-picker-head-x10 h2 {
-        margin:0;
-      }
-      .killcritic-brand {
-        display:inline-flex;
-        align-items:center;
-        gap:9px;
-        flex-shrink:0;
-        user-select:none;
-        white-space:nowrap;
-      }
-      .killcritic-brand::before {
-        content:'';
-        width:34px;
-        height:2px;
-        margin-right:2px;
-        border-radius:999px;
-        background:var(--m-chess);
-        opacity:.7;
-      }
-      .killcritic-x10 {
-        display:inline-flex;
-        align-items:center;
-        justify-content:center;
-        min-width:42px;
-        height:26px;
-        padding:0 9px;
-        border-radius:8px;
-        background:linear-gradient(135deg,var(--m-chess),#8f5cf4);
-        color:#fff;
-        font-size:13px;
-        font-weight:900;
-        line-height:1;
-        letter-spacing:-.5px;
-        box-shadow:0 4px 10px rgba(124,77,255,.18),inset 0 1px 0 rgba(255,255,255,.22);
-      }
-      .killcritic-name {
-        font-family:'Nunito','Segoe UI',system-ui,sans-serif;
-        font-size:17px;
-        font-weight:900;
-        font-style:italic;
-        line-height:1;
-        letter-spacing:-.7px;
-        color:var(--ink-2);
-      }
-      .killcritic-name strong {
-        color:var(--m-chess);
-      }
-      @media (max-width:600px) {
-        .tui-picker-head-x10 {
-          align-items:center;
-          gap:12px;
-        }
-        .killcritic-brand {
-          gap:6px;
-        }
-        .killcritic-brand::before {
-          display:none;
-        }
-        .killcritic-x10 {
-          min-width:36px;
-          height:23px;
-          padding:0 7px;
-          border-radius:7px;
-          font-size:11px;
-        }
-        .killcritic-name {
-          font-size:13px;
-          letter-spacing:-.4px;
-        }
-      }
-      @media (max-width:420px) {
-        .tui-picker-head-x10 {
-          flex-wrap:wrap;
-        }
-        .killcritic-brand {
-          width:100%;
-          justify-content:flex-end;
-        }
-      }
-    `;
-    document.head.appendChild(style);
-  }
-
   /* ---------- Лица (SVG, офлайн) ---------- */
   const FACES = {
     'coach-fire': '<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="31" fill="#c0392b"/><circle cx="32" cy="26" r="12" fill="#f0c9a0"/><path d="M20 22 Q22 12 32 12 Q42 12 44 22 Q42 18 32 18 Q22 18 20 22 Z" fill="#3a1010"/><path d="M14 62 Q14 42 32 42 Q50 42 50 62 Z" fill="#7a1a10"/><circle cx="26" cy="27" r="1.8" fill="#222"/><circle cx="38" cy="27" r="1.8" fill="#222"/><path d="M26 36 Q32 40 38 36" stroke="#222" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M10 8 L14 16 L18 8" stroke="#f5a623" stroke-width="2" fill="none"/></svg>',
@@ -235,32 +137,10 @@ window.ChessTeacherUI = (function () {
     '</div>';
   }
 
-  /* ---------- X10 KILLCRITIC + выбор учителя ---------- */
-  function ensurePickerBrand(host) {
-    ensureBrandStyles();
-
-    const section = host && host.closest('.section');
-    if (!section) return;
-
-    const head = section.querySelector('.section-head');
-    if (!head || head.querySelector('.killcritic-brand')) return;
-
-    head.classList.add('tui-picker-head-x10');
-    const brand = document.createElement('div');
-    brand.className = 'killcritic-brand';
-    brand.setAttribute('aria-label', 'X10 KILLCRITIC');
-    brand.innerHTML =
-      '<span class="killcritic-x10">X10</span>' +
-      '<span class="killcritic-name"><strong>KILL</strong>CRITIC</span>';
-    head.appendChild(brand);
-  }
-
+  /* ---------- Выбор учителя ---------- */
   function renderPicker(hostSel) {
     const host = typeof hostSel === 'string' ? document.querySelector(hostSel) : hostSel;
     if (!host) return;
-
-    ensurePickerBrand(host);
-
     const lang = (window.Sky && Sky.lang) || 'ru';
     const selected = getSelected();
 
