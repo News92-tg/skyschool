@@ -49,7 +49,7 @@
   function loadLessonUI(){
     if(document.querySelector('script[data-chess-lesson-ui="1"]')||window.__skyChessLessonUI)return;
     const s=document.createElement('script');
-    s.src='assets/chess-lesson-ui.js?v=1';
+    s.src='assets/chess-lesson-ui.js?v=2';
     s.async=false;
     s.dataset.chessLessonUi='1';
     s.onload=()=>{window.__skyChessLessonUI=true};
