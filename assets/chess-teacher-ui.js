@@ -9,3 +9,5 @@ document.write('<script src="assets/chess-review-ui.js?v=4"><\/script>');
 document.write('<script src="assets/chess-game-visibility.js?v=4"><\/script>');
 document.write('<script src="assets/chess-boot-repair.js?v=4"><\/script>');
 document.write('<script src="assets/chess-trainer-access.js?v=2"><\/script>');
+document.write('<script src="assets/chess-lesson-ui.js?v=2"><\/script>');
+document.write('<script src="assets/chess-lesson-fix.js?v=1"><\/script>');
