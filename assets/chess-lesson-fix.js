@@ -1,86 +1,209 @@
-/* SkyySchool — компактный рендер открытых уроков.
-   Не меняет содержимое уроков и шахматную логику: только перестраивает DOM и размеры. */
+/* SkyySchool — isolated mini-board renderer for lesson cards.
+   Lessons are static illustrations: no clicks, no drag, no animation.
+   Kept outside the main game board styles so lesson boards cannot inherit
+   interactive-board geometry. */
 'use strict';
 (function(){
-  const $=(s,r=document)=>r.querySelector(s);
+  const PIECES = {
+    p:'♟', n:'♞', b:'♝', r:'♜', q:'♛', k:'♚'
+  };
 
-  function styles(){
-    if($('#chess-lesson-fix-styles')) return;
-    const s=document.createElement('style');
-    s.id='chess-lesson-fix-styles';
-    s.textContent=`
-      /* Уроки: короткая строка по умолчанию */
-      #tab-lessons #lessonList{display:grid;gap:8px}
-      #tab-lessons #lessonList > .lesson{overflow:hidden;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);box-shadow:var(--shadow-sm)}
-      #tab-lessons #lessonList > .lesson.open{border-color:var(--m-chess)}
-      #tab-lessons #lessonList > .lesson > button{display:grid;grid-template-columns:30px minmax(0,1fr) 18px;align-items:center;gap:9px;width:100%;min-height:48px;padding:9px 12px;text-align:left}
-      #tab-lessons #lessonList > .lesson > button > span:first-child{min-width:0;font-size:12px;font-weight:900;line-height:1.25}
-      #tab-lessons #lessonList > .lesson > button > span:first-child:before{content:'Урок';display:block;margin-bottom:1px;color:var(--muted);font-size:8px;font-weight:900;letter-spacing:.07em;text-transform:uppercase}
-      #tab-lessons #lessonList > .lesson > button .arrow{justify-self:end;color:var(--muted);font-size:18px;line-height:1;transition:transform .18s,color .18s}
-      #tab-lessons #lessonList > .lesson.open > button .arrow{transform:rotate(90deg);color:var(--m-chess)}
+  function renderMiniBoard(fen, size = 280){
+    const board = document.createElement('div');
+    board.className = 'mini-board';
 
-      /* Открытый урок: компактно и без вертикального растягивания */
-      #tab-lessons #lessonList > .lesson > .body{display:grid!important;grid-template-columns:220px minmax(0,1fr);gap:14px;align-items:start;padding:0 12px 12px}
-      #tab-lessons #lessonList > .lesson > .body.is-reflowed{grid-template-columns:220px minmax(0,1fr)}
-      #tab-lessons #lessonList > .lesson > .body > .lesson-copy{min-width:0;font-size:11px;line-height:1.55;color:var(--ink-2);white-space:pre-wrap}
-      #tab-lessons #lessonList > .lesson > .body > .board{grid-column:1;width:220px!important;height:220px!important;max-width:220px!important;min-height:0!important;align-self:start!important;margin:0!important}
-      #tab-lessons #lessonList > .lesson > .body > .board .sqr{min-width:0!important;min-height:0!important}
+    const px = Math.max(1, Math.min(280, Number(size) || 280));
+    board.style.setProperty('--mini-board-size', px + 'px');
 
-      @media(max-width:700px){
-        #tab-lessons #lessonList > .lesson > .body{grid-template-columns:180px minmax(0,1fr);gap:10px}
-        #tab-lessons #lessonList > .lesson > .body > .board{width:180px!important;height:180px!important;max-width:180px!important}
-        #tab-lessons #lessonList > .lesson > .body > .lesson-copy{font-size:10.5px;line-height:1.5}
+    const placement = String(fen || '').trim().split(/\s+/)[0] || '';
+    const ranks = placement.split('/');
+    const cells = [];
+
+    for(let rank = 0; rank < 8; rank++){
+      const row = ranks[rank] || '';
+      let file = 0;
+
+      for(const ch of row){
+        if(/[1-8]/.test(ch)){
+          file += Number(ch);
+          continue;
+        }
+
+        if(file >= 8) break;
+
+        const cell = document.createElement('div');
+        const light = (file + (7 - rank)) % 2 === 1;
+        cell.className = 'mini-sqr ' + (light ? 'light' : 'dark');
+
+        const glyph = PIECES[ch.toLowerCase()];
+        if(glyph){
+          const piece = document.createElement('span');
+          piece.className = 'mini-piece ' + (ch === ch.toUpperCase() ? 'w' : 'b');
+          piece.textContent = glyph;
+          cell.appendChild(piece);
+        }
+
+        board.appendChild(cell);
+        cells.push(cell);
+        file++;
       }
-      @media(max-width:520px){
-        #tab-lessons #lessonList > .lesson > .body{grid-template-columns:1fr}
-        #tab-lessons #lessonList > .lesson > .body > .board{grid-column:1;width:min(220px,100%)!important;height:auto!important;aspect-ratio:1!important;margin:0 auto!important}
+
+      while(file < 8){
+        const cell = document.createElement('div');
+        const light = (file + (7 - rank)) % 2 === 1;
+        cell.className = 'mini-sqr ' + (light ? 'light' : 'dark');
+        board.appendChild(cell);
+        cells.push(cell);
+        file++;
+      }
+    }
+
+    /* Malformed placement strings still produce a predictable 8×8 grid. */
+    while(cells.length < 64){
+      const i = cells.length;
+      const file = i % 8;
+      const rank = 7 - Math.floor(i / 8);
+      const cell = document.createElement('div');
+      cell.className = 'mini-sqr ' + (((file + rank) % 2) ? 'light' : 'dark');
+      board.appendChild(cell);
+      cells.push(cell);
+    }
+
+    return board;
+  }
+
+  window.renderMiniBoard = renderMiniBoard;
+
+  function installStyles(){
+    if(document.getElementById('mini-board-styles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'mini-board-styles';
+    style.textContent = `
+      /* Static lesson board — deliberately independent from .board. */
+      #lessonList .mini-board{
+        --mini-board-size:280px;
+        display:grid !important;
+        grid-template-columns:repeat(8,minmax(0,1fr)) !important;
+        grid-template-rows:repeat(8,minmax(0,1fr)) !important;
+        width:min(var(--mini-board-size),100%) !important;
+        height:auto !important;
+        aspect-ratio:1 / 1 !important;
+        flex:0 0 auto !important;
+        min-width:0 !important;
+        min-height:0 !important;
+        margin:16px auto 0 !important;
+        padding:0 !important;
+        border:1px solid var(--line-2) !important;
+        border-radius:var(--r) !important;
+        overflow:hidden !important;
+        box-shadow:none !important;
+        pointer-events:none !important;
+        position:relative !important;
+      }
+
+      #lessonList .mini-sqr{
+        position:relative !important;
+        min-width:0 !important;
+        min-height:0 !important;
+        width:auto !important;
+        height:auto !important;
+        aspect-ratio:auto !important;
+        display:grid !important;
+        place-items:center !important;
+        padding:0 !important;
+        margin:0 !important;
+        border:0 !important;
+      }
+      #lessonList .mini-sqr.light{background:var(--board-light) !important}
+      #lessonList .mini-sqr.dark{background:var(--board-dark) !important}
+
+      #lessonList .mini-piece{
+        display:block !important;
+        position:static !important;
+        width:auto !important;
+        height:auto !important;
+        line-height:1 !important;
+        font-family:"DejaVu Sans","Segoe UI Symbol",serif !important;
+        font-size:calc(var(--mini-board-size) / 8 * .72) !important;
+        font-weight:400 !important;
+        transform:none !important;
+        transition:none !important;
+        animation:none !important;
+        user-select:none !important;
+      }
+      #lessonList .mini-piece.w{
+        color:#fff !important;
+        text-shadow:0 0 1px #10233c,0 0 2px rgba(0,0,0,.8),0 1px 1px rgba(0,0,0,.4) !important;
+      }
+      #lessonList .mini-piece.b{
+        color:#141820 !important;
+        text-shadow:0 0 1px rgba(255,255,255,.35) !important;
+      }
+
+      #lessonList .lesson > .body.lesson-body-static{
+        display:flex !important;
+        flex-direction:column !important;
+        align-items:stretch !important;
+        width:100% !important;
+        min-width:0 !important;
+        padding:0 19px 19px !important;
+      }
+      #lessonList .lesson > .body.lesson-body-static .lesson-copy{
+        width:100% !important;
+        min-width:0 !important;
+        white-space:pre-wrap !important;
+      }
+
+      @media(max-width:600px){
+        #lessonList .mini-board{
+          --mini-board-size:min(280px,100%) !important;
+        }
+        #lessonList .lesson > .body.lesson-body-static{
+          padding:0 15px 15px !important;
+        }
       }
     `;
-    document.head.appendChild(s);
+    document.head.appendChild(style);
   }
 
-  function compactCard(card){
-    const body=card.querySelector(':scope > .body');
-    if(!body || body.__lessonFix) return;
-    const board=body.querySelector(':scope > .board');
-    if(!board) return;
+  function patchLessons(){
+    installStyles();
+    const host = document.getElementById('lessonList');
+    const lessons = window.CHESS_LESSONS;
+    if(!host || !Array.isArray(lessons) || !window.renderMiniBoard) return;
 
-    const copy=document.createElement('div');
-    copy.className='lesson-copy';
+    const cards = host.querySelectorAll(':scope > .lesson');
+    cards.forEach((card, index) => {
+      const lesson = lessons[index];
+      if(!lesson || !lesson.fen || card.dataset.miniBoardReady === '1') return;
 
-    const text=[];
-    for(const node of Array.from(body.childNodes)){
-      if(node===board) continue;
-      if(node.nodeType===Node.TEXT_NODE && node.textContent.trim()) text.push(node.textContent);
-      else if(node.nodeType===Node.ELEMENT_NODE) text.push(node.outerHTML);
-    }
-    copy.innerHTML=text.join('').replace(/\n{3,}/g,'\n\n');
+      const body = card.querySelector(':scope > .body');
+      if(!body) return;
 
-    body.innerHTML='';
-    body.appendChild(board);
-    body.appendChild(copy);
-    body.classList.add('is-reflowed');
-    body.__lessonFix=true;
+      const oldBoard = body.querySelector(':scope > .board');
+      const copy = document.createElement('div');
+      copy.className = 'lesson-copy';
+
+      for(const node of Array.from(body.childNodes)){
+        if(node === oldBoard) continue;
+        copy.appendChild(node.cloneNode(true));
+      }
+
+      const mini = renderMiniBoard(lesson.fen, 280);
+      body.replaceChildren(copy, mini);
+      body.classList.add('lesson-body-static');
+      card.dataset.miniBoardReady = '1';
+    });
   }
 
-  function run(){
-    styles();
-    const host=$('#lessonList');
-    if(!host) return;
-    host.querySelectorAll(':scope > .lesson').forEach(compactCard);
+  function schedulePatch(){ setTimeout(patchLessons, 0); }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', schedulePatch, { once:true });
+  }else{
+    schedulePatch();
   }
 
-  function init(){
-    run();
-    const host=$('#lessonList');
-    if(host && !host.__lessonFixObserver){
-      const mo=new MutationObserver(()=>run());
-      mo.observe(host,{childList:true,subtree:true});
-      host.__lessonFixObserver=true;
-    }
-  }
-
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(init,0),{once:true});
-  else setTimeout(init,0);
-  document.addEventListener('langchange',()=>setTimeout(run,0));
+  document.addEventListener('langchange', schedulePatch);
 })();
