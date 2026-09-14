@@ -5,5 +5,5 @@ document.write('<script src="assets/chess-teacher-ui-core.js"><\/script>');
 document.write('<script src="assets/chess-game-modes.js"><\/script>');
 document.write('<script src="assets/chess-puzzle-coach.js"><\/script>');
 document.write('<script src="assets/chess-game-flow.js"><\/script>');
-document.write('<script src="assets/chess-lesson-fix.js?v=9"><\/script>');
+document.write('<script src="assets/chess-lesson-fix.js?v=10"><\/script>');
 document.write('<script src="assets/chess-lesson-polish.js?v=1"><\/script>');
