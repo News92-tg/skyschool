@@ -125,18 +125,27 @@ Sky.db = (function () {
 
   async function signUp(email, password, meta) {
     if (mode === 'cloud' && sb) {
-      const { data, error } = await sb.auth.signUp({ email, password });
+      const { data, error } = await sb.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name: meta?.name || '',
+            role: meta?.role || 'student',
+            emoji: meta?.emoji || null
+          }
+        }
+      });
       if (error) return { error: error.message };
-      if (data.user) {
-        await sb.from('profiles').upsert({
-          id: data.user.id, email,
-          name: meta.name, role: meta.role,
-          emoji: meta.emoji || null
-        });
-        await loadProfile(data.user);
-      }
+
+      /* Профиль создаёт server-side trigger из auth metadata.
+         Не делаем upsert из браузера: при включённом подтверждении почты
+         у нового пользователя ещё нет JWT, поэтому RLS корректно
+         запрещает клиентскую запись. */
+      if (data.user && data.session) await loadProfile(data.user);
       return { ok: true, needsConfirm: !data.session };
     }
+
     const rec = { id: uid(), email, name: meta.name, role: meta.role, emoji: meta.emoji || null };
     const rows = localTable('profiles');
     rows.push(rec);
