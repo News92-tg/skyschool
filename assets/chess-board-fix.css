@@ -1,0 +1,48 @@
+/* Chess board geometry fix: every board must be a real 8x8 square grid. */
+.board,
+#lessonList .lesson .body > .board{
+  display:grid !important;
+  grid-template-columns:repeat(8,minmax(0,1fr)) !important;
+  grid-template-rows:repeat(8,minmax(0,1fr)) !important;
+  aspect-ratio:1 / 1 !important;
+  width:100%;
+  height:auto;
+  min-height:0;
+}
+
+#lessonList .lesson .body > .board{
+  width:min(230px,100%) !important;
+  max-width:230px !important;
+  margin-top:0 !important;
+  justify-self:start;
+}
+
+#lessonList .lesson .body{
+  display:grid;
+  grid-template-columns:minmax(0,230px) minmax(0,1fr);
+  align-items:start;
+  gap:22px;
+  padding:0 16px 18px;
+  font-size:13.5px;
+  line-height:1.7;
+}
+
+#lessonList .lesson .body > :not(.board){
+  min-width:0;
+}
+
+#lessonList .lesson .body .piece{
+  font-size:clamp(18px,3vw,30px) !important;
+  line-height:1 !important;
+}
+
+@media(max-width:720px){
+  #lessonList .lesson .body{
+    grid-template-columns:1fr;
+    gap:14px;
+  }
+  #lessonList .lesson .body > .board{
+    width:min(250px,100%) !important;
+    max-width:250px !important;
+  }
+}
