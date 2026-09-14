@@ -1,0 +1,40 @@
+name: Normalize English reading label
+
+on:
+  push:
+    paths:
+      - '.github/workflows/normalize-english-reading-label.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Patch Russian label
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('data/bank-english.js')
+          s = p.read_text(encoding='utf-8')
+          old = 'topic:{ru:"Reading comprehension", en:"Reading comprehension"}'
+          new = 'topic:{ru:"Чтение", en:"Reading comprehension"}'
+          changed = s.count(old)
+          if not changed:
+              raise SystemExit('No Reading comprehension topic entries found')
+          p.write_text(s.replace(old, new), encoding='utf-8')
+          print(f'Patched {changed} entries')
+          PY
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/bank-english.js
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix(trainer): translate English reading label to Russian'
+          git push
