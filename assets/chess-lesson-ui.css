@@ -1,0 +1,50 @@
+/* SkyySchool chess lessons — compact, readable teaching layout. */
+
+/* Lesson cards should teach one idea at a time, not become giant scroll walls. */
+#lessonList{display:grid;gap:12px}
+#lessonList .lesson{border-radius:18px;overflow:hidden}
+#lessonList .lesson > button{padding:13px 16px;min-height:58px;gap:9px;font-size:14px;line-height:1.25}
+#lessonList .lesson > button .arrow{font-size:16px}
+
+/* The generic board renderer is reused by games and lessons. Force lesson
+   boards to have a real 1:1 geometry so auto row sizing cannot explode. */
+#lessonList .lesson .body{display:grid;grid-template-columns:220px minmax(0,1fr);align-items:start;gap:22px;padding:0 16px 17px}
+#lessonList .lesson .body > .board{
+  width:220px!important;
+  height:220px!important;
+  min-width:220px;
+  min-height:220px;
+  max-width:220px;
+  max-height:220px;
+  aspect-ratio:1/1!important;
+  display:grid!important;
+  grid-template-columns:repeat(8,minmax(0,1fr))!important;
+  grid-template-rows:repeat(8,minmax(0,1fr))!important;
+  align-self:start;
+  overflow:hidden;
+  margin-top:0;
+  border-radius:10px;
+}
+#lessonList .lesson .body > .board > *{min-width:0!important;min-height:0!important}
+#lessonList .lesson .body > :not(.board){min-width:0}
+#lessonList .lesson .body .board .piece{font-size:clamp(18px,2.6vw,30px)!important;line-height:1!important}
+
+/* Text beside a board stays compact and easy to scan. */
+#lessonList .lesson .body{font-size:13.5px;line-height:1.65}
+#lessonList .lesson .body > :not(.board){max-width:70ch}
+
+/* Lessons without a diagram use the full width. */
+#lessonList .lesson .body:not(:has(> .board)){display:block}
+
+/* Keep long lessons from looking like one uninterrupted paragraph. */
+#lessonList .lesson .body br + br{content:''}
+
+@media(max-width:720px){
+  #lessonList .lesson .body{grid-template-columns:1fr;gap:13px}
+  #lessonList .lesson .body > .board{width:min(240px,100%)!important;height:auto!important;min-width:0;min-height:0;max-width:240px;max-height:none;aspect-ratio:1/1!important;justify-self:start}
+}
+
+@media(max-width:430px){
+  #lessonList .lesson > button{padding:12px 14px;font-size:13.5px}
+  #lessonList .lesson .body{padding:0 14px 15px;font-size:13px}
+}
