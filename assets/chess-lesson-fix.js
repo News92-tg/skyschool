@@ -70,25 +70,37 @@
     }
     return board;
   }
-  function putMotionPiece(board,key,sq){
+  function placePiece(board,key,sq){
     board.querySelectorAll('.lesson-motion-piece').forEach(n=>n.remove());
     const cell=motionCell(board,sq); if(!cell)return;
     const p=document.createElement('span');
-    p.className='lesson-motion-piece'; p.textContent=DEMOS[key].glyph;
-    cell.appendChild(p);
+    p.className='lesson-motion-piece';
+    p.textContent=DEMOS[key].glyph;
+    const boardRect=board.getBoundingClientRect(), cellRect=cell.getBoundingClientRect();
+    p.style.left=(cellRect.left-boardRect.left+cellRect.width/2)+'px';
+    p.style.top=(cellRect.top-boardRect.top+cellRect.height/2)+'px';
+    p.dataset.square=sq;
+    board.appendChild(p);
   }
-  function animateMotion(board,key,from,to,duration=380,onDone){
+  function movePiece(board,from,to,duration=380,onDone){
     const p=board.querySelector('.lesson-motion-piece');
     const a=motionCell(board,from), b=motionCell(board,to);
     if(!p||!a||!b){onDone?.();return;}
-    const root=board.getBoundingClientRect(), ar=a.getBoundingClientRect(), br=b.getBoundingClientRect();
-    const x1=ar.left-root.left+ar.width/2, y1=ar.top-root.top+ar.height/2;
-    p.style.left=x1+'px'; p.style.top=y1+'px'; p.style.position='absolute'; p.style.transform='translate(-50%,-50%)';
+    const dx=b.getBoundingClientRect().left-a.getBoundingClientRect().left;
+    const dy=b.getBoundingClientRect().top-a.getBoundingClientRect().top;
     p.style.transition='transform '+duration+'ms cubic-bezier(.18,.8,.2,1)';
-    const dx=br.left-ar.left, dy=br.top-ar.top;
-    requestAnimationFrame(()=>{p.style.transform='translate(calc(-50% + '+dx+'px),calc(-50% + '+dy+'px))';});
-    setTimeout(()=>{putMotionPiece(board,key,to); onDone?.();},duration+30);
+    p.style.transform='translate(calc(-50% + '+dx+'px),calc(-50% + '+dy+'px))';
+    setTimeout(()=>{
+      p.style.transition='none';
+      const boardRect=board.getBoundingClientRect(), br=b.getBoundingClientRect();
+      p.style.transform='translate(-50%,-50%)';
+      p.style.left=(br.left-boardRect.left+br.width/2)+'px';
+      p.style.top=(br.top-boardRect.top+br.height/2)+'px';
+      p.dataset.square=to;
+      onDone?.();
+    },duration+30);
   }
+
   function mountMotionDemo(host){
     if(host.dataset.motionReady==='1') return;
     host.dataset.motionReady='1'; host.replaceChildren();
@@ -102,7 +114,7 @@
     function reset(){
       stop();
       board.querySelectorAll('.lesson-motion-cell.from,.lesson-motion-cell.to').forEach(x=>x.classList.remove('from','to'));
-      putMotionPiece(board,current,DEMOS[current].start);
+      placePiece(board,current,DEMOS[current].start);
       info.textContent=DEMOS[current].name+' · нажмите «Показать движение»';
     }
     function demo(){
@@ -110,21 +122,21 @@
       stop(); busy=true;
       const path=DEMOS[current].path;
       let i=0;
-      putMotionPiece(board,current,path[0]);
+      placePiece(board,current,path[0]);
       const step=()=>{
-        if(i>=path.length-1){busy=false;info.textContent=DEMOS[current].name+' · готово';timer=setTimeout(reset,1100);return;}
+        if(i>=path.length-1){busy=false;info.textContent=DEMOS[current].name+' · готово';timer=setTimeout(()=>{reset();timer=setTimeout(demo,550);},900);return;}
         const from=path[i],to=path[i+1];
         board.querySelectorAll('.lesson-motion-cell.from,.lesson-motion-cell.to').forEach(x=>x.classList.remove('from','to'));
         motionCell(board,from)?.classList.add('from'); motionCell(board,to)?.classList.add('to');
         info.textContent=DEMOS[current].name+' · '+from+' → '+to;
-        animateMotion(board,current,from,to,380,()=>{i++;timer=setTimeout(step,70);});
+        movePiece(board,from,to,380,()=>{i++;timer=setTimeout(step,70);});
       };
       step();
     }
     Object.entries(DEMOS).forEach(([key,d])=>{
       const b=document.createElement('button'); b.type='button'; b.className='lesson-motion-piece-btn';
       b.innerHTML='<span>'+d.glyph+'</span><em>'+d.name+'</em>';
-      b.addEventListener('click',()=>{current=key;controls.querySelectorAll('button').forEach(x=>x.classList.remove('active'));b.classList.add('active');reset();});
+      b.addEventListener('click',()=>{current=key;controls.querySelectorAll('button').forEach(x=>x.classList.remove('active'));b.classList.add('active');reset();timer=setTimeout(demo,550);});
       controls.appendChild(b);
     });
     const actions=document.createElement('div'); actions.className='lesson-motion-actions';
@@ -132,12 +144,12 @@
     const again=document.createElement('button'); again.type='button'; again.className='btn ghost small'; again.textContent='↺ Сначала'; again.addEventListener('click',reset);
     actions.append(play,again);
     wrap.append(title,controls,board,info,actions); host.appendChild(wrap);
-    controls.querySelector('button')?.classList.add('active'); reset();
+    controls.querySelector('button')?.classList.add('active'); reset(); timer=setTimeout(demo,550);
   }
 
   function installStyles(){
-    if($('mini-board-styles-v5')) return;
-    const style=document.createElement('style'); style.id='mini-board-styles-v5';
+    if($('mini-board-styles-v6'))return;
+    const style=document.createElement('style'); style.id='mini-board-styles-v6';
     style.textContent=`
       #tab-lessons .lesson-modern-body{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:16px!important;width:100%!important;min-width:0!important;padding:0 16px 16px!important;box-sizing:border-box!important}
       #tab-lessons .lesson-modern .lesson-text{order:1!important;width:100%!important;min-width:0!important}
@@ -164,7 +176,7 @@
       #tab-lessons .lesson-motion-cell.dark{background:var(--board-dark)}
       #tab-lessons .lesson-motion-cell.from{box-shadow:inset 0 0 0 3px rgba(126,91,255,.45)}
       #tab-lessons .lesson-motion-cell.to{box-shadow:inset 0 0 0 4px rgba(126,91,255,.82)}
-      #tab-lessons .lesson-motion-piece{font:46px/1 "DejaVu Sans","Segoe UI Symbol",serif;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.7),0 0 2px rgba(0,0,0,.55);position:relative;z-index:3;pointer-events:none;will-change:transform}
+      #tab-lessons .lesson-motion-piece{font:46px/1 "DejaVu Sans","Segoe UI Symbol",serif;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.7),0 0 2px rgba(0,0,0,.55);position:absolute;left:0;top:0;z-index:3;pointer-events:none;will-change:transform}
       #tab-lessons .lesson-motion-info{text-align:center;font-size:11px;font-weight:800;color:var(--muted);min-height:16px}
       #tab-lessons .lesson-motion-actions{display:flex;justify-content:center;gap:7px;flex-wrap:wrap}
       @media(max-width:560px){#tab-lessons .lesson-motion-controls{grid-template-columns:repeat(3,minmax(0,1fr))}#tab-lessons .lesson-motion-piece-btn em{font-size:9px}#tab-lessons .lesson-motion-piece{font-size:38px}}
@@ -176,15 +188,15 @@
     installStyles();
     const host=document.getElementById('lessonList');
     const lessons=window.CHESS_LESSONS;
-    if(!host || !Array.isArray(lessons)) return;
+    if(!host || !Array.isArray(lessons))return;
     host.querySelectorAll(':scope > .lesson-modern').forEach((card,index)=>{
       const lesson=lessons[index];
       const demoHost=card.querySelector('.lesson-demo-board');
-      if(!lesson || !demoHost) return;
+      if(!lesson || !demoHost)return;
       if(lesson.id==='l01'){
-        if(!demoHost.dataset.motionReady) mountMotionDemo(demoHost);
+        if(!demoHost.dataset.motionReady)mountMotionDemo(demoHost);
       }else if(!demoHost.querySelector('.mini-board')){
-        if(lesson.fen) demoHost.replaceChildren(renderMiniBoard(lesson.fen,260));
+        if(lesson.fen)demoHost.replaceChildren(renderMiniBoard(lesson.fen,260));
       }
     });
   }
@@ -192,7 +204,7 @@
     const host=document.getElementById('lessonList');
     if(!host || host.__miniBoardObserver)return;
     const observer=new MutationObserver(()=>{clearTimeout(host.__miniBoardTimer);host.__miniBoardTimer=setTimeout(patchLessons,0);});
-    observer.observe(host,{childList:true,subtree:true}); host.__miniBoardObserver=observer;
+    observer.observe(host,{childList:true,subtree:true});host.__miniBoardObserver=observer;
   }
   function init(){installStyles();patchLessons();installObserver();}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
