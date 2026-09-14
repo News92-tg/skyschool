@@ -66,7 +66,6 @@
     const style=document.createElement('style');
     style.id='mini-board-styles-v4';
     style.textContent=`
-      /* Lesson = one vertical flow: text first, board second. */
       #tab-lessons .lesson-modern-body{
         display:flex !important;
         flex-direction:column !important;
@@ -110,8 +109,6 @@
         padding:0 !important;
         overflow:visible !important;
       }
-
-      /* Isolated 8×8 board. No .board/.sqr rules can stretch these cells. */
       #tab-lessons .mini-board{
         --mini-size:260px;
         display:grid !important;
@@ -197,6 +194,7 @@
       const lesson=lessons[index];
       const demoHost=card.querySelector('.lesson-demo-board');
       if(!lesson || !lesson.fen || !demoHost) return;
+      if(demoHost.querySelector('.mini-board')) return;
       demoHost.replaceChildren(renderMiniBoard(lesson.fen,260));
       card.dataset.miniBoardReady='1';
     });
