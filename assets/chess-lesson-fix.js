@@ -79,6 +79,7 @@
     const boardRect=board.getBoundingClientRect(), cellRect=cell.getBoundingClientRect();
     p.style.left=(cellRect.left-boardRect.left+cellRect.width/2)+'px';
     p.style.top=(cellRect.top-boardRect.top+cellRect.height/2)+'px';
+    p.style.transform='translate(-50%,-50%)';
     p.dataset.square=sq;
     board.appendChild(p);
   }
@@ -148,8 +149,8 @@
   }
 
   function installStyles(){
-    if($('mini-board-styles-v6'))return;
-    const style=document.createElement('style'); style.id='mini-board-styles-v6';
+    if($('mini-board-styles-v7'))return;
+    const style=document.createElement('style'); style.id='mini-board-styles-v7';
     style.textContent=`
       #tab-lessons .lesson-modern-body{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:16px!important;width:100%!important;min-width:0!important;padding:0 16px 16px!important;box-sizing:border-box!important}
       #tab-lessons .lesson-modern .lesson-text{order:1!important;width:100%!important;min-width:0!important}
@@ -163,10 +164,17 @@
       #tab-lessons .mini-board .mini-piece{display:block!important;position:static!important;width:auto!important;height:auto!important;margin:0!important;padding:0!important;line-height:1!important;font-family:"DejaVu Sans","Segoe UI Symbol",serif!important;font-size:28px!important;font-weight:400!important;transform:none!important;transition:none!important;animation:none!important;user-select:none!important;pointer-events:none!important}
       #tab-lessons .mini-piece.white{color:#fff!important;text-shadow:0 1px 1px rgba(0,0,0,.55),0 0 2px rgba(0,0,0,.45)!important}
       #tab-lessons .mini-piece.black{color:#141820!important;text-shadow:0 1px 1px rgba(255,255,255,.35)!important}
+      #tab-lessons .lesson-modern{transition:box-shadow .18s,border-color .18s,transform .18s}
+      #tab-lessons .lesson-modern:hover{transform:translateY(-1px)}
+      #tab-lessons .lesson-modern.open{box-shadow:0 10px 28px rgba(55,72,110,.10)}
+      #tab-lessons .lesson-modern-body{max-width:1000px;margin:0 auto}
+      #tab-lessons .lesson-modern .lesson-text-content{max-width:880px}
+      #tab-lessons .lesson-modern .lesson-demo{background:linear-gradient(180deg,var(--panel-2),var(--panel));}
       #tab-lessons .lesson-motion-wrap{width:min(680px,100%);display:grid;gap:10px;justify-items:center}
       #tab-lessons .lesson-motion-label{width:100%;font-size:11px;font-weight:900;color:var(--muted);text-align:left;text-transform:uppercase;letter-spacing:.05em}
       #tab-lessons .lesson-motion-controls{width:100%;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px}
-      #tab-lessons .lesson-motion-piece-btn{display:flex;align-items:center;justify-content:center;gap:5px;padding:7px 5px;border:1px solid var(--line);border-radius:10px;background:var(--panel);font:700 10px Nunito,sans-serif;color:var(--ink-2);cursor:pointer}
+      #tab-lessons .lesson-motion-piece-btn{display:flex;align-items:center;justify-content:center;gap:5px;padding:7px 5px;border:1px solid var(--line);border-radius:10px;background:var(--panel);font:700 10px Nunito,sans-serif;color:var(--ink-2);cursor:pointer;transition:transform .16s,box-shadow .16s,border-color .16s,background .16s}
+      #tab-lessons .lesson-motion-piece-btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(55,72,110,.08)}
       #tab-lessons .lesson-motion-piece-btn span{font:23px/1 "DejaVu Sans","Segoe UI Symbol",serif}
       #tab-lessons .lesson-motion-piece-btn em{font-style:normal}
       #tab-lessons .lesson-motion-piece-btn.active{border-color:var(--m-chess);background:var(--m-chess-soft);color:var(--m-chess)}
