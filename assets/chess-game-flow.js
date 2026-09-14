@@ -14,7 +14,6 @@
     const s=document.createElement('style');
     s.id='chess-game-flow-styles';
     s.textContent=`
-      /* Hide the old/secondary setup UI. This layer owns the whole game entry flow. */
       #tab-game>.game-mode-panel,
       #tab-game>.difficulty-panel,
       #tab-game>.row.game-controls-clean,
@@ -40,7 +39,6 @@
       .game-flow-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
       .game-flow-actions .btn{width:100%}
       .game-flow-start{grid-column:1/-1}
-      .game-flow-aux{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
       .game-flow-label{font-size:11px;color:var(--muted);font-weight:900;text-transform:uppercase;letter-spacing:.08em}
       .game-flow-side{margin-top:12px;max-width:260px}
       #tab-game.game-flow-started #gameFlowRoot{display:none!important}
@@ -49,6 +47,16 @@
       @media(max-width:600px){.game-flow-config .difficulty-panel .difficulty-grid{grid-template-columns:1fr 1fr}.game-flow-actions{grid-template-columns:1fr}.game-flow-start{grid-column:auto}.game-flow-side{max-width:none}}
     `;
     document.head.appendChild(s);
+  }
+
+  function hideGlobalTrainerSource(){
+    const picker=$('chessTeacherPicker');
+    if(picker){
+      const section=picker.closest('.section');
+      if(section) section.remove();
+      else picker.remove();
+    }
+    document.querySelectorAll('[data-tab="trainer"],#tab-teacher').forEach(el=>el.remove());
   }
 
   function hideLegacy(){
@@ -67,22 +75,12 @@
     return root;
   }
 
-  function selectedSide(){
-    const select=$('gSide');
-    return select ? select.value : 'w';
-  }
-
-  function selectedDifficulty(){
-    const select=$('gLevel');
-    return select ? select.value : '2';
-  }
-
   function startGame(){
     const original=$('gNew');
-    if(!original){return;}
+    if(!original) return;
     stage='started';
     const game=$('tab-game');
-    localStorage.setItem(MODE, game.dataset.flowMode==='solo'?'solo':'coach');
+    localStorage.setItem(MODE,game.dataset.flowMode==='solo'?'solo':'coach');
     original.click();
     setTimeout(()=>{
       game.classList.add('game-flow-started');
@@ -90,7 +88,7 @@
       if(boardWrap) boardWrap.style.display='grid';
       const board=$('gBoard');
       if(board) board.scrollIntoView({behavior:'smooth',block:'start'});
-    },60);
+    },80);
   }
 
   function modeChooser(root){
@@ -113,8 +111,9 @@
   function wrapDifficulty(){
     const holder=document.createElement('div');
     holder.className='game-flow-config';
-    const old=$('tab-game')?.querySelector(':scope>.row.game-controls-clean .difficulty-panel') || $('tab-game')?.querySelector(':scope>.difficulty-panel');
-    if(old){holder.appendChild(old); old.classList.remove('game-flow-hidden');}
+    const game=$('tab-game');
+    const old=game?.querySelector(':scope>.row.game-controls-clean .difficulty-panel') || game?.querySelector(':scope>.difficulty-panel');
+    if(old){holder.appendChild(old);old.classList.remove('game-flow-hidden');}
     return holder;
   }
 
@@ -128,47 +127,44 @@
     const panel=root.firstElementChild;
 
     if(kind==='coach'){
-      const block=document.createElement('div'); block.className='game-flow-config';
-      const label=document.createElement('div'); label.className='game-flow-label'; label.textContent=tx('Тренер','Coach');
+      const block=document.createElement('div');block.className='game-flow-config';
+      const label=document.createElement('div');label.className='game-flow-label';label.textContent=tx('Тренер','Coach');
       block.appendChild(label);
-      const teachers=document.createElement('div'); teachers.id='gameFlowTeachers'; teachers.className='game-flow-teachers'; block.appendChild(teachers);
+      const teachers=document.createElement('div');teachers.id='gameFlowTeachers';teachers.className='game-flow-teachers';block.appendChild(teachers);
       panel.appendChild(block);
-      setTimeout(()=>{ if(window.ChessTeacherUI) ChessTeacherUI.renderPicker(teachers); },0);
-    } else {
-      const block=wrapDifficulty(); panel.appendChild(block);
+      setTimeout(()=>{if(window.ChessTeacherUI) ChessTeacherUI.renderPicker(teachers);},0);
+    }else{
+      panel.appendChild(wrapDifficulty());
     }
 
-    const sideBlock=document.createElement('div'); sideBlock.className='game-flow-side';
+    const sideBlock=document.createElement('div');sideBlock.className='game-flow-side';
     sideBlock.innerHTML=`<div class="game-flow-label">${tx('Я играю','I play')}</div><div class="field" style="margin-top:6px"><select id="gameFlowSide"><option value="w">${tx('Белыми','White')}</option><option value="b">${tx('Чёрными','Black')}</option></select></div>`;
     panel.appendChild(sideBlock);
 
-    const actions=document.createElement('div'); actions.className='game-flow-actions';
-    const start=document.createElement('button'); start.type='button'; start.className='btn chess big game-flow-start'; start.textContent=tx('Начать партию','Start game');
+    const actions=document.createElement('div');actions.className='game-flow-actions';
+    const start=document.createElement('button');start.type='button';start.className='btn chess big game-flow-start';start.textContent=tx('Начать партию','Start game');
     start.addEventListener('click',()=>{
-      const side=$('gameFlowSide'); if(side&&$('gSide')) $('gSide').value=side.value;
-      if(kind==='solo'){
-        localStorage.setItem(MODE,'solo');
-      }else{
-        localStorage.setItem(MODE,'coach');
-      }
+      const side=$('gameFlowSide');
+      if(side&&$('gSide')) $('gSide').value=side.value;
+      localStorage.setItem(MODE,kind==='solo'?'solo':'coach');
       startGame();
     });
-    actions.appendChild(start); panel.appendChild(actions);
-    const note=document.createElement('div'); note.className='game-flow-sub'; note.style.marginTop='10px'; note.textContent=tx('После старта откроется шахматная доска.','The chess board opens immediately after you start.'); panel.appendChild(note);
+    actions.appendChild(start);panel.appendChild(actions);
   }
 
   function resetStarted(){
-    const game=$('tab-game'); if(!game) return;
+    const game=$('tab-game');if(!game)return;
     game.classList.remove('game-flow-started');
     const boardWrap=game.querySelector(':scope>.board-wrap');
     if(boardWrap) boardWrap.style.display='none';
     stage='choose';game.dataset.flowMode='';
-    const root=buildRoot(); if(root) modeChooser(root);
+    const root=buildRoot();if(root)modeChooser(root);
   }
 
   function init(){
     styles();
-    const game=$('tab-game'); if(!game){setTimeout(init,60);return;}
+    hideGlobalTrainerSource();
+    const game=$('tab-game');if(!game){setTimeout(init,60);return;}
     hideLegacy();
     const root=buildRoot();
     modeChooser(root);
@@ -177,7 +173,7 @@
 
   document.addEventListener('click',e=>{
     const tab=e.target.closest('[data-tab="game"]');
-    if(tab){setTimeout(init,0);}
+    if(tab) setTimeout(init,0);
   });
   document.addEventListener('langchange',()=>setTimeout(()=>{if(stage!=='started')init();},0));
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init,{once:true}); else setTimeout(init,0);
