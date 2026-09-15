@@ -1,0 +1,31 @@
+name: Chess quality
+
+on:
+  push:
+    paths:
+      - 'chess.html'
+      - 'assets/chess-*.js'
+      - 'data/chess-*.js'
+      - 'scripts/test-chess-engine.js'
+      - '.github/workflows/chess-quality.yml'
+  pull_request:
+    paths:
+      - 'chess.html'
+      - 'assets/chess-*.js'
+      - 'data/chess-*.js'
+      - 'scripts/test-chess-engine.js'
+      - '.github/workflows/chess-quality.yml'
+
+jobs:
+  chess:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax-check chess modules
+        run: |
+          for f in assets/chess-*.js scripts/test-chess-engine.js; do node --check "$f"; done
+      - name: Run chess regression suite
+        run: node scripts/test-chess-engine.js
