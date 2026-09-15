@@ -14,6 +14,8 @@
   function replay(a){var st=E.create(E.START_FEN),cap={w:0,b:0};for(var i=0;i<a.length;i++){var m=E.findMove(st,a[i]);if(!m)break;if(m.captured)cap[(m.captured&8)?'b':'w']++;E.make(st,m);}return{state:st,cap:cap};}
   function fixPanel(){var p=document.getElementById('skyGameOver');if(!p||!p.classList.contains('show'))return;var a=sans(),r=replay(a),side=(document.getElementById('gSide')||{}).value||'w',h=side==='b'?E.BLACK:E.WHITE,f=p.querySelectorAll('.sky-chess-stat b');if(f[0])f[0].textContent=Math.ceil(a.length/2);if(f[1])f[1].textContent=r.cap[h===E.WHITE?'b':'w'];if(f[2])f[2].textContent=r.cap[h===E.WHITE?'w':'b'];}
   function fixHint(){var b=document.getElementById('skyHint'),p=document.getElementById('skyGameHint');if(!b||!p||b.__skyFixed)return;b.__skyFixed=true;b.onclick=function(){var r=replay(sans()),side=(document.getElementById('gSide')||{}).value||'w',h=side==='b'?E.BLACK:E.WHITE;if(r.state.turn!==h){p.style.display='block';p.innerHTML='<b>'+(root.Sky&&Sky.lang==='en'?'Wait for the bot.':'Подожди ход бота.')+'</b>';return;}var lvl=Number((document.getElementById('gLevel')||{}).value)||2,ai=root.ChessAI&&root.ChessAI.bestMove?root.ChessAI.bestMove(r.state,Math.min(3,lvl)):null;if(!ai||!ai.move)return;p.style.display='block';p.innerHTML='<b>'+(root.Sky&&Sky.lang==='en'?'Idea':'Идея')+'</b> '+E.toAlg(ai.move.from)+' → '+E.toAlg(ai.move.to);};}
+  /* Prevent the older platform hardening layer from wrapping this corrected implementation at DOMContentLoaded. */
+  E.__skyHardened=true;
   E.__skySeniorHardened=true;
   setTimeout(function(){fixHint();fixPanel();var g=document.getElementById('tab-game');if(g){new MutationObserver(function(){fixHint();fixPanel();}).observe(g,{childList:true,subtree:true});}},0);
 })(window);
