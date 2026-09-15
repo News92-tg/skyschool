@@ -1,1 +1,1 @@
-ci-smoke
+ci-smoke-trigger-2
