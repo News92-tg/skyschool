@@ -1,6 +1,4 @@
-/* SkyySchool — runtime guard for optional/blocked teacher-cloud UI.
-   Keeps the page bootable when Supabase RLS is not configured yet or when
-   another UI layer has removed an optional teacher node. */
+/* SkyySchool — runtime guard for optional/blocked cloud UI and partial DOM. */
 'use strict';
 (function () {
   function ensure(id, tag, parent, className) {
@@ -14,23 +12,39 @@
     return el;
   }
 
-  function repairTeacherDom() {
-    const tab = document.getElementById('tab-teacher');
-    if (!tab) return;
-    const gate = ensure('tGate', 'div', tab);
-    const body = ensure('tBody', 'div', tab, 'hidden');
-    ensure('tTitle', 'h2', body);
-    ensure('tNew', 'button', body, 'btn chess small hidden');
+  function repairChessDom() {
+    const main = document.querySelector('main.wrap') || document.body;
+    const tabs = document.querySelector('.tabs');
+    const names = ['lessons','puzzles','game','teacher','live'];
+
+    /* The tab click handler assumes every target section exists. Keep that
+       invariant true even if an optional layer removes a node. */
+    if (tabs) {
+      names.forEach(name => ensure('tab-' + name, 'section', main, name === 'lessons' ? '' : 'hidden'));
+    }
+
+    const teacher = document.getElementById('tab-teacher');
+    if (!teacher) return;
+    const gate = ensure('tGate', 'div', teacher);
+    const body = ensure('tBody', 'div', teacher, 'hidden');
+    let head = body.querySelector('.section-head');
+    if (!head) {
+      head = document.createElement('div');
+      head.className = 'section-head';
+      body.insertBefore(head, body.firstChild || null);
+    }
+    ensure('tTitle', 'h2', head);
+    ensure('tNew', 'button', head, 'btn chess small hidden');
     ensure('tList', 'div', body, 'list');
     return { gate, body };
   }
 
   function boot() {
-    repairTeacherDom();
-    const tab = document.getElementById('tab-teacher');
-    if (tab && !tab.__skyTeacherGuard) {
-      tab.__skyTeacherGuard = true;
-      new MutationObserver(repairTeacherDom).observe(tab, { childList: true, subtree: true });
+    repairChessDom();
+    const teacher = document.getElementById('tab-teacher');
+    if (teacher && !teacher.__skyTeacherGuard) {
+      teacher.__skyTeacherGuard = true;
+      new MutationObserver(repairChessDom).observe(teacher, { childList: true, subtree: true });
     }
   }
 
