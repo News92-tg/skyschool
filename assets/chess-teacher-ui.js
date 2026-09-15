@@ -8,3 +8,4 @@ document.write('<script src="assets/chess-game-flow.js"><\/script>');
 document.write('<script src="assets/chess-lesson-fix.js?v=10"><\/script>');
 document.write('<script src="assets/chess-lesson-polish.js?v=1"><\/script>');
 document.write('<script src="assets/chess-lesson-motion-correct.js?v=1"><\/script>');
+document.write('<script src="assets/chess-lessons-interactive.js?v=2"><\/script>');
