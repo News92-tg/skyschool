@@ -56,6 +56,30 @@
         <div class="stat"><b id="stQual">—</b><span data-i18n="stQualL"></span></div>
       </div>
     </div>
+
+    <!-- ==================== СОН И РЕЗУЛЬТАТЫ ====================
+         Единственное место, где сходятся часы сна и точность решения:
+         и то и другое уже лежит в этом браузере, по одним и тем же
+         датам. Показываем только когда данных хватает — на трёх днях
+         любая разница случайна. -->
+    <div class="panel section" id="linkPanel">
+      <h2 data-i18n="linkTitle"></h2>
+      <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="linkLead"></p>
+
+      <div class="hidden" id="linkWait">
+        <p class="note" id="linkWaitText"></p>
+      </div>
+
+      <div class="hidden" id="linkResult">
+        <div class="stats section">
+          <div class="stat"><b id="linkShort">—</b><span data-i18n="linkShortL"></span></div>
+          <div class="stat ok"><b id="linkLong">—</b><span data-i18n="linkLongL"></span></div>
+          <div class="stat accent"><b id="linkDays">0</b><span data-i18n="linkDaysL"></span></div>
+        </div>
+        <p class="note" id="linkPhrase" style="margin-top:14px"></p>
+        <p class="note hidden" id="linkVolume"></p>
+      </div>
+    </div>
   </section>
 
   <!-- ==================== РАСПИСАНИЕ ==================== -->
@@ -138,6 +162,7 @@
 <script src="assets/db.js"></script>
 <script src="assets/auth.js"></script>
 <script src="assets/trackers.js"></script>
+<script src="assets/insights.js"></script>
 <script>
 'use strict';
 Sky.init({
@@ -167,6 +192,20 @@ Sky.init({
   stNightsL:{ru:'ночей записано',en:'nights logged'},
   stShortL:{ru:'ночей меньше 7 ч',en:'nights under 7h'},
   stQualL:{ru:'самочувствие',en:'how you felt'},
+
+  /* ---------- сон и результаты ---------- */
+  linkTitle:{ru:'Сон и результаты',en:'Sleep and results'},
+  linkLead:{ru:'Считается прямо в браузере по твоим записям: часы сна из этого раздела и точность решений из тренажёра за те же дни. Никуда не отправляется.',
+            en:'Worked out in your browser from your own records: sleep hours from this page and trainer accuracy for the same days. Nothing is sent anywhere.'},
+  linkShortL:{ru:'после коротких ночей',en:'after short nights'},
+  linkLongL:{ru:'после длинных',en:'after longer ones'},
+  linkDaysL:{ru:'дней сопоставлено',en:'days matched'},
+  linkWaitN:{ru:'Пока рано: нужно %1 дней, где есть и сон, и решённые задания. Сейчас таких %2. Записывай сон дальше — через пару недель будет что показать.',
+             en:'Too early: this needs %1 days with both sleep and solved problems. So far there are %2. Keep logging and there will be something to show in a couple of weeks.'},
+  linkWaitSide:{ru:'Данных хватает, но почти все ночи одинаковой длины (коротких %1, длинных %2). Сравнивать пока не с чем.',
+                en:'There is enough data, but the nights are nearly all the same length (%1 short, %2 longer). There is nothing to compare yet.'},
+  linkVol:{ru:'Задач в день: %1 после коротких ночей, %2 после длинных.',
+           en:'Problems per day: %1 after short nights, %2 after longer ones.'},
 
   /* ---------- расписание ---------- */
   dayTitle:{ru:'Расписание дня',en:'Daily schedule'},
@@ -302,7 +341,45 @@ $('#sSave').addEventListener('click', () => {
   Sky.toast(Sky.t('saved'));
   loadSleepDay();
   renderSleepChart();
+  renderLink();
 });
+
+/* ---------- сон и результаты ----------
+   Наблюдение считает assets/insights.js, здесь только показ. Порог
+   молчания важнее самого наблюдения: вывод на трёх днях — это не
+   аналитика, а гадание, и ученику оно обойдётся дороже, чем пустой
+   блок. */
+function renderLink() {
+  const res = SkyInsights.sleepVsAccuracy();
+  const wait = $('#linkWait'), result = $('#linkResult');
+
+  if (!res.enough) {
+    result.classList.add('hidden');
+    wait.classList.remove('hidden');
+    $('#linkWaitText').textContent = res.oneSided
+      ? Sky.t('linkWaitSide').replace('%1', res.short).replace('%2', res.long)
+      : Sky.t('linkWaitN').replace('%1', res.need).replace('%2', res.have);
+    return;
+  }
+
+  wait.classList.add('hidden');
+  result.classList.remove('hidden');
+  $('#linkShort').textContent = res.short.accuracy + '%';
+  $('#linkLong').textContent = res.long.accuracy + '%';
+  $('#linkDays').textContent = res.days;
+  $('#linkPhrase').textContent = SkyInsights.phrase(res, Sky.lang);
+
+  const vol = SkyInsights.sleepVsVolume();
+  const volBox = $('#linkVolume');
+  /* Объём показываем только если разница заметна: одинаковые числа
+     рядом выглядят как вывод, которого нет. */
+  if (vol && Math.abs(vol.gap) >= 2) {
+    volBox.textContent = Sky.t('linkVol').replace('%1', vol.short).replace('%2', vol.long);
+    volBox.classList.remove('hidden');
+  } else {
+    volBox.classList.add('hidden');
+  }
+}
 
 function renderSleepChart() {
   const st = T.sleepStats(30);
@@ -730,6 +807,7 @@ function renderAll() {
   buildMinsSelect();
   loadSleepDay();
   renderSleepChart();
+  renderLink();
   renderDay();
   renderFood();
   renderPatterns();

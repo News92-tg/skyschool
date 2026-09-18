@@ -67,6 +67,10 @@
         <button class="btn ghost small" id="aiSetupBtn"></button>
       </div>
       <p class="note hidden" id="ruNote" style="border-left-color:var(--warn)"></p>
+      <!-- Свои задачи с фотографий — отдельный предмет в списке выше.
+           Без этой строки о нём никто не узнает: ученик добавил задачу
+           три дня назад и забыл. -->
+      <p class="note hidden" id="photoNote" style="border-left-color:var(--m-teach)"></p>
       <button class="btn full big" id="startBtn" style="margin-top:16px" data-i18n="start"></button>
     </div>
 
@@ -100,6 +104,16 @@
       </div>
 
       <div class="options" id="qOptions"></div>
+
+      <!-- Карточка с фотографии: вариантов ответа нет, ученик
+           вспоминает решение и честно отмечает результат. -->
+      <div class="hidden" id="qSelf">
+        <button class="btn ghost full" id="qReveal" type="button" data-i18n="selfReveal"></button>
+        <div class="row hidden" id="qSelfGrade" style="margin-top:12px">
+          <button class="btn ok" id="qGotIt" type="button" data-i18n="selfOk"></button>
+          <button class="btn ghost" id="qMissed" type="button" data-i18n="selfNo"></button>
+        </div>
+      </div>
 
       <div class="note hidden" id="qHint"></div>
       <div class="verdict hidden" id="qVerdict"></div>
@@ -178,6 +192,12 @@
           </div>
 
           <div class="pa-feedback hidden" id="paFeedback"></div>
+
+          <!-- Разбор прочитан — и на этом всё заканчивалось. Кнопка
+               кладёт задачу в ту же очередь повторения, что и
+               задания из банков: через день она вернётся сама. -->
+          <button class="btn ghost full hidden" id="paRepeat" type="button"
+                  style="margin-top:14px" data-i18n="paRepeat"></button>
         </div>
       </div>
     </div>
@@ -194,6 +214,7 @@
 <script src="assets/python-editor.js"></script>
 <script src="assets/speech.js"></script>
 <script src="assets/photo-ai.js"></script>
+<script src="assets/photo-tasks.js"></script>
 <script src="data/ai-teachers.js"></script>
 <script src="assets/ai-teachers.js"></script>
 <script src="data/bank-math.js"></script>
@@ -289,6 +310,15 @@ Sky.init({
   paNotSaved:{ru:'Разбор показан, но в историю не записан: для этого нужно войти в аккаунт.',
               en:'The analysis is shown but not saved to your history — that needs you to be signed in.'},
 
+  paRepeat:{ru:'📌 Повторить эту задачу позже',en:'📌 Bring this task back later'},
+  paRepeatAdded:{ru:'Задача добавлена: вернётся завтра в разделе «Мои задачи с фото»',en:'Added: it comes back tomorrow under “My photo tasks”'},
+  paRepeatHave:{ru:'Эта задача уже в повторении',en:'This task is already in the review queue'},
+  selfReveal:{ru:'Показать решение',en:'Show the solution'},
+  selfOk:{ru:'Справился сам',en:'Got it myself'},
+  selfNo:{ru:'Не вспомнил',en:'Could not recall'},
+  selfNote:{ru:'Своя задача с фотографии. Вспомни решение, потом проверь себя — честность здесь работает на тебя.',en:'Your own task from a photo. Recall the solution, then check yourself — being honest here works in your favour.'},
+  photoDue:{ru:'Своих задач с фото ждёт повторения: %1',en:'Photo tasks due for review: %1'},
+
   catGrammar:{ru:'грамматика',en:'grammar'},
   catVocabulary:{ru:'лексика',en:'vocabulary'},
   catReading:{ru:'чтение',en:'reading'},
@@ -313,6 +343,13 @@ document.addEventListener('teacherchange', renderTeacher);
 document.addEventListener('langchange', renderTeacher);
 renderTeacher();
 
+/* Задачи, снятые на фото, подмешиваются к банкам как обычный предмет.
+   Тренажёру не нужно про них знать: фильтры, расписание повторения,
+   прогресс и статистика работают ровно так же, как для математики. */
+if (window.PhotoTasks) {
+  const pb = PhotoTasks.bank();
+  if (pb) { window.BANKS = window.BANKS || {}; window.BANKS.photo = pb; }
+}
 const BANKS = window.BANKS || {};
 const $ = s => document.querySelector(s);
 const EXAM_LABEL = { oge:'ОГЭ', ege:'ЕГЭ', both:'ЕГЭ/ОГЭ' };
@@ -354,6 +391,14 @@ function noteText() {
     (sub === 'all' ? Object.values(BANKS).some(b => b.ruOnly) : (BANKS[sub] && BANKS[sub].ruOnly));
   ru.classList.toggle('hidden', !showsRuOnly);
   if (showsRuOnly) ru.textContent = Sky.t('ruOnlyNote');
+
+  /* Свои задачи с фотографий: напоминаем, только когда есть что
+     повторять, и только если ученик не выбрал этот предмет сам. */
+  const pn = $('#photoNote');
+  const due = window.PhotoTasks ? PhotoTasks.dueCount() : 0;
+  const show = due > 0 && sub !== 'photo';
+  pn.classList.toggle('hidden', !show);
+  if (show) pn.textContent = Sky.t('photoDue').replace('%1', due);
 }
 $('#mode').addEventListener('change', noteText);
 subjSel.addEventListener('change', () => { noteText(); renderStats(); });
@@ -403,7 +448,7 @@ $('#stopBtn').addEventListener('click', () => {
 });
 
 function hideExtras() {
-  ['qHint','qVerdict','qSolution','qTr','qAi'].forEach(id => $('#' + id).classList.add('hidden'));
+  ['qHint','qVerdict','qSolution','qTr','qAi','qSelf'].forEach(id => $('#' + id).classList.add('hidden'));
 }
 
 function nextTask() {
@@ -415,6 +460,7 @@ function nextTask() {
     document.querySelectorAll('.meta .tag').forEach(s => s.classList.add('hidden'));
     $('#qAudioBox').classList.add('hidden');
     $('#qText').textContent = '';
+    $('#qOptions').classList.remove('hidden');   /* у карточек с фото он был скрыт */
     $('#qOptions').innerHTML = `<div class="empty"><div class="big">🌤</div>
       <b>${Sky.t('doneT')}</b><p>${Sky.t('doneD')}</p></div>`;
     ['hintBtn','checkBtn','aiBtn','nextBtn'].forEach(id => $('#' + id).classList.add('hidden'));
@@ -472,18 +518,41 @@ function renderTask() {
     list.appendChild(b);
   });
 
+  /* ---------- карточка с фотографии ----------
+     У неё нет вариантов ответа: ученик вспоминает решение и сам
+     отмечает, справился ли. Это штатный режим карточных систем, а не
+     упрощение — проверить произвольный ответ из тетради платформа всё
+     равно не может, и делать вид, что может, было бы хуже. */
+  const selfCheck = !!current.selfCheck;
+  $('#qSelf').classList.toggle('hidden', !selfCheck || answered);
+  $('#qOptions').classList.toggle('hidden', selfCheck);
+  if (selfCheck && !answered) {
+    $('#qSelfGrade').classList.add('hidden');
+    $('#qReveal').classList.remove('hidden');
+    $('#qHint').classList.remove('hidden');
+    $('#qHint').textContent = Sky.t('selfNote');
+  }
+
   $('#checkBtn').disabled = (picked === null);
-  $('#hintBtn').classList.toggle('hidden', answered);
-  $('#checkBtn').classList.toggle('hidden', answered);
+  $('#hintBtn').classList.toggle('hidden', answered || selfCheck);
+  $('#checkBtn').classList.toggle('hidden', answered || selfCheck);
   $('#nextBtn').classList.toggle('hidden', !answered);
   $('#aiBtn').classList.toggle('hidden', !answered);
 
-  if (!$('#qHint').classList.contains('hidden')) $('#qHint').textContent = Sky.L(current.hint);
+  /* У карточки с фотографии в hint лежит первый шаг решения — он
+     открывается кнопкой «Подсказка», а не сам собой. Иначе строка ниже
+     показала бы начало решения раньше, чем ученик попробовал вспомнить,
+     и вся карточка потеряла бы смысл. */
+  if (!selfCheck && !$('#qHint').classList.contains('hidden')) {
+    $('#qHint').textContent = Sky.L(current.hint);
+  }
   if (answered) {
     const ok = picked === current.answer;
     const v = $('#qVerdict');
     v.className = 'verdict ' + (ok ? 'ok' : 'no');
-    v.textContent = ok ? '✓ ' + Sky.t('right')
+    /* У самопроверки вердикт ставит gradeSelf: там нет «правильного
+       варианта», который можно назвать. */
+    if (!selfCheck) v.textContent = ok ? '✓ ' + Sky.t('right')
       : '✕ ' + Sky.t('wrong') + ' — ' + Sky.t('correctIs') + Sky.L(current.options[current.answer]);
     $('#qSolution').textContent = Sky.L(current.solution);
 
@@ -623,6 +692,37 @@ $('#checkBtn').addEventListener('click', () => {
   const days = Math.max(1, Math.round((res.due - Date.now()) / 864e5));
   Sky.toast(days <= 1 ? Sky.t('nextTomorrow') : Sky.t('nextIn').replace('%1', days));
 });
+
+/* ---------- самопроверка карточек с фото ----------
+   Вспомнил → посмотрел решение → честно отметил. Оценку ставит сам
+   ученик, и дальше карточка живёт по обычному расписанию повторения. */
+$('#qReveal').addEventListener('click', () => {
+  if (!current) return;
+  $('#qSolution').textContent = Sky.L(current.solution);
+  $('#qSolution').classList.remove('hidden');
+  $('#qReveal').classList.add('hidden');
+  $('#qSelfGrade').classList.remove('hidden');
+});
+
+function gradeSelf(ok) {
+  if (!current || answered) return;
+  answered = true;
+  picked = ok ? current.answer : -1;
+  Sky.record(bank.id, current.id, ok);
+
+  const v = $('#qVerdict');
+  v.className = 'verdict ' + (ok ? 'ok' : 'no');
+  v.textContent = (ok ? '✓ ' : '✕ ') + Sky.t(ok ? 'right' : 'wrong');
+  v.classList.remove('hidden');
+  $('#qSolution').textContent = Sky.L(current.solution);
+  $('#qSolution').classList.remove('hidden');
+  $('#qSelf').classList.add('hidden');
+  $('#nextBtn').classList.remove('hidden');
+  $('#aiBtn').classList.add('hidden');
+  renderStats();
+}
+$('#qGotIt').addEventListener('click', () => gradeSelf(true));
+$('#qMissed').addEventListener('click', () => gradeSelf(false));
 
 $('#nextBtn').addEventListener('click', () => {
   pos++; nextTask(); window.scrollTo({ top:0, behavior:'smooth' });
@@ -770,7 +870,7 @@ function paReset(keepShot) {
     $('#paFile').value = '';
   }
   paData = null; paRow = null; paStepsShown = 0;
-  ['paResult','paWorking','paFail','paSolutionBox','paErrorsBox','paFeedback']
+  ['paResult','paWorking','paFail','paSolutionBox','paErrorsBox','paFeedback','paRepeat']
     .forEach(id => $('#' + id).classList.add('hidden'));
 }
 
@@ -826,6 +926,7 @@ $('#paRunBtn').addEventListener('click', async () => {
 
   if (!res.ok) { paFail(res.message, res.code === 'cooldown' ? 'warn' : ''); return; }
   paData = res.data;
+  paSyncRepeat();
   if (res.warning) paFail(res.warning, 'warn');
   paRender();
   paSave();
@@ -928,6 +1029,30 @@ async function paSave() {
 /* Исправленный руками текст — это то, что ученик считает написанным
    на самом деле. В историю должен попасть он, а не то, что померещилось
    распознаванию. */
+
+/* Кнопка «повторить позже» появляется только когда есть что повторять:
+   условие распознано и разобрано по шагам. */
+function paSyncRepeat() {
+  const btn = $('#paRepeat');
+  const can = !!(paData && paData.text && (paData.solution || []).length);
+  btn.classList.toggle('hidden', !can);
+  if (!can) return;
+  const have = PhotoTasks.has(paData.text);
+  btn.disabled = have;
+  btn.textContent = Sky.t(have ? 'paRepeatHave' : 'paRepeat');
+}
+
+$('#paRepeat').addEventListener('click', () => {
+  if (!paData) return;
+  /* В повторение уходит текст ИЗ ПОЛЯ: если ученик поправил
+     распознавание, вернуться должно исправленное условие, а не то,
+     что померещилось модели. */
+  const edited = Object.assign({}, paData, { text: $('#paText').value.trim() || paData.text });
+  PhotoTasks.add(edited, { subject: bank ? bank.id : subjSel.value });
+  paSyncRepeat();
+  Sky.toast(Sky.t('paRepeatAdded'), 4000);
+});
+
 $('#paSaveText').addEventListener('click', async () => {
   const text = $('#paText').value.trim();
   if (paData) paData.text = text;
