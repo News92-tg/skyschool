@@ -262,8 +262,166 @@ window.Sky = (function () {
       if (b) setLang(b.dataset.lang);
     });
     host.querySelector('#themeBtn').addEventListener('click', toggleTheme);
+
+    addSkipLink();
+    fitNav();
+    renderTabbar();
     document.dispatchEvent(new CustomEvent('headerready'));
   }
+
+  /* ---------- перемычка к содержимому ----------
+     В меню семнадцать пунктов. Без этой ссылки человек, который ходит
+     по сайту с клавиатуры, проходит их все на КАЖДОЙ странице, прежде
+     чем добраться до первой кнопки. Видна только при фокусе. */
+  function addSkipLink() {
+    if (document.querySelector('.skip-link')) return;
+    const main = document.querySelector('main');
+    if (!main) return;
+    if (!main.id) main.id = 'main';
+    const a = document.createElement('a');
+    a.className = 'skip-link';
+    a.href = '#' + main.id;
+    a.textContent = lang === 'ru' ? 'К содержимому' : 'Skip to content';
+    document.body.insertBefore(a, document.body.firstChild);
+  }
+
+  /* ---------- сколько пунктов влезает ----------
+     Раньше меню было полосой с горизонтальной прокруткой. На практике
+     между логотипом и блоком аккаунта оставалось около сотни пикселей,
+     пункт обрезался на полуслове («Задани…»), и ничто не подсказывало,
+     что полосу можно листать. Разделы, которых не видно, для человека
+     не существуют.
+
+     Теперь показываем столько, сколько действительно помещается, а
+     остальное складываем в «Ещё». Текущая страница показывается всегда:
+     ученик должен видеть, где он находится, даже если этот пункт
+     двадцатый по счёту. */
+  let navFitTimer = null;
+  function fitNav() {
+    const bar = document.querySelector('.appbar .inner');
+    const nav = bar && bar.querySelector('.appnav');
+    if (!nav) return;
+    if (window.innerWidth <= 760) return;   /* там работает нижняя панель */
+
+    const links = [...nav.querySelectorAll('a')];
+    let more = bar.querySelector('.nav-more');
+    if (!more) {
+      more = document.createElement('div');
+      more.className = 'nav-more';
+      more.innerHTML = '<button type="button" aria-expanded="false"></button>' +
+                       '<div class="nav-sheet" hidden></div>';
+      nav.after(more);
+      const btn = more.querySelector('button');
+      btn.addEventListener('click', () => {
+        const open = btn.getAttribute('aria-expanded') === 'true';
+        btn.setAttribute('aria-expanded', String(!open));
+        more.querySelector('.nav-sheet').hidden = open;
+      });
+      /* Клик мимо и Esc закрывают список: иначе он висит поверх
+         страницы и перехватывает нажатия. */
+      document.addEventListener('click', e => {
+        if (!more.contains(e.target)) {
+          more.querySelector('button').setAttribute('aria-expanded', 'false');
+          more.querySelector('.nav-sheet').hidden = true;
+        }
+      });
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+          more.querySelector('button').setAttribute('aria-expanded', 'false');
+          more.querySelector('.nav-sheet').hidden = true;
+        }
+      });
+    }
+    const btn = more.querySelector('button');
+    const sheet = more.querySelector('.nav-sheet');
+    btn.firstChild && btn.removeChild(btn.firstChild);
+    btn.insertBefore(document.createTextNode(lang === 'ru' ? 'Ещё' : 'More'), btn.firstChild);
+
+    /* Меряем в два прохода: сначала всё показываем, чтобы узнать
+       настоящую ширину пунктов, потом прячем лишние. */
+    links.forEach(a => a.classList.remove('nav-hidden'));
+    /* Кнопку «Ещё» показываем на время замера: её ширину тоже нужно
+       вычесть, иначе последний пункт налезает на неё. */
+    more.style.display = '';
+    const tools = bar.querySelector('.tools');
+    const brand = bar.querySelector('.brand');
+    const moreW = more.offsetWidth || 74;
+    const avail = bar.clientWidth - brand.offsetWidth - tools.offsetWidth - moreW - 40;
+
+    let used = 0;
+    const hidden = [];
+    links.forEach(a => {
+      const w = a.offsetWidth + 2;
+      const isHere = a.hasAttribute('aria-current');
+      if (used + w <= avail || isHere) { used += w; }
+      else { a.classList.add('nav-hidden'); hidden.push(a); }
+    });
+
+    if (!hidden.length) { more.style.display = 'none'; sheet.innerHTML = ''; return; }
+    more.style.display = '';
+    sheet.innerHTML = '';
+    hidden.forEach(a => {
+      const copy = document.createElement('a');
+      copy.href = a.getAttribute('href');
+      copy.textContent = a.textContent;
+      if (a.hasAttribute('aria-current')) copy.setAttribute('aria-current', 'page');
+      sheet.appendChild(copy);
+    });
+  }
+
+  window.addEventListener('resize', () => {
+    clearTimeout(navFitTimer);
+    navFitTimer = setTimeout(() => { fitNav(); renderTabbar(); }, 150);
+  });
+
+  /* ---------- нижняя панель на телефоне ----------
+     Четыре раздела, которыми пользуются каждый день, плюс «Ещё» со
+     всем остальным. Большой палец дотягивается до низа экрана, а не до
+     верхнего края — и цели по 56 px вместо 34×28 у прежних вкладок. */
+  const TABS = [
+    { href:'index.html',   key:'navHome',  icon:'☁️' },
+    { href:'trainer.html', key:'navLearn', icon:'📚' },
+    { href:'chess.html',   key:'navChess', icon:'♟️' },
+    { href:'life.html',    key:'navLife',  icon:'🌙' }
+  ];
+
+  function renderTabbar() {
+    let bar = document.querySelector('.tabbar');
+    if (window.innerWidth > 760) { if (bar) bar.remove(); return; }
+    const here = (location.pathname.split('/').pop() || 'index.html');
+
+    if (!bar) {
+      bar = document.createElement('nav');
+      bar.className = 'tabbar';
+      bar.setAttribute('aria-label', lang === 'ru' ? 'Разделы' : 'Sections');
+      document.body.appendChild(bar);
+    }
+    const rest = navItems().filter(n => !TABS.some(t => t.href === n.href));
+    bar.innerHTML =
+      '<div class="row-tabs">' +
+      TABS.map(t =>
+        `<a href="${t.href}"${t.href === here ? ' aria-current="page"' : ''}>` +
+        `<i aria-hidden="true">${t.icon}</i><span>${escapeHtml(t2(t.key))}</span></a>`).join('') +
+      `<button type="button" id="tabMore" aria-expanded="false">` +
+      `<i aria-hidden="true">☰</i><span>${lang === 'ru' ? 'Ещё' : 'More'}</span></button>` +
+      '</div>' +
+      '<div class="nav-sheet" id="tabSheet" hidden style="position:static;max-height:52vh;border:none;box-shadow:none;border-top:1px solid var(--line);border-radius:0">' +
+      rest.map(n =>
+        `<a href="${n.href}"${n.href === here ? ' aria-current="page"' : ''}>${escapeHtml(t2(n.key))}</a>`).join('') +
+      '</div>';
+
+    const btn = bar.querySelector('#tabMore');
+    const sheet = bar.querySelector('#tabSheet');
+    btn.addEventListener('click', () => {
+      const open = btn.getAttribute('aria-expanded') === 'true';
+      btn.setAttribute('aria-expanded', String(!open));
+      sheet.hidden = open;
+    });
+  }
+
+  const t2 = key => t(key);
+  const escapeHtml = s => String(s).replace(/[&<>"]/g, c =>
+    ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' })[c]);
 
   function renderFooter() {
     const host = document.getElementById('appFooter');
