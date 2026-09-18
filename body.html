@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Тело — SkyySchool</title>
+<meta name="theme-color" content="#f6faff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon-512.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/sky.css">
+</head>
+<body>
+<header id="appHeader"></header>
+
+<main class="wrap">
+  <h1 data-i18n="h1"></h1>
+  <p class="lead" data-i18n="lead"></p>
+
+  <!-- Плашка про приватность стоит выше всего: тут просят записать
+       болезни и лекарства, и человек должен видеть, куда это попадёт,
+       ДО того как начнёт печатать, а не после. -->
+  <div class="psy-disclaimer body-note">
+    <span class="ic">🔒</span>
+    <p data-i18n="privacyTop"></p>
+  </div>
+
+  <!-- ==================== ПОТРЕБНОСТИ ==================== -->
+  <div class="panel section">
+    <div class="spread">
+      <h2 style="margin:0" data-i18n="needsTitle"></h2>
+      <span class="need-pct" id="needPct">0%</span>
+    </div>
+    <p class="lead" style="font-size:13px;margin-top:8px" data-i18n="needsLead"></p>
+
+    <div class="field section" style="max-width:200px">
+      <label data-i18n="nDate"></label><input id="nDate" type="date">
+    </div>
+
+    <div class="progress big" style="margin-top:4px"><i id="needBar"></i></div>
+    <div class="needs-list" id="needsList"></div>
+  </div>
+
+  <!-- ==================== РЕКОМЕНДАЦИИ ==================== -->
+  <div class="panel section">
+    <h2 data-i18n="recTitle"></h2>
+    <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="recLead"></p>
+    <div class="role-list" id="recList"></div>
+    <div class="hidden" id="psyHint">
+      <a class="role-card link" href="psychologist.html" style="margin-top:12px">
+        <span class="ic">💬</span>
+        <span class="body"><b data-i18n="psyHintT"></b><span data-i18n="psyHintS"></span></span>
+      </a>
+    </div>
+  </div>
+
+  <!-- ==================== ДАННЫЕ О ЗДОРОВЬЕ ==================== -->
+  <div class="panel section">
+    <h2 data-i18n="cardTitle"></h2>
+    <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="cardLead"></p>
+
+    <div class="row section">
+      <div class="field" style="flex:0 0 150px">
+        <label data-i18n="bHeight"></label>
+        <input id="bHeight" type="number" min="80" max="230" step="0.5" placeholder="165">
+      </div>
+      <div class="field" style="flex:0 0 150px">
+        <label data-i18n="bWeight"></label>
+        <input id="bWeight" type="number" min="15" max="250" step="0.1" placeholder="54">
+      </div>
+      <div class="field" style="flex:0 0 auto;display:flex;align-items:flex-end">
+        <button class="btn" id="bWeightAdd" data-i18n="bWeightAdd"></button>
+      </div>
+    </div>
+    <p class="note" data-i18n="bWeightNote"></p>
+    <div class="weight-chart hidden" id="weightChart"></div>
+
+    <div class="field section">
+      <label data-i18n="bConditions"></label>
+      <textarea id="bConditions" rows="2" data-i18n-ph="bConditionsPh"></textarea>
+    </div>
+    <div class="field">
+      <label data-i18n="bAllergies"></label>
+      <textarea id="bAllergies" rows="2" data-i18n-ph="bAllergiesPh"></textarea>
+    </div>
+    <div class="field">
+      <label data-i18n="bMeds"></label>
+      <textarea id="bMeds" rows="2" data-i18n-ph="bMedsPh"></textarea>
+      <span class="hint" data-i18n="bMedsHint"></span>
+    </div>
+    <div class="field">
+      <label data-i18n="bNotes"></label>
+      <textarea id="bNotes" rows="3" data-i18n-ph="bNotesPh"></textarea>
+    </div>
+
+    <button class="btn full big" id="bSave" style="margin-top:16px" data-i18n="save"></button>
+  </div>
+
+  <!-- ==================== ПРИВАТНОСТЬ ==================== -->
+  <div class="panel section">
+    <h2 data-i18n="privTitle"></h2>
+    <p class="lead" style="font-size:13.5px;margin-top:10px;line-height:1.7" data-i18n="privText"></p>
+    <button class="btn ghost" id="wipeBtn" style="margin-top:14px" data-i18n="wipeBtn"></button>
+  </div>
+</main>
+
+<footer id="appFooter"></footer>
+
+<script src="assets/config.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/db.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/trackers.js"></script>
+<script src="assets/body.js"></script>
+<script>
+'use strict';
+Sky.init({
+  h1:{ru:'Тело',en:'Body'},
+  lead:{ru:'Твоя личная карточка и чек-лист базовых потребностей. Страница ничего не диагностирует и не оценивает — она только показывает, что ты сам(а) о себе записал(а).',
+        en:'Your own health card and a checklist of basic needs. This page diagnoses nothing and judges nothing — it only shows back what you recorded yourself.'},
+
+  privacyTop:{ru:'Всё с этой страницы — рост, вес, болезни, лекарства, заметки — хранится только в этом браузере на этом устройстве. Никуда не отправляется: ни нам, ни в школу, ни родителям.',
+              en:'Everything on this page — height, weight, conditions, medication, notes — is stored only in this browser on this device. It is sent nowhere: not to us, not to your school, not to your parents.'},
+
+  /* ---------- потребности ---------- */
+  needsTitle:{ru:'Базовые потребности',en:'Basic needs'},
+  needsLead:{ru:'Сон, еда и вода считаются сами из трекеров — отмечать дважды не нужно. Вручную отмечается только движение.',
+             en:'Sleep, food and water are counted automatically from the trackers — no need to log them twice. Only movement is ticked by hand.'},
+  nDate:{ru:'День',en:'Day'},
+  needSleep:{ru:'%1 из 8 часов',en:'%1 of 8 hours'},
+  needMeals:{ru:'%1 из 3 приёмов пищи',en:'%1 of 3 meals'},
+  needWater:{ru:'%1 из 6 стаканов',en:'%1 of 6 glasses'},
+  needMove:{ru:'30 минут на улице',en:'30 minutes outside'},
+  needMoveNo:{ru:'ещё не отмечено',en:'not ticked yet'},
+  goTrackers:{ru:'Отметить в трекерах →',en:'Log it in the trackers →'},
+
+  /* ---------- рекомендации ---------- */
+  recTitle:{ru:'Что стоит поправить',en:'What is worth fixing'},
+  recLead:{ru:'Только про режим: сон, еда, вода, движение. Ничего про лекарства и лечение — с этим только к врачу или к взрослому.',
+           en:'Routine only: sleep, food, water, movement. Nothing about medication or treatment — that is for a doctor or an adult.'},
+  recNeed:{ru:'Пока мало записей. Советы появятся, когда наберётся хотя бы %1 с отметками — иначе это будет гадание, а не совет.',
+           en:'Not enough entries yet. Advice appears once there are at least %1 with data — otherwise it would be guesswork, not advice.'},
+  daysPl1:{ru:'дня',en:'days'}, daysPl2:{ru:'дней',en:'days'}, daysPl5:{ru:'дней',en:'days'},
+
+  psyHintT:{ru:'Спишь нормально, а сил всё равно нет?',en:'Sleeping fine but still no energy?'},
+  psyHintS:{ru:'Так бывает, и дело тогда обычно не в режиме. На вкладке «Психолог» есть спокойные инструменты, чтобы посмотреть на это.',
+            en:'That happens, and then it is usually not about routine. The Psychologist tab has calm tools to look at it.'},
+
+  /* ---------- карточка ---------- */
+  cardTitle:{ru:'Данные о здоровье',en:'Health details'},
+  cardLead:{ru:'Всё по желанию — можно заполнить одно поле, можно ни одного. Удобно, когда нужно быстро вспомнить и показать врачу.',
+            en:'All optional — fill in one field or none. Handy when you need to recall something quickly or show a doctor.'},
+  bHeight:{ru:'Рост, см',en:'Height, cm'},
+  bWeight:{ru:'Вес, кг',en:'Weight, kg'},
+  bWeightAdd:{ru:'Записать вес',en:'Log weight'},
+  bWeightNote:{ru:'Вес сохраняется просто как отметка на шкале времени. Никакого ИМТ, «нормы» и оценок здесь нет и не будет: у растущего человека это число само по себе ничего не значит, а разбираться в нём — работа педиатра на осмотре, а не веб-страницы.',
+               en:'Weight is stored simply as a point in time. There is no BMI, no "norm" and no verdict here, and there will not be: for a growing person that number means nothing on its own, and making sense of it is a paediatrician’s job at a check-up, not a web page’s.'},
+  weightSaved:{ru:'Вес записан',en:'Weight logged'},
+
+  bConditions:{ru:'Хронические болезни',en:'Chronic conditions'},
+  bConditionsPh:{ru:'Если есть. Если нет — оставь пустым',en:'If any. If not, leave it blank'},
+  bAllergies:{ru:'Аллергии',en:'Allergies'},
+  bAllergiesPh:{ru:'На что и как проявляется',en:'To what, and how it shows up'},
+  bMeds:{ru:'Что принимаешь',en:'What you take'},
+  bMedsPh:{ru:'Название и когда принимать',en:'Name and when to take it'},
+  bMedsHint:{ru:'Это просто напоминалка для тебя. Сайт никогда не советует лекарства, не отменяет назначенные и ничего о них не подсказывает — назначения меняет только врач.',
+             en:'This is a reminder for you and nothing more. The site never suggests medication, never cancels what was prescribed and gives no advice about it — only a doctor changes a prescription.'},
+  bNotes:{ru:'Личные заметки',en:'Personal notes'},
+  bNotesPh:{ru:'Что хочешь запомнить или спросить у врача',en:'Anything to remember or to ask a doctor'},
+  save:{ru:'Сохранить',en:'Save'},
+  saved:{ru:'Сохранено',en:'Saved'},
+
+  /* ---------- приватность ---------- */
+  privTitle:{ru:'Где это хранится',en:'Where this is stored'},
+  privText:{ru:'Только в localStorage этого браузера. В отличие от прогресса по заданиям, эти данные не синхронизируются с аккаунтом и не уходят в облако — так задумано: медицинская карточка подростка не должна оказываться на сервере без отдельного разговора об этом. Обратная сторона: если почистить данные браузера, записи пропадут безвозвратно.',
+             en:'Only in this browser’s localStorage. Unlike your exercise progress, this data does not sync to your account and never goes to the cloud — by design: a teenager’s health card should not end up on a server without a separate conversation about it. The flip side: clearing browser data deletes it for good.'},
+  wipeBtn:{ru:'Удалить все данные о здоровье',en:'Delete all health data'},
+  wipeConfirm:{ru:'Удалить карточку, историю веса и отметки о прогулках? Это нельзя отменить.',
+               en:'Delete the card, weight history and walk ticks? This cannot be undone.'},
+  wipeYes:{ru:'Да, удалить',en:'Yes, delete'},
+  cancel:{ru:'Отмена',en:'Cancel'},
+  wiped:{ru:'Удалено',en:'Deleted'}
+});
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ============================================================
+   ПОТРЕБНОСТИ
+   ============================================================ */
+$('#nDate').addEventListener('change', renderNeeds);
+
+function renderNeeds() {
+  const date = $('#nDate').value || Sky.dayKey();
+  const n = SkyBody.needsOf(date);
+  const pct = SkyBody.satisfaction(date);
+
+  $('#needPct').textContent = pct + '%';
+  $('#needBar').style.width = pct + '%';
+
+  const rows = [
+    { id:'sleep', ico:'😴', ok:n.sleep.ok,
+      text: Sky.t('needSleep').replace('%1', n.sleep.value ? n.sleep.value.toFixed(1) : 0) },
+    { id:'meals', ico:'🍽', ok:n.meals.ok,
+      text: Sky.t('needMeals').replace('%1', n.meals.value) },
+    { id:'water', ico:'💧', ok:n.water.ok,
+      text: Sky.t('needWater').replace('%1', n.water.value) },
+    { id:'move',  ico:'🚶', ok:n.move.ok,
+      text: n.move.ok ? Sky.t('needMove') : Sky.t('needMoveNo') }
+  ];
+
+  const box = $('#needsList');
+  box.innerHTML = '';
+  rows.forEach(r => {
+    const el = document.createElement('div');
+    el.className = 'need-row' + (r.ok ? ' ok' : '');
+    el.innerHTML =
+      `<span class="ic">${r.ico}</span>
+       <span class="txt"><b>${esc(Sky.L(SkyBody.NEEDS.find(x => x.id === r.id).label))}</b>
+       <span>${esc(r.text)}</span></span>`;
+
+    if (r.id === 'move') {
+      /* единственная ручная отметка */
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'need-check' + (r.ok ? ' on' : '');
+      b.textContent = r.ok ? '✓' : '';
+      b.addEventListener('click', () => {
+        SkyBody.setMove(date, !r.ok);
+        renderNeeds(); renderRecs();
+      });
+      el.appendChild(b);
+    } else {
+      /* остальные считаются из трекеров — вместо галочки ссылка туда,
+         чтобы было понятно, где это правится */
+      const a = document.createElement('a');
+      a.className = 'need-link';
+      a.href = 'trackers.html';
+      a.textContent = '→';
+      a.title = Sky.t('goTrackers');
+      el.appendChild(a);
+    }
+    box.appendChild(el);
+  });
+}
+
+/* ============================================================
+   РЕКОМЕНДАЦИИ
+   ============================================================ */
+function renderRecs() {
+  const r = SkyBody.recommendations();
+  const box = $('#recList');
+  if (!r.enough) {
+    box.innerHTML = `<p class="note">${esc(Sky.t('recNeed').replace('%1',
+      Sky.plural(r.need, Sky.t('daysPl1'), Sky.t('daysPl2'), Sky.t('daysPl5'))))}</p>`;
+  } else {
+    box.innerHTML = r.items.map(it =>
+      `<div class="psy-pattern tone-${it.tone}"><span class="ic">${it.ico}</span><p>${esc(Sky.L(it.text))}</p></div>`
+    ).join('');
+  }
+  $('#psyHint').classList.toggle('hidden', !SkyBody.suggestPsychologist());
+}
+
+/* ============================================================
+   КАРТОЧКА
+   ============================================================ */
+function loadProfile() {
+  const p = SkyBody.profile();
+  $('#bHeight').value = p.height || '';
+  $('#bConditions').value = p.conditions || '';
+  $('#bAllergies').value = p.allergies || '';
+  $('#bMeds').value = p.meds || '';
+  $('#bNotes').value = p.notes || '';
+  const w = SkyBody.lastWeight();
+  if (w) $('#bWeight').value = w.kg;
+}
+
+$('#bSave').addEventListener('click', () => {
+  SkyBody.saveProfile({
+    height: parseFloat($('#bHeight').value) || null,
+    conditions: $('#bConditions').value.trim().slice(0, 600),
+    allergies: $('#bAllergies').value.trim().slice(0, 600),
+    meds: $('#bMeds').value.trim().slice(0, 600),
+    notes: $('#bNotes').value.trim().slice(0, 1500)
+  });
+  Sky.toast(Sky.t('saved'));
+});
+
+$('#bWeightAdd').addEventListener('click', () => {
+  const kg = parseFloat($('#bWeight').value);
+  if (isNaN(kg) || kg <= 0) return;
+  SkyBody.addWeight(Sky.dayKey(), kg);
+  Sky.toast(Sky.t('weightSaved'));
+  renderWeight();
+});
+
+/* График веса: только точки во времени. Ось не начинается с нуля и
+   не имеет никакой «нормы» — это след, а не оценка. */
+function renderWeight() {
+  const list = SkyBody.weights();
+  const box = $('#weightChart');
+  box.classList.toggle('hidden', list.length < 2);
+  if (list.length < 2) return;
+
+  const vals = list.map(w => w.kg);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const span = Math.max(max - min, 2);   /* минимум 2 кг, иначе шум выглядит как обвал */
+
+  box.innerHTML = list.map(w => {
+    const h = ((w.kg - min) / span) * 70 + 15;   /* 15…85% — точки не липнут к краям */
+    return `<div class="wbar" title="${esc(w.date)}: ${w.kg} кг">
+              <i style="height:${h}%"></i><span>${w.kg}</span>
+            </div>`;
+  }).join('');
+}
+
+/* ============================================================
+   УДАЛЕНИЕ
+   ============================================================ */
+$('#wipeBtn').addEventListener('click', () => {
+  Sky.modal(
+    `<p class="lead" style="font-size:14px;line-height:1.6">${esc(Sky.t('wipeConfirm'))}</p>
+     <div class="row" style="margin-top:18px;gap:9px">
+       <button class="btn ghost" id="wCancel" style="flex:1">${esc(Sky.t('cancel'))}</button>
+       <button class="btn" id="wYes" style="flex:1">${esc(Sky.t('wipeYes'))}</button>
+     </div>`,
+    (box, close) => {
+      box.querySelector('#wCancel').addEventListener('click', close);
+      box.querySelector('#wYes').addEventListener('click', () => {
+        SkyBody.wipe();
+        close();
+        Sky.toast(Sky.t('wiped'));
+        loadProfile();
+        $('#bWeight').value = '';
+        renderAll();
+      });
+    }
+  );
+});
+
+/* ============================================================
+   СТАРТ
+   ============================================================ */
+function renderAll() { renderNeeds(); renderRecs(); renderWeight(); }
+
+$('#nDate').value = Sky.dayKey();
+loadProfile();
+renderAll();
+
+document.addEventListener('langchange', () => { renderAll(); });
+window.addEventListener('storage', e => { if (e.key && e.key.indexOf('life') >= 0) renderAll(); });
+</script>
+</body>
+</html>

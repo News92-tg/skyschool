@@ -82,6 +82,20 @@
     <div class="panel current" id="currentBlock"></div>
   </div>
 
+  <!-- топ-3 по рейтингу -->
+  <div class="section hidden" id="topSection">
+    <div class="section-head">
+      <h2 data-i18n="topTitle"></h2>
+      <span class="lead" style="font-size:12px" data-i18n="topNote"></span>
+    </div>
+    <div class="top3" id="topList"></div>
+  </div>
+
+  <!-- доступ к премиум-учителям -->
+  <div class="section hidden" id="premiumSection">
+    <div class="panel premium-box" id="premiumBox"></div>
+  </div>
+
   <!-- каталог -->
   <div class="section">
     <div class="section-head">
@@ -169,6 +183,31 @@ Sky.init({
                   en:'Teacher ratings live in the shared database — this needs Supabase connected.'},
   teachRateAuth:{ru:'Чтобы оценить учителя, войдите в аккаунт.',en:'Sign in to rate a teacher.'},
 
+  topTitle:{ru:'Топ-3 по оценкам',en:'Top 3 by rating'},
+  topNote:{ru:'в топ попадают учителя от 3 отзывов — по одному судить рано',
+           en:'teachers enter the top from 3 reviews — one is too few to judge'},
+  topPlace:{ru:'%1 место',en:'#%1'},
+  topStars:{ru:'%1 из 5 · %2',en:'%1 out of 5 · %2'},
+  reviewsPl:{ru:'отзыв',en:'review'},
+  reviewsPl2:{ru:'отзыва',en:'reviews'},
+  reviewsPl5:{ru:'отзывов',en:'reviews'},
+
+  premTitle:{ru:'Премиум-учителя',en:'Premium teachers'},
+  premLockedText:{ru:'Откроются, когда ты решишь %1 и оставишь %2. Отзывы нужны не для галочки: без них рейтингу учителей не на чем держаться.',
+                  en:'They unlock once you solve %1 and leave %2. Reviews are not a formality: without them the teacher ratings have nothing to stand on.'},
+  premOpenText:{ru:'Открыты. Спасибо за отзывы — именно на них держится рейтинг, который видят остальные.',
+                en:'Unlocked. Thank you for the reviews — they are what the rating everyone sees is built on.'},
+  premSolvedN:{ru:'%1 заданий',en:'%1 problems'},
+  premReviewsN:{ru:'%1 отзыва',en:'%1 reviews'},
+  premLeft:{ru:'решено %1 из %2 · отзывов %3 из %4',en:'solved %1 of %2 · reviews %3 of %4'},
+  premLockedBtn:{ru:'Ещё закрыт',en:'Locked'},
+  premBadge:{ru:'премиум',en:'premium'},
+
+  rateLesson:{ru:'Оценка за конкретный разбор, а не «вообще». Если этот учитель уже объяснял тебе что-то ещё — оценивай каждый разбор отдельно.',
+              en:'This rates one specific explanation, not the teacher "in general". If they have explained something else to you, rate each explanation separately.'},
+  rateOffline:{ru:'Отзыв сохранён на этом устройстве. Когда войдёшь в аккаунт, он уйдёт в общий рейтинг.',
+               en:'Your review is saved on this device. It will join the shared rating once you sign in.'},
+
   foundN:{ru:'подходит: %1',en:'matching: %1'},
   emptyFilter:{ru:'Под такие условия никто не подходит. Снимите часть фильтров.',
                en:'Nobody matches these filters. Try removing some.'}
@@ -238,14 +277,16 @@ function starsHtml(id) {
 
 function card(t) {
   const mine = t.id === SkyTeachers.selectedId();
+  const locked = !SkyTeachers.canUse(t);
   const el = document.createElement('div');
-  el.className = 'tcard' + (mine ? ' picked' : '');
+  el.className = 'tcard' + (mine ? ' picked' : '') + (locked ? ' locked' : '');
   el.innerHTML =
     `<div class="top">
        <div class="ava">${esc(t.emoji)}</div>
        <div>
          <h3>${esc(Sky.L(t.name))}</h3>
-         <div class="role">${esc(roleLabel(t.role))} · ${esc(t.subject || Sky.t('universal'))}</div>
+         <div class="role">${esc(roleLabel(t.role))} · ${esc(t.subject || Sky.t('universal'))}${
+           SkyTeachers.isPremium(t) ? ` <span class="prem-badge">${esc(Sky.t('premBadge'))}</span>` : ''}</div>
        </div>
      </div>
      <p class="style">${esc(Sky.L(t.style))}</p>
@@ -256,11 +297,64 @@ function card(t) {
        <div class="line"><span>${Sky.t('ratingL')}</span>${starsHtml(t.id)}</div>
      </div>
      <div class="actions">
-       <button class="btn${mine ? ' ghost' : ''}" data-pick="${esc(t.id)}"${mine ? ' disabled' : ''}>
-         ${mine ? Sky.t('picked') : Sky.t('pick')}</button>
+       <button class="btn${mine || locked ? ' ghost' : ''}" data-pick="${esc(t.id)}"${mine || locked ? ' disabled' : ''}>
+         ${mine ? Sky.t('picked') : locked ? Sky.t('premLockedBtn') : Sky.t('pick')}</button>
        <button class="btn ghost" data-rate="${esc(t.id)}">${Sky.t('rateBtn')}</button>
      </div>`;
   return el;
+}
+
+/* ---------- топ-3 ----------
+   Считает SkyTeachers.top(): там взвешенная оценка, поэтому учитель
+   с единственной пятёркой не встанет над учителем с 4,8 по полусотне
+   отзывов. Блок прячется целиком, пока оценок нет вообще: пустой
+   «топ» выглядит как сломанная страница. */
+function renderTop() {
+  const list = SkyTeachers.top(RATINGS, 3);
+  $('#topSection').classList.toggle('hidden', !list.length);
+  if (!list.length) return;
+
+  const box = $('#topList');
+  box.innerHTML = '';
+  list.forEach((row, i) => {
+    const t = row.teacher;
+    const el = document.createElement('div');
+    el.className = 'top-card' + (i === 0 ? ' first' : '');
+    el.innerHTML =
+      `<div class="place">${['🥇','🥈','🥉'][i] || (i + 1)}</div>
+       <div class="ava">${esc(t.emoji)}</div>
+       <div class="who">
+         <b>${esc(Sky.L(t.name))}</b>
+         <span>${esc(Sky.t('topStars')
+            .replace('%1', row.avg.toFixed(1))
+            .replace('%2', Sky.plural(row.count, Sky.t('reviewsPl'), Sky.t('reviewsPl2'), Sky.t('reviewsPl5'))))}</span>
+       </div>
+       <div class="stars-top">${'★'.repeat(Math.round(row.avg))}${'☆'.repeat(5 - Math.round(row.avg))}</div>`;
+    box.appendChild(el);
+  });
+}
+
+/* ---------- плашка доступа к премиум-учителям ----------
+   Показываем только если премиум-учителя в каталоге вообще есть:
+   иначе это реклама того, чего нет. */
+function renderPremium() {
+  const hasPremium = TEACHERS.some(t => SkyTeachers.isPremium(t));
+  $('#premiumSection').classList.toggle('hidden', !hasPremium);
+  if (!hasPremium) return;
+
+  const st = SkyTeachers.premiumState();
+  $('#premiumBox').innerHTML =
+    `<div class="spread">
+       <h3>${esc(Sky.t('premTitle'))} ${st.unlocked ? '🔓' : '🔒'}</h3>
+       <span class="pct">${st.pct}%</span>
+     </div>
+     <p>${st.unlocked ? esc(Sky.t('premOpenText')) : esc(Sky.t('premLockedText')
+        .replace('%1', Sky.t('premSolvedN').replace('%1', st.solvedNeed))
+        .replace('%2', Sky.t('premReviewsN').replace('%1', st.reviewsNeed)))}</p>
+     <div class="progress"><i style="width:${st.pct}%"></i></div>
+     <span class="left">${esc(Sky.t('premLeft')
+        .replace('%1', st.solved).replace('%2', st.solvedNeed)
+        .replace('%3', st.reviews).replace('%4', st.reviewsNeed))}</span>`;
 }
 
 function renderList() {
@@ -288,16 +382,25 @@ function renderCurrent() {
 }
 
 /* ---------- оценка учителя ---------- */
-function openRate(t) {
-  let stars = 0;
+/* lesson — необязательный объект {id, kind, subject, title}.
+   С каталога учителей его нет (оценивают учителя вообще), а из
+   тренажёра и разбора по фото передаётся конкретный урок — тогда
+   отзыв привязывается именно к нему. */
+function openRate(t, lesson) {
+  lesson = lesson || {};
+  const prev = SkyTeachers.myReview(t.id, lesson.id);
+  let stars = prev ? prev.stars : 0;
+
   Sky.modal(
-    `<h2 style="margin-bottom:14px">${esc(Sky.t('rateTitle').replace('%1', Sky.L(t.name)))}</h2>
+    `<h2 style="margin-bottom:6px">${esc(Sky.t('rateTitle').replace('%1', Sky.L(t.name)))}</h2>
+     ${lesson.title ? `<p class="lead" style="font-size:12.5px;margin-bottom:12px">${esc(lesson.title)}</p>` : ''}
+     <p class="lead" style="font-size:12px;margin-bottom:14px">${esc(Sky.t('rateLesson'))}</p>
      <div class="rate-row" id="rateRow">
-       ${[1,2,3,4,5].map(n => `<button type="button" data-n="${n}">★</button>`).join('')}
+       ${[1,2,3,4,5].map(n => `<button type="button" data-n="${n}"${n <= stars ? ' class="on"' : ''}>★</button>`).join('')}
      </div>
      <div class="field"><label>${Sky.t('rateComment')}</label>
-       <textarea id="rateComment" rows="3"></textarea></div>
-     <button class="btn full big" id="rateSave" disabled>${Sky.t('rateSave')}</button>`,
+       <textarea id="rateComment" rows="3">${esc(prev && prev.comment ? prev.comment : '')}</textarea></div>
+     <button class="btn full big" id="rateSave"${stars ? '' : ' disabled'}>${Sky.t('rateSave')}</button>`,
     (box, close) => {
       const row = box.querySelector('#rateRow');
       row.addEventListener('click', e => {
@@ -310,11 +413,16 @@ function openRate(t) {
       box.querySelector('#rateSave').addEventListener('click', async () => {
         const btn = box.querySelector('#rateSave');
         btn.disabled = true;
-        const res = await SkyTeachers.rate(t.id, stars, box.querySelector('#rateComment').value.trim());
+        const res = await SkyTeachers.rate(t.id, stars, box.querySelector('#rateComment').value.trim(), lesson);
         if (res && res.error) { Sky.toast(res.error, 4200); btn.disabled = false; return; }
         RATINGS = await SkyTeachers.ratings();
         renderList();
-        Sky.toast(Sky.t('rateThanks'));
+        renderTop();
+        renderPremium();   /* отзыв мог открыть премиум-учителей */
+        /* Офлайн отзыв всё равно сохранён — говорим об этом честно,
+           вместо прежнего отказа «нужна база». */
+        const offline = !(Sky.db && Sky.db.isCloud && Sky.db.isCloud() && Sky.db.me && Sky.db.me());
+        Sky.toast(offline ? Sky.t('rateOffline') : Sky.t('rateThanks'), offline ? 4200 : 3200);
         close();
       });
     }
@@ -325,7 +433,8 @@ function openRate(t) {
 $('#tList').addEventListener('click', async e => {
   const pick = e.target.closest('button[data-pick]');
   if (pick) {
-    await SkyTeachers.select(pick.dataset.pick);
+    const ok = await SkyTeachers.select(pick.dataset.pick);
+    if (!ok) { Sky.toast(Sky.t('premLockedBtn'), 3600); return; }
     renderCurrent();
     renderList();
     Sky.toast(Sky.t('picked') + ': ' + Sky.L(SkyTeachers.selected().name));
@@ -345,7 +454,14 @@ document.addEventListener('langchange', () => {
   fillFilters();
   renderCurrent();
   renderList();
+  renderTop();
+  renderPremium();
 });
+
+/* Решённые задания влияют на доступ к премиум-учителям — значит,
+   полосу прогресса надо обновлять и когда статистика меняется в
+   другой вкладке. */
+document.addEventListener('statschange', renderPremium);
 
 /* ---------- запуск ---------- */
 (async function start() {
@@ -355,6 +471,8 @@ document.addEventListener('langchange', () => {
   fillFilters();
   renderCurrent();
   renderList();
+  renderTop();
+  renderPremium();
 })();
 </script>
 </body>

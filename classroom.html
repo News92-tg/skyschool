@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Классный руководитель — SkyySchool</title>
+<meta name="theme-color" content="#f6faff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon-512.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/sky.css">
+</head>
+<body>
+<header id="appHeader"></header>
+
+<main class="wrap">
+  <h1 data-i18n="h1"></h1>
+  <p class="lead" data-i18n="lead"></p>
+
+  <!-- ==================== АНКЕТА ==================== -->
+  <div class="panel section" id="formPanel">
+    <h2 data-i18n="formTitle"></h2>
+
+    <div class="row" style="margin-top:16px">
+      <div class="field"><label data-i18n="fName"></label><input id="fName" type="text" data-i18n-ph="fNamePh"></div>
+      <div class="field"><label data-i18n="fClass"></label><input id="fClass" type="text" data-i18n-ph="fClassPh"></div>
+      <div class="field"><label data-i18n="fSchool"></label><input id="fSchool" type="text" data-i18n-ph="fSchoolPh"></div>
+    </div>
+
+    <div class="section">
+      <label class="chip-label" data-i18n="fLike"></label>
+      <div class="chip-select" id="likeChips"></div>
+    </div>
+
+    <div class="section">
+      <label class="chip-label" data-i18n="fHard"></label>
+      <div class="chip-select" id="hardChips"></div>
+    </div>
+
+    <div class="section">
+      <h2 style="margin-bottom:0" data-i18n="fGoals"></h2>
+      <p class="lead" style="font-size:12.5px;margin-top:4px" data-i18n="fGoalsLead"></p>
+      <div class="row" style="margin-top:12px">
+        <div class="field"><input id="goalText" type="text" data-i18n-ph="fGoalPh"></div>
+        <div class="field" style="flex:0 0 160px"><input id="goalDate" type="date"></div>
+        <div class="field" style="flex:0 0 auto"><button class="btn" id="addGoalBtn" data-i18n="add"></button></div>
+      </div>
+      <div class="list" id="goalsList" style="margin-top:12px"></div>
+    </div>
+
+    <div class="field section">
+      <label data-i18n="fProblems"></label>
+      <textarea id="fProblems" data-i18n-ph="fProblemsPh"></textarea>
+    </div>
+
+    <button class="btn full big" id="saveProfileBtn" style="margin-top:18px" data-i18n="save"></button>
+  </div>
+
+  <!-- ==================== ДАШБОРД ==================== -->
+  <div id="dashboard" class="hidden">
+
+    <div class="panel section">
+      <div class="spread">
+        <div>
+          <div class="eyebrow" id="dashGreeting"></div>
+          <p class="lead" style="font-size:13px;margin-top:4px" id="dashSub"></p>
+        </div>
+        <button class="btn ghost small" id="editProfileBtn" data-i18n="editProfile"></button>
+      </div>
+    </div>
+
+    <div class="panel section">
+      <h2 data-i18n="assignTitle"></h2>
+      <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="assignLead"></p>
+      <div class="role-list" id="assignList"></div>
+    </div>
+
+    <div class="panel section">
+      <h2 data-i18n="courseTitle"></h2>
+      <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="courseLead"></p>
+      <div class="role-list" id="courseList"></div>
+    </div>
+
+    <div class="panel section">
+      <h2 data-i18n="progressTitle"></h2>
+      <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="progressLead"></p>
+      <div id="progressList" style="margin-top:6px"></div>
+    </div>
+
+    <div class="panel section">
+      <h2 data-i18n="deadlineTitle"></h2>
+      <div id="deadlineList" style="margin-top:6px"></div>
+    </div>
+
+    <div class="panel section hidden" id="problemsPanel">
+      <h2 data-i18n="problemsTitle"></h2>
+      <p class="lead" style="font-size:13px;margin-top:8px" id="problemsText"></p>
+    </div>
+
+  </div>
+</main>
+
+<footer id="appFooter"></footer>
+
+<script src="assets/config.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/db.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/roles.js"></script>
+<script>
+'use strict';
+Sky.init({
+  h1:{ru:'Классный руководитель',en:'Homeroom teacher'},
+  lead:{ru:'Короткая анкета — и дальше персональные задания, курсы по слабым темам, дедлайны и прогресс собираются сами.',
+        en:'A short questionnaire, then personal assignments, courses on weak subjects, deadlines and progress are all built for you.'},
+
+  formTitle:{ru:'Анкета ученика',en:'Student questionnaire'},
+  fName:{ru:'Имя',en:'Name'}, fNamePh:{ru:'Как к вам обращаться',en:'What should we call you'},
+  fClass:{ru:'Класс',en:'Class'}, fClassPh:{ru:'Например: 9А',en:'e.g. 9A'},
+  fSchool:{ru:'Школа',en:'School'}, fSchoolPh:{ru:'Название школы',en:'School name'},
+  fLike:{ru:'Любимые предметы',en:'Favourite subjects'},
+  fHard:{ru:'Сложные предметы',en:'Subjects you find hard'},
+  fGoals:{ru:'Цели на год',en:'Goals for the year'},
+  fGoalsLead:{ru:'Дата необязательна — но если поставить дедлайн, он появится в списке ниже, на дашборде.',
+              en:'The date is optional — but adding a deadline makes it show up in the list below, on the dashboard.'},
+  fGoalPh:{ru:'Например: сдать ОГЭ по математике на 5',en:'e.g. get a top grade in the maths exam'},
+  add:{ru:'Добавить',en:'Add'},
+  fProblems:{ru:'Проблемы в учёбе',en:'Difficulties in your studies'},
+  fProblemsPh:{ru:'Что мешает или беспокоит — в свободной форме',en:'What is getting in the way — free text'},
+  save:{ru:'Сохранить анкету',en:'Save the questionnaire'},
+  saved:{ru:'Анкета сохранена',en:'Questionnaire saved'},
+
+  editProfile:{ru:'Изменить анкету',en:'Edit questionnaire'},
+  dashSubT:{ru:'%1 · %2',en:'%1 · %2'},
+
+  assignTitle:{ru:'Персональные задания',en:'Personal assignments'},
+  assignLead:{ru:'Собраны из банков заданий тренажёра — в первую очередь по сложным и любимым предметам из анкеты.',
+              en:'Pulled from the trainer’s task banks — mainly the hard and favourite subjects from your questionnaire.'},
+  assignCard:{ru:'Ежедневная практика по расписанию повторения',en:'Daily practice on the review schedule'},
+  practiceNow:{ru:'Решать →',en:'Practise →'},
+
+  courseTitle:{ru:'Курсы по слабым темам',en:'Courses on weak subjects'},
+  courseLead:{ru:'Сквозной проход по предмету — от лёгких заданий к сложным, без привязки к расписанию повторения.',
+              en:'A full sweep through the subject — easy tasks to hard, outside the spaced-repetition schedule.'},
+  courseCard:{ru:'Все уровни сложности подряд',en:'Every difficulty level, in order'},
+  courseGo:{ru:'Пройти курс →',en:'Take the course →'},
+  courseNone:{ru:'Отметьте в анкете хотя бы один сложный предмет — здесь появится курс по нему.',
+              en:'Mark at least one hard subject in the questionnaire, and a course for it will appear here.'},
+
+  progressTitle:{ru:'Прогресс по темам',en:'Progress by subject'},
+  progressLead:{ru:'Точность ответов по предметам из анкеты — считается из уже решённых заданий тренажёра.',
+                en:'Answer accuracy for the subjects in your questionnaire — computed from problems already solved in the trainer.'},
+  progressNone:{ru:'по этому предмету ещё нет решённых заданий',en:'no solved problems for this subject yet'},
+
+  deadlineTitle:{ru:'Напоминания о дедлайнах',en:'Deadline reminders'},
+  deadlineNone:{ru:'Дедлайнов не поставлено — добавьте дату у цели в анкете.',
+                en:'No deadlines set — add a date to a goal in the questionnaire.'},
+  daysLeftN:{ru:'%1 дн.',en:'%1 d'},
+  daysOver:{ru:'просрочено',en:'overdue'},
+  daysToday:{ru:'сегодня',en:'today'},
+
+  problemsTitle:{ru:'Проблемы в учёбе (из анкеты)',en:'Study difficulties (from the questionnaire)'},
+
+  del:{ru:'Удалить',en:'Delete'}
+});
+
+const $ = s => document.querySelector(s);
+
+/* ============================================================
+   АНКЕТА
+   ============================================================ */
+let likeSel = new Set();
+let hardSel = new Set();
+let formGoals = [];
+
+function renderChipGroup(containerId, set, otherSet) {
+  const box = $(containerId);
+  box.innerHTML = '';
+  SkyRoles.SUBJECTS.forEach(s => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip-opt' + (set.has(s.id) ? ' on' : '');
+    b.innerHTML = `<span class="ic">${s.icon}</span>${Sky.L(s.name)}`;
+    b.addEventListener('click', () => {
+      if (set.has(s.id)) set.delete(s.id); else set.add(s.id);
+      renderChipGroup(containerId, set, otherSet);
+    });
+    box.appendChild(b);
+  });
+}
+
+function renderGoals() {
+  const box = $('#goalsList');
+  if (!formGoals.length) {
+    box.innerHTML = `<div class="empty"><div class="big">🎯</div><p>${Sky.t('fGoalsLead')}</p></div>`;
+    return;
+  }
+  box.innerHTML = '';
+  formGoals.forEach((g, i) => {
+    const el = document.createElement('div');
+    el.className = 'item';
+    el.innerHTML = `<div class="txt"><b></b><span></span></div><button class="btn small ghost" type="button">×</button>`;
+    el.querySelector('b').textContent = g.text;
+    el.querySelector('span').textContent = g.date || '';
+    el.querySelector('button').addEventListener('click', () => { formGoals.splice(i, 1); renderGoals(); });
+    box.appendChild(el);
+  });
+}
+
+$('#addGoalBtn').addEventListener('click', () => {
+  const text = $('#goalText').value.trim();
+  if (!text) return;
+  formGoals.push({ text: text.slice(0, 140), date: $('#goalDate').value || '' });
+  $('#goalText').value = ''; $('#goalDate').value = '';
+  renderGoals();
+});
+$('#goalText').addEventListener('keydown', e => { if (e.key === 'Enter') $('#addGoalBtn').click(); });
+
+function loadForm(p) {
+  p = p || {};
+  $('#fName').value = p.name || '';
+  $('#fClass').value = p.className || '';
+  $('#fSchool').value = p.school || '';
+  $('#fProblems').value = p.problems || '';
+  likeSel = new Set(p.likeSubjects || []);
+  hardSel = new Set(p.hardSubjects || []);
+  formGoals = (p.goals || []).slice();
+  renderChipGroup('#likeChips', likeSel);
+  renderChipGroup('#hardChips', hardSel);
+  renderGoals();
+}
+
+function showForm() { $('#formPanel').classList.remove('hidden'); $('#dashboard').classList.add('hidden'); window.scrollTo({top:0}); }
+function showDashboard() { $('#formPanel').classList.add('hidden'); $('#dashboard').classList.remove('hidden'); renderDashboard(); }
+
+$('#saveProfileBtn').addEventListener('click', () => {
+  const profile = {
+    name: $('#fName').value.trim(),
+    className: $('#fClass').value.trim(),
+    school: $('#fSchool').value.trim(),
+    likeSubjects: [...likeSel],
+    hardSubjects: [...hardSel],
+    goals: formGoals,
+    problems: $('#fProblems').value.trim()
+  };
+  SkyRoles.saveClassroom(profile);
+  Sky.toast(Sky.t('saved'));
+  showDashboard();
+});
+$('#editProfileBtn').addEventListener('click', () => { loadForm(SkyRoles.getClassroom()); showForm(); });
+
+/* ============================================================
+   ДАШБОРД
+   ============================================================ */
+function subjectRoleCard(id, blurb, linkQs, ctaKey) {
+  const s = SkyRoles.subjectById(id);
+  if (!s) return '';
+  return `<a class="role-card link" href="trainer.html?${linkQs}">` +
+    `<span class="ic">${s.icon}</span>` +
+    `<span class="body"><b>${Sky.L(s.name)}</b><span>${blurb} · ${Sky.t(ctaKey)}</span></span>` +
+    `</a>`;
+}
+
+function renderDashboard() {
+  const p = SkyRoles.getClassroom();
+  if (!p) { showForm(); return; }
+
+  $('#dashGreeting').textContent = p.name || Sky.t('student');
+  $('#dashSub').textContent = [p.className, p.school].filter(Boolean).join(' · ');
+
+  /* задания: сложные + любимые предметы анкеты, а если анкета почти
+     пустая — просто первые несколько предметов, чтобы список не был пустым */
+  let assignIds = [...new Set([...hardSel_or(p.hardSubjects), ...(p.likeSubjects || [])])];
+  if (!assignIds.length) assignIds = SkyRoles.SUBJECTS.slice(0, 4).map(s => s.id);
+  assignIds = assignIds.slice(0, 6);
+
+  const assignBox = $('#assignList');
+  assignBox.innerHTML = assignIds.map(id =>
+    subjectRoleCard(id, Sky.t('assignCard'), `subject=${id}&mode=due&autostart=1`, 'practiceNow')
+  ).join('');
+
+  /* курсы — только по сложным предметам, это и есть их смысл */
+  const courseBox = $('#courseList');
+  const hard = p.hardSubjects || [];
+  courseBox.innerHTML = hard.length
+    ? hard.map(id => subjectRoleCard(id, Sky.t('courseCard'), `subject=${id}&mode=all&autostart=1`, 'courseGo')).join('')
+    : `<p class="note">${Sky.t('courseNone')}</p>`;
+
+  /* прогресс — точность по предметам анкеты (любимые+сложные), из общей статистики тренажёра */
+  const progressIds = [...new Set([...(p.hardSubjects || []), ...(p.likeSubjects || [])])];
+  const stats = Sky.stats();
+  const progBox = $('#progressList');
+  progBox.innerHTML = progressIds.length ? '' : `<p class="note">${Sky.t('courseNone')}</p>`;
+  progressIds.forEach(id => {
+    const s = SkyRoles.subjectById(id); if (!s) return;
+    const st = stats.bySubject[id];
+    const pct = st && st.n ? Sky.pct(st.right, st.n) : 0;
+    const row = document.createElement('div');
+    row.className = 'subj-stat-row';
+    row.innerHTML = `<span class="ic">${s.icon}</span><span class="name">${Sky.L(s.name)}</span>` +
+      `<span class="bar">${SkyRoles.progressBarHtml(pct)}</span><span class="n">${st && st.n ? pct + '%' : '—'}</span>`;
+    progBox.appendChild(row);
+  });
+
+  /* дедлайны из целей на год */
+  const dl = $('#deadlineList');
+  const goalsWithDates = (p.goals || []).filter(g => g.date)
+    .map(g => Object.assign({ left: Sky.daysLeft(g.date) }, g))
+    .sort((a, b) => (a.left ?? 9e9) - (b.left ?? 9e9));
+  if (!goalsWithDates.length) {
+    dl.innerHTML = `<p class="note">${Sky.t('deadlineNone')}</p>`;
+  } else {
+    dl.innerHTML = goalsWithDates.map(g => {
+      const cls = g.left < 0 ? 'over' : g.left <= 7 ? 'soon' : 'far';
+      const label = g.left < 0 ? Sky.t('daysOver') : g.left === 0 ? Sky.t('daysToday') : Sky.t('daysLeftN').replace('%1', g.left);
+      return `<div class="deadline-row"><span class="txt">${escHtml(g.text)}</span><span class="days ${cls}">${label}</span></div>`;
+    }).join('');
+  }
+
+  /* проблемы в учёбе — свободный текст из анкеты */
+  const panel = $('#problemsPanel');
+  if (p.problems) { panel.classList.remove('hidden'); $('#problemsText').textContent = p.problems; }
+  else panel.classList.add('hidden');
+}
+/* на случай если у профиля почему-то нет hardSubjects — не падаем */
+function hardSel_or(arr) { return arr || []; }
+
+function escHtml(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c])); }
+
+/* ============================================================
+   СТАРТ
+   ============================================================ */
+document.addEventListener('langchange', () => {
+  const p = SkyRoles.getClassroom();
+  if (p && !$('#dashboard').classList.contains('hidden')) renderDashboard();
+  else { renderChipGroup('#likeChips', likeSel); renderChipGroup('#hardChips', hardSel); renderGoals(); }
+});
+document.addEventListener('statschange', () => {
+  if (!$('#dashboard').classList.contains('hidden')) renderDashboard();
+});
+
+const existing = SkyRoles.getClassroom();
+if (existing) { loadForm(existing); showDashboard(); }
+else { loadForm(null); showForm(); }
+</script>
+</body>
+</html>

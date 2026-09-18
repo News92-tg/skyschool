@@ -1,0 +1,749 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Трекеры — SkyySchool</title>
+<meta name="theme-color" content="#f6faff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon-512.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/sky.css">
+</head>
+<body>
+<header id="appHeader"></header>
+
+<main class="wrap">
+  <h1 data-i18n="h1"></h1>
+  <p class="lead" data-i18n="lead"></p>
+
+  <div class="psy-seg" id="trackSeg">
+    <button data-tab="sleep"   data-i18n="tabSleep"></button>
+    <button data-tab="day"     data-i18n="tabDay"></button>
+    <button data-tab="food"    data-i18n="tabFood"></button>
+    <button data-tab="courses" data-i18n="tabCourses"></button>
+  </div>
+
+  <!-- ==================== СОН ==================== -->
+  <section id="tabSleep">
+    <div class="panel section">
+      <h2 data-i18n="sleepTitle"></h2>
+      <div class="row section">
+        <div class="field" style="flex:0 0 150px"><label data-i18n="sDate"></label><input id="sDate" type="date"></div>
+        <div class="field" style="flex:0 0 130px"><label data-i18n="sIn"></label><input id="sIn" type="time"></div>
+        <div class="field" style="flex:0 0 130px"><label data-i18n="sOut"></label><input id="sOut" type="time"></div>
+      </div>
+      <div class="section">
+        <label class="chip-label" data-i18n="sQuality"></label>
+        <div class="psy-scale" id="sQualityScale"></div>
+      </div>
+      <div id="sResult" style="margin-top:6px"></div>
+      <button class="btn full big" id="sSave" style="margin-top:16px" data-i18n="save"></button>
+    </div>
+
+    <div class="panel section">
+      <h2 data-i18n="s30Title"></h2>
+      <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="s30Lead"></p>
+      <div class="sleep-chart" id="sChart"></div>
+      <div class="mood-legend"><span id="sFrom"></span><span id="sTo"></span></div>
+      <div class="stats section">
+        <div class="stat accent"><b id="stAvg">—</b><span data-i18n="stAvgL"></span></div>
+        <div class="stat"><b id="stNights">0</b><span data-i18n="stNightsL"></span></div>
+        <div class="stat"><b id="stShort">0</b><span data-i18n="stShortL"></span></div>
+        <div class="stat"><b id="stQual">—</b><span data-i18n="stQualL"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== РАСПИСАНИЕ ==================== -->
+  <section id="tabDay" class="hidden">
+    <div class="panel section">
+      <h2 data-i18n="dayTitle"></h2>
+      <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="dayLead"></p>
+
+      <div class="row section">
+        <div class="field" style="flex:0 0 120px"><label data-i18n="dTime"></label><input id="dTime" type="time"></div>
+        <div class="field" style="flex:0 0 110px"><label data-i18n="dMins"></label>
+          <select id="dMins"></select></div>
+        <div class="field"><label data-i18n="dWhat"></label><input id="dWhat" type="text" data-i18n-ph="dWhatPh"></div>
+      </div>
+      <div class="section">
+        <label class="chip-label" data-i18n="dCat"></label>
+        <div class="chip-select" id="dCatChips"></div>
+      </div>
+      <button class="btn" id="dAdd" style="margin-top:6px" data-i18n="add"></button>
+
+      <div class="daygrid" id="dayGrid"></div>
+
+      <div class="cat-summary" id="catSummary"></div>
+
+      <div class="row" style="margin-top:18px;gap:9px">
+        <button class="btn ghost" id="dExport" data-i18n="exportPng"></button>
+        <button class="btn ghost" id="dTemplate" data-i18n="useTemplate"></button>
+      </div>
+      <p class="note" data-i18n="exportNote"></p>
+    </div>
+  </section>
+
+  <!-- ==================== ПИТАНИЕ ==================== -->
+  <section id="tabFood" class="hidden">
+    <div class="panel section">
+      <h2 data-i18n="foodTitle"></h2>
+      <div class="field section" style="max-width:200px">
+        <label data-i18n="fDate"></label><input id="fDate" type="date">
+      </div>
+      <div class="role-list" id="mealList"></div>
+    </div>
+
+    <div class="panel section">
+      <h2 data-i18n="waterTitle"></h2>
+      <p class="lead" style="font-size:13px;margin-top:6px" id="waterLead"></p>
+      <div class="water-row" id="waterRow"></div>
+    </div>
+
+    <div class="panel section">
+      <h2 data-i18n="patTitle"></h2>
+      <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="patLead"></p>
+      <div class="role-list" id="patternList"></div>
+    </div>
+  </section>
+
+  <!-- ==================== КУРСЫ ==================== -->
+  <section id="tabCourses" class="hidden">
+    <div class="panel section">
+      <h2 data-i18n="cTitle"></h2>
+      <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="cLead"></p>
+      <button class="btn" id="cAdd" style="margin-top:14px" data-i18n="cAddBtn"></button>
+      <div class="role-list" id="courseList"></div>
+    </div>
+
+    <div class="panel section hidden" id="deadlinePanel">
+      <h2 data-i18n="cDeadlines"></h2>
+      <div id="deadlineList" style="margin-top:8px"></div>
+      <div class="row" style="margin-top:16px;gap:9px">
+        <button class="btn ghost" id="notifyBtn"></button>
+      </div>
+      <p class="note" id="notifyState"></p>
+    </div>
+  </section>
+</main>
+
+<footer id="appFooter"></footer>
+
+<script src="assets/config.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/db.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/trackers.js"></script>
+<script>
+'use strict';
+Sky.init({
+  h1:{ru:'Трекеры',en:'Trackers'},
+  lead:{ru:'Сон, расписание, еда и курсы в одном месте. Это те же данные, что на странице «Режим дня» — отметил там, видно здесь, и наоборот.',
+        en:'Sleep, schedule, food and courses in one place. This is the same data as on the Daily life page — log it there, see it here, and the other way round.'},
+
+  tabSleep:{ru:'Сон',en:'Sleep'},
+  tabDay:{ru:'Расписание',en:'Schedule'},
+  tabFood:{ru:'Питание',en:'Food'},
+  tabCourses:{ru:'Курсы',en:'Courses'},
+
+  /* ---------- сон ---------- */
+  sleepTitle:{ru:'Как спалось',en:'How you slept'},
+  sDate:{ru:'Ночь на',en:'Night of'},
+  sIn:{ru:'Лёг(ла)',en:'Went to bed'},
+  sOut:{ru:'Встал(а)',en:'Woke up'},
+  sQuality:{ru:'Самочувствие после сна',en:'How you felt afterwards'},
+  save:{ru:'Сохранить',en:'Save'},
+  saved:{ru:'Записано',en:'Saved'},
+  sleptFor:{ru:'Сон: %1',en:'Slept: %1'},
+
+  s30Title:{ru:'Сон за 30 дней',en:'Sleep over 30 days'},
+  s30Lead:{ru:'Оранжевым — ночи короче 7 часов. Серым — дни без записи; пропуски это нормально, смотри на общую форму.',
+           en:'Orange marks nights under 7 hours. Grey means no entry; gaps are fine — look at the overall shape.'},
+  stAvgL:{ru:'в среднем',en:'on average'},
+  stNightsL:{ru:'ночей записано',en:'nights logged'},
+  stShortL:{ru:'ночей меньше 7 ч',en:'nights under 7h'},
+  stQualL:{ru:'самочувствие',en:'how you felt'},
+
+  /* ---------- расписание ---------- */
+  dayTitle:{ru:'Расписание дня',en:'Daily schedule'},
+  dayLead:{ru:'Блоки по часам с цветом по категории. Это то же расписание, что на «Режиме дня» — записи оттуда подхватятся, им просто присвоится категория «другое».',
+           en:'Hour blocks coloured by category. This is the same schedule as on Daily life — entries from there show up here, just filed under "other".'},
+  dTime:{ru:'Во сколько',en:'At'},
+  dMins:{ru:'Сколько',en:'For'},
+  dWhat:{ru:'Что делаешь',en:'What you are doing'},
+  dWhatPh:{ru:'Например: тренировка',en:'e.g. training'},
+  dCat:{ru:'Категория',en:'Category'},
+  add:{ru:'Добавить',en:'Add'},
+  minsN:{ru:'%1 мин',en:'%1 min'},
+  hourN:{ru:'%1 ч',en:'%1 h'},
+  dayEmpty:{ru:'Пока пусто. Добавь первый блок сверху или возьми готовый шаблон.',
+            en:'Nothing here yet. Add your first block above, or start from the template.'},
+  useTemplate:{ru:'Взять шаблон дня',en:'Use a day template'},
+  exportPng:{ru:'Скачать картинкой',en:'Download as image'},
+  exportNote:{ru:'Картинка рисуется прямо в браузере и никуда не отправляется — можно распечатать и повесить над столом.',
+              en:'The image is drawn in your browser and sent nowhere — print it and pin it above your desk.'},
+  exported:{ru:'Картинка скачана',en:'Image downloaded'},
+  catSummaryT:{ru:'За день набирается',en:'Adds up to, per day'},
+
+  /* ---------- питание ---------- */
+  foodTitle:{ru:'Что ел(а) за день',en:'What you ate today'},
+  fDate:{ru:'Дата',en:'Date'},
+  mealWhatPh:{ru:'Что именно (необязательно)',en:'What exactly (optional)'},
+  waterTitle:{ru:'Вода',en:'Water'},
+  waterLeadT:{ru:'Ориентир — %1 стаканов в день. Сегодня: %2.',en:'A guide is %1 glasses a day. Today: %2.'},
+
+  patTitle:{ru:'Что заметно',en:'What stands out'},
+  patLead:{ru:'Считается по регулярности, а не по калориям: сколько раз ел, не пропущен ли завтрак, хватает ли воды и сна.',
+           en:'Based on regularity rather than calories: how many times you ate, whether breakfast got skipped, whether water and sleep are enough.'},
+  patNeed:{ru:'Пока данных мало. Закономерности появятся после %1 с записями — иначе это будут не закономерности, а совпадения.',
+           en:'Not enough data yet. Patterns appear after %1 with entries — otherwise they would be coincidences, not patterns.'},
+  daysPl1:{ru:'дня',en:'days'}, daysPl2:{ru:'дней',en:'days'}, daysPl5:{ru:'дней',en:'days'},
+  patNone:{ru:'Ничего особенного не выделяется — это тоже нормальный результат.',
+           en:'Nothing in particular stands out — that is also a normal result.'},
+
+  /* ---------- курсы ---------- */
+  cTitle:{ru:'Программы и курсы',en:'Programmes and courses'},
+  cLead:{ru:'Всё, что идёт параллельно школе: кружки, онлайн-курсы, подготовка. Прогресс — в занятиях или темах, как тебе удобнее считать.',
+         en:'Everything running alongside school: clubs, online courses, prep. Progress counts in sessions or topics — whichever suits you.'},
+  cAddBtn:{ru:'Добавить курс',en:'Add a course'},
+  cEmpty:{ru:'Пока ни одного курса. Добавь тот, который идёт прямо сейчас.',
+          en:'No courses yet. Add the one you are doing right now.'},
+  cName:{ru:'Название',en:'Name'},
+  cNamePh:{ru:'Например: Python для начинающих',en:'e.g. Python for beginners'},
+  cWhere:{ru:'Где',en:'Where'},
+  cWherePh:{ru:'Школа, онлайн, репетитор',en:'School, online, tutor'},
+  cDone:{ru:'Пройдено',en:'Done'},
+  cTotal:{ru:'Всего',en:'Total'},
+  cDeadline:{ru:'Дедлайн',en:'Deadline'},
+  cNote:{ru:'Заметка',en:'Note'},
+  cSave:{ru:'Сохранить',en:'Save'},
+  cSaved:{ru:'Курс сохранён',en:'Course saved'},
+  cNameNeeded:{ru:'Впиши хотя бы название.',en:'At least give it a name.'},
+  cEdit:{ru:'Изменить',en:'Edit'},
+  cPlus:{ru:'+1 занятие',en:'+1 session'},
+  cOf:{ru:'%1 из %2',en:'%1 of %2'},
+  cDone100:{ru:'Пройден',en:'Completed'},
+
+  cDeadlines:{ru:'Ближайшие дедлайны',en:'Upcoming deadlines'},
+  daysLeftN:{ru:'%1 дн.',en:'%1 d'},
+  daysToday:{ru:'сегодня',en:'today'},
+  daysOver:{ru:'просрочено',en:'overdue'},
+
+  notifyOn:{ru:'Включить напоминания',en:'Turn on reminders'},
+  notifyOff:{ru:'Выключить напоминания',en:'Turn off reminders'},
+  notifyStOn:{ru:'Напоминание придёт, когда до дедлайна останется 3 дня и меньше — пока вкладка сайта открыта.',
+              en:'A reminder arrives when a deadline is 3 days away or less — while the site tab is open.'},
+  notifyStOff:{ru:'Напоминания выключены.',en:'Reminders are off.'},
+  notifyDenied:{ru:'Браузер запретил уведомления для сайта. Разреши их в настройках сайта и нажми ещё раз.',
+                en:'The browser blocked notifications for this site. Allow them in site settings and press again.'},
+  notifyTitle:{ru:'Дедлайн близко',en:'Deadline coming up'},
+  notifyBody:{ru:'%1 — осталось %2',en:'%1 — %2 left'},
+
+  del:{ru:'Удалить',en:'Delete'},
+  cancel:{ru:'Отмена',en:'Cancel'}
+});
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const T = SkyTrack;
+
+/* ============================================================
+   ВКЛАДКИ
+   ============================================================ */
+const TABS = { sleep:'#tabSleep', day:'#tabDay', food:'#tabFood', courses:'#tabCourses' };
+function selectTab(name) {
+  Object.keys(TABS).forEach(k => $(TABS[k]).classList.toggle('hidden', k !== name));
+  document.querySelectorAll('#trackSeg button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+document.querySelectorAll('#trackSeg button').forEach(b =>
+  b.addEventListener('click', () => selectTab(b.dataset.tab)));
+
+/* ============================================================
+   СОН
+   ============================================================ */
+let sQuality = null;
+
+function buildQualityScale() {
+  const box = $('#sQualityScale');
+  box.innerHTML = '';
+  T.SLEEP_QUALITY.forEach(q => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.innerHTML = `<span class="face">${q.ico}</span><span class="lab">${esc(Sky.L(q.label))}</span>`;
+    b.addEventListener('click', () => { sQuality = q.v; paintQuality(); });
+    box.appendChild(b);
+  });
+}
+function paintQuality() {
+  $('#sQualityScale').querySelectorAll('button')
+    .forEach((b, i) => b.classList.toggle('on', sQuality === i + 1));
+}
+
+function loadSleepDay() {
+  const rec = T.sleepOf($('#sDate').value);
+  $('#sIn').value = rec && rec.in ? rec.in : '';
+  $('#sOut').value = rec && rec.out ? rec.out : '';
+  sQuality = rec && typeof rec.quality === 'number' ? rec.quality : null;
+  paintQuality();
+  $('#sResult').innerHTML = rec && rec.hours
+    ? `<div class="verdict ${rec.hours >= 7 ? 'ok' : 'warn'}">${esc(Sky.t('sleptFor').replace('%1', T.fmtHours(rec.hours)))}</div>` : '';
+}
+$('#sDate').addEventListener('change', loadSleepDay);
+
+$('#sSave').addEventListener('click', () => {
+  const a = $('#sIn').value, b = $('#sOut').value;
+  if (!a || !b) return;
+  T.saveSleep($('#sDate').value || Sky.dayKey(), a, b, sQuality);
+  Sky.toast(Sky.t('saved'));
+  loadSleepDay();
+  renderSleepChart();
+});
+
+function renderSleepChart() {
+  const st = T.sleepStats(30);
+  const box = $('#sChart');
+  box.innerHTML = '';
+  /* 12 часов — верх шкалы: выше спят редко, и растягивать ось до
+     максимума одной аномальной ночи значит сплющить все остальные */
+  st.days.forEach(d => {
+    const bar = document.createElement('div');
+    const has = d.hours > 0;
+    bar.className = 'sbar' + (has ? (d.hours < 7 ? ' short' : ' ok') : ' empty');
+    bar.title = has ? `${d.key}: ${T.fmtHours(d.hours)}` : d.key;
+    bar.innerHTML = `<i style="height:${has ? Math.min(100, d.hours / 12 * 100) : 3}%"></i>`;
+    box.appendChild(bar);
+  });
+  $('#sFrom').textContent = st.days[0].key;
+  $('#sTo').textContent = st.days[st.days.length - 1].key;
+
+  $('#stAvg').textContent = st.avgHours != null ? T.fmtHours(st.avgHours) : '—';
+  $('#stNights').textContent = st.count;
+  $('#stShort').textContent = st.shortNights;
+  $('#stQual').textContent = st.avgQuality != null ? st.avgQuality.toFixed(1) + '/5' : '—';
+}
+
+/* ============================================================
+   РАСПИСАНИЕ
+   ============================================================ */
+let dCat = 'school';
+
+function buildCatChips() {
+  const box = $('#dCatChips');
+  box.innerHTML = '';
+  T.CATEGORIES.filter(c => c.id !== 'other').forEach(c => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip-opt' + (dCat === c.id ? ' on' : '');
+    b.style.cssText = dCat === c.id ? `border-color:${c.color};color:${c.color};background:${c.color}18` : '';
+    b.innerHTML = `<span class="ic">${c.ico}</span>${esc(Sky.L(c.name))}`;
+    b.addEventListener('click', () => { dCat = c.id; buildCatChips(); });
+    box.appendChild(b);
+  });
+}
+
+const MINS_OPTIONS = [15, 30, 45, 60, 90, 120, 180];
+function buildMinsSelect() {
+  const sel = $('#dMins');
+  sel.innerHTML = '';
+  MINS_OPTIONS.forEach(m => {
+    const o = document.createElement('option');
+    o.value = m;
+    o.textContent = m >= 60 && m % 60 === 0
+      ? Sky.t('hourN').replace('%1', m / 60)
+      : Sky.t('minsN').replace('%1', m);
+    sel.appendChild(o);
+  });
+  sel.value = 60;
+}
+
+$('#dAdd').addEventListener('click', () => {
+  const time = $('#dTime').value, what = $('#dWhat').value.trim();
+  if (!time || !what) return;
+  T.addSlot(time, what, dCat, +$('#dMins').value);
+  $('#dWhat').value = '';
+  renderDay();
+});
+$('#dWhat').addEventListener('keydown', e => { if (e.key === 'Enter') $('#dAdd').click(); });
+
+const TEMPLATE = [
+  { time:'07:30', mins:30, cat:'food',   ru:'Подъём и завтрак', en:'Wake up and breakfast' },
+  { time:'08:30', mins:360, cat:'school', ru:'Школа', en:'School' },
+  { time:'15:00', mins:60, cat:'food',   ru:'Обед и отдых', en:'Lunch and a break' },
+  { time:'16:00', mins:90, cat:'study',  ru:'Домашние задания', en:'Homework' },
+  { time:'18:00', mins:30, cat:'study',  ru:'Тренажёр SkyySchool', en:'SkyySchool trainer' },
+  { time:'19:00', mins:30, cat:'food',   ru:'Ужин', en:'Dinner' },
+  { time:'19:30', mins:60, cat:'sport',  ru:'Прогулка или спорт', en:'Walk or sport' },
+  { time:'21:00', mins:60, cat:'rest',   ru:'Свободное время', en:'Free time' },
+  { time:'22:30', mins:30, cat:'rest',   ru:'Готовимся ко сну', en:'Wind down for bed' }
+];
+$('#dTemplate').addEventListener('click', () => {
+  TEMPLATE.forEach(t => T.addSlot(t.time, Sky.lang === 'en' ? t.en : t.ru, t.cat, t.mins));
+  renderDay();
+});
+
+function renderDay() {
+  const list = T.slots();
+  const grid = $('#dayGrid');
+  if (!list.length) {
+    grid.innerHTML = `<div class="empty"><div class="big">🕘</div><p>${esc(Sky.t('dayEmpty'))}</p></div>`;
+    $('#catSummary').innerHTML = '';
+    return;
+  }
+  grid.innerHTML = '';
+  list.forEach(s => {
+    const c = T.categoryById(s.cat);
+    const el = document.createElement('div');
+    el.className = 'dayblock' + (s.done ? ' done' : '');
+    el.style.borderLeftColor = c.color;
+    el.innerHTML =
+      `<span class="time">${esc(s.time)}</span>
+       <span class="cat" style="background:${c.color}1f;color:${c.color}">${c.ico} ${esc(Sky.L(c.name))}</span>
+       <span class="what">${esc(s.what)}</span>
+       <span class="mins">${esc(s.mins >= 60 && s.mins % 60 === 0 ? Sky.t('hourN').replace('%1', s.mins/60) : Sky.t('minsN').replace('%1', s.mins || 60))}</span>`;
+    const done = document.createElement('button');
+    done.className = 'check'; done.type = 'button';
+    done.textContent = s.done ? '✓' : '';
+    if (s.done) done.style.cssText = `background:${c.color};border-color:${c.color};color:#fff`;
+    done.addEventListener('click', () => { T.updateSlot(s.id, { done: !s.done }); renderDay(); });
+    const rm = document.createElement('button');
+    rm.className = 'btn small ghost'; rm.type = 'button'; rm.textContent = '×';
+    rm.addEventListener('click', () => { T.removeSlot(s.id); renderDay(); });
+    const box = document.createElement('div');
+    box.className = 'dayblock-actions';
+    box.append(done, rm);
+    el.appendChild(box);
+    grid.appendChild(el);
+  });
+
+  /* сводка по категориям */
+  const mins = T.categoryMinutes();
+  const total = Object.values(mins).reduce((a, b) => a + b, 0) || 1;
+  $('#catSummary').innerHTML =
+    `<div class="cat-sum-title">${esc(Sky.t('catSummaryT'))}</div>` +
+    `<div class="cat-bar">` +
+    T.CATEGORIES.filter(c => mins[c.id]).map(c =>
+      `<i style="width:${mins[c.id] / total * 100}%;background:${c.color}" title="${esc(Sky.L(c.name))}"></i>`).join('') +
+    `</div>` +
+    `<div class="cat-legend">` +
+    T.CATEGORIES.filter(c => mins[c.id]).map(c => {
+      const m = mins[c.id];
+      const lbl = m >= 60 ? Sky.t('hourN').replace('%1', (m / 60).toFixed(m % 60 ? 1 : 0)) : Sky.t('minsN').replace('%1', m);
+      return `<span><i style="background:${c.color}"></i>${esc(Sky.L(c.name))} — ${esc(lbl)}</span>`;
+    }).join('') + `</div>`;
+}
+
+/* ---------- экспорт расписания в картинку ----------
+   Рисуем на canvas вручную: библиотек в проекте нет и заводить их
+   ради одной кнопки незачем. toBlob + ссылка со скачиванием — всё
+   локально, ничего никуда не уходит. */
+$('#dExport').addEventListener('click', () => {
+  const list = T.slots();
+  if (!list.length) return;
+
+  const W = 900, rowH = 62, padTop = 110, padBottom = 40;
+  const H = padTop + list.length * rowH + padBottom;
+  const cv = document.createElement('canvas');
+  const scale = 2;                    /* ретина: печатать будут, пусть будет резко */
+  cv.width = W * scale; cv.height = H * scale;
+  const x = cv.getContext('2d');
+  x.scale(scale, scale);
+
+  /* фон всегда светлый — картинку печатают на белой бумаге,
+     тёмная тема сайта тут только помешала бы */
+  x.fillStyle = '#ffffff'; x.fillRect(0, 0, W, H);
+
+  x.fillStyle = '#0f172a';
+  x.font = '900 30px Nunito, system-ui, sans-serif';
+  x.fillText(Sky.t('dayTitle'), 40, 56);
+
+  x.fillStyle = '#64748b';
+  x.font = '700 15px Nunito, system-ui, sans-serif';
+  x.fillText(new Date().toLocaleDateString(Sky.lang === 'en' ? 'en-GB' : 'ru-RU',
+    { weekday:'long', day:'numeric', month:'long' }), 40, 82);
+
+  list.forEach((s, i) => {
+    const c = T.categoryById(s.cat);
+    const y = padTop + i * rowH;
+
+    x.fillStyle = i % 2 ? '#f8fafc' : '#ffffff';
+    x.fillRect(40, y, W - 80, rowH - 8);
+
+    x.fillStyle = c.color;
+    x.fillRect(40, y, 6, rowH - 8);
+
+    x.fillStyle = '#0f172a';
+    x.font = '900 20px "JetBrains Mono", ui-monospace, monospace';
+    x.fillText(s.time, 62, y + 34);
+
+    x.font = '800 18px Nunito, system-ui, sans-serif';
+    x.fillText(s.what.length > 46 ? s.what.slice(0, 45) + '…' : s.what, 165, y + 34);
+
+    const label = Sky.L(c.name);
+    x.font = '800 13px Nunito, system-ui, sans-serif';
+    const tw = x.measureText(label).width;
+    x.fillStyle = c.color + '22';
+    x.beginPath();
+    const bx = W - 60 - tw - 22, by = y + 12, bw = tw + 22, bh = 26, r = 13;
+    x.moveTo(bx + r, by); x.arcTo(bx + bw, by, bx + bw, by + bh, r);
+    x.arcTo(bx + bw, by + bh, bx, by + bh, r); x.arcTo(bx, by + bh, bx, by, r);
+    x.arcTo(bx, by, bx + bw, by, r); x.closePath(); x.fill();
+    x.fillStyle = c.color;
+    x.fillText(label, bx + 11, by + 18);
+  });
+
+  x.fillStyle = '#94a3b8';
+  x.font = '700 13px Nunito, system-ui, sans-serif';
+  x.fillText('SkyySchool', 40, H - 18);
+
+  cv.toBlob(blob => {
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'raspisanie-' + Sky.dayKey() + '.png';
+    document.body.appendChild(a); a.click(); a.remove();
+    /* отпускаем память не сразу: Safari успевает начать скачивание */
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    Sky.toast(Sky.t('exported'));
+  }, 'image/png');
+});
+
+/* ============================================================
+   ПИТАНИЕ
+   ============================================================ */
+$('#fDate').addEventListener('change', renderFood);
+
+function renderFood() {
+  const date = $('#fDate').value || Sky.dayKey();
+  const meals = T.mealsOf(date);
+  const notes = T.mealNotesOf(date);
+
+  const box = $('#mealList');
+  box.innerHTML = '';
+  T.MEALS.forEach(m => {
+    const on = !!meals[m.id];
+    const el = document.createElement('div');
+    el.className = 'meal-card' + (on ? ' on' : '');
+    el.innerHTML =
+      `<button type="button" class="meal-head">
+         <span class="ic">${m.ico}</span>
+         <span class="nm">${esc(Sky.L(m.name))}</span>
+         <span class="check">${on ? '✓' : ''}</span>
+       </button>
+       <input type="text" class="meal-note" placeholder="${esc(Sky.t('mealWhatPh'))}" value="${esc(notes[m.id] || '')}">`;
+    el.querySelector('.meal-head').addEventListener('click', () => {
+      T.toggleMeal(date, m.id);
+      renderFood(); renderPatterns();
+    });
+    const inp = el.querySelector('.meal-note');
+    inp.addEventListener('change', () => {
+      T.setMealNote(date, m.id, inp.value);
+      renderFood(); renderPatterns();
+    });
+    box.appendChild(el);
+  });
+
+  const glasses = T.waterOf(date);
+  $('#waterLead').textContent = Sky.t('waterLeadT')
+    .replace('%1', T.WATER_TARGET).replace('%2', glasses);
+  const row = $('#waterRow');
+  row.innerHTML = '';
+  for (let i = 1; i <= T.WATER_MAX; i++) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'glass' + (i <= glasses ? ' on' : '') + (i > T.WATER_TARGET ? ' extra' : '');
+    b.textContent = i <= glasses ? '💧' : '';
+    b.addEventListener('click', () => {
+      T.setWater(date, glasses === i ? i - 1 : i);
+      renderFood(); renderPatterns();
+    });
+    row.appendChild(b);
+  }
+}
+
+function renderPatterns() {
+  const p = T.patterns();
+  const box = $('#patternList');
+  if (!p.enough) {
+    box.innerHTML = `<p class="note">${esc(Sky.t('patNeed').replace('%1',
+      Sky.plural(p.need, Sky.t('daysPl1'), Sky.t('daysPl2'), Sky.t('daysPl5'))))}</p>`;
+    return;
+  }
+  if (!p.items.length) { box.innerHTML = `<p class="note">${esc(Sky.t('patNone'))}</p>`; return; }
+  box.innerHTML = p.items.map(it =>
+    `<div class="psy-pattern tone-${it.tone}"><span class="ic">${it.ico}</span><p>${esc(Sky.L(it.text))}</p></div>`
+  ).join('');
+}
+
+/* ============================================================
+   КУРСЫ
+   ============================================================ */
+$('#cAdd').addEventListener('click', () => openCourseForm(null));
+
+function openCourseForm(existing) {
+  const c = existing || { name:'', where:'', done:0, total:10, deadline:'', note:'' };
+  Sky.modal(
+    `<h2 style="margin-bottom:14px">${esc(Sky.t(existing ? 'cEdit' : 'cAddBtn'))}</h2>
+     <div class="field"><label>${esc(Sky.t('cName'))}</label>
+       <input id="cfName" type="text" placeholder="${esc(Sky.t('cNamePh'))}" value="${esc(c.name)}"></div>
+     <div class="field"><label>${esc(Sky.t('cWhere'))}</label>
+       <input id="cfWhere" type="text" placeholder="${esc(Sky.t('cWherePh'))}" value="${esc(c.where || '')}"></div>
+     <div class="row">
+       <div class="field"><label>${esc(Sky.t('cDone'))}</label>
+         <input id="cfDone" type="number" min="0" step="1" value="${c.done}"></div>
+       <div class="field"><label>${esc(Sky.t('cTotal'))}</label>
+         <input id="cfTotal" type="number" min="1" step="1" value="${c.total}"></div>
+       <div class="field"><label>${esc(Sky.t('cDeadline'))}</label>
+         <input id="cfDeadline" type="date" value="${esc(c.deadline || '')}"></div>
+     </div>
+     <div class="field"><label>${esc(Sky.t('cNote'))}</label>
+       <textarea id="cfNote" rows="2">${esc(c.note || '')}</textarea></div>
+     <button class="btn full big" id="cfSave" style="margin-top:16px">${esc(Sky.t('cSave'))}</button>`,
+    (box, close) => {
+      box.querySelector('#cfSave').addEventListener('click', () => {
+        const data = {
+          name: box.querySelector('#cfName').value.trim(),
+          where: box.querySelector('#cfWhere').value.trim(),
+          done: +box.querySelector('#cfDone').value || 0,
+          total: +box.querySelector('#cfTotal').value || 1,
+          deadline: box.querySelector('#cfDeadline').value,
+          note: box.querySelector('#cfNote').value.trim()
+        };
+        if (!data.name) { Sky.toast(Sky.t('cNameNeeded')); return; }
+        if (existing) T.updateCourse(existing.id, data); else T.addCourse(data);
+        Sky.toast(Sky.t('cSaved'));
+        close();
+        renderCourses();
+      });
+    }
+  );
+}
+
+function renderCourses() {
+  const list = T.courses();
+  const box = $('#courseList');
+  if (!list.length) {
+    box.innerHTML = `<p class="note">${esc(Sky.t('cEmpty'))}</p>`;
+  } else {
+    box.innerHTML = '';
+    list.forEach(c => {
+      const pct = T.coursePct(c);
+      const full = c.done >= c.total;
+      const el = document.createElement('div');
+      el.className = 'course-card' + (full ? ' full' : '');
+      el.innerHTML =
+        `<div class="spread">
+           <div style="min-width:0">
+             <b>${esc(c.name)}</b>
+             ${c.where ? `<span class="where">${esc(c.where)}</span>` : ''}
+           </div>
+           <span class="pct">${full ? esc(Sky.t('cDone100')) : pct + '%'}</span>
+         </div>
+         <div class="progress" style="margin-top:10px"><i style="width:${pct}%"></i></div>
+         <div class="course-meta">
+           <span>${esc(Sky.t('cOf').replace('%1', c.done).replace('%2', c.total))}</span>
+           ${c.deadline ? `<span>📅 ${esc(c.deadline)}</span>` : ''}
+         </div>
+         ${c.note ? `<p class="course-note">${esc(c.note)}</p>` : ''}
+         <div class="course-actions"></div>`;
+      const acts = el.querySelector('.course-actions');
+
+      if (!full) {
+        const plus = document.createElement('button');
+        plus.className = 'btn small'; plus.type = 'button'; plus.textContent = Sky.t('cPlus');
+        plus.addEventListener('click', () => { T.updateCourse(c.id, { done: c.done + 1 }); renderCourses(); });
+        acts.appendChild(plus);
+      }
+      const ed = document.createElement('button');
+      ed.className = 'btn small ghost'; ed.type = 'button'; ed.textContent = Sky.t('cEdit');
+      ed.addEventListener('click', () => openCourseForm(c));
+      const rm = document.createElement('button');
+      rm.className = 'btn small ghost'; rm.type = 'button'; rm.textContent = '×';
+      rm.addEventListener('click', () => { T.removeCourse(c.id); renderCourses(); });
+      acts.append(ed, rm);
+      box.appendChild(el);
+    });
+  }
+  renderDeadlines();
+}
+
+function renderDeadlines() {
+  const dl = T.deadlines();
+  $('#deadlinePanel').classList.toggle('hidden', !dl.length);
+  if (!dl.length) return;
+  $('#deadlineList').innerHTML = dl.map(c => {
+    const cls = c.left < 0 ? 'over' : c.left <= 3 ? 'soon' : 'far';
+    const label = c.left < 0 ? Sky.t('daysOver')
+                : c.left === 0 ? Sky.t('daysToday')
+                : Sky.t('daysLeftN').replace('%1', c.left);
+    return `<div class="deadline-row"><span class="txt">${esc(c.name)}</span>
+            <span class="days ${cls}">${esc(label)}</span></div>`;
+  }).join('');
+  renderNotifyState();
+  maybeNotify(dl);
+}
+
+/* Уведомления о дедлайнах. Шлём максимум одно на курс в день —
+   иначе при открытой вкладке оно бы повторялось на каждом рендере. */
+function maybeNotify(dl) {
+  if (!Sky.get('courseNotify', false)) return;
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const sent = Sky.get('courseNotifySent', {});
+  const today = Sky.dayKey();
+  let changed = false;
+  dl.filter(c => c.left != null && c.left >= 0 && c.left <= 3).forEach(c => {
+    if (sent[c.id] === today) return;
+    const label = c.left === 0 ? Sky.t('daysToday') : Sky.t('daysLeftN').replace('%1', c.left);
+    Sky.notify(Sky.t('notifyTitle'), Sky.t('notifyBody').replace('%1', c.name).replace('%2', label));
+    sent[c.id] = today; changed = true;
+  });
+  if (changed) Sky.set('courseNotifySent', sent);
+}
+
+function renderNotifyState() {
+  const on = Sky.get('courseNotify', false);
+  $('#notifyBtn').textContent = Sky.t(on ? 'notifyOff' : 'notifyOn');
+  const st = $('#notifyState');
+  if (!('Notification' in window)) st.textContent = '';
+  else if (Notification.permission === 'denied') st.textContent = Sky.t('notifyDenied');
+  else st.textContent = Sky.t(on ? 'notifyStOn' : 'notifyStOff');
+}
+$('#notifyBtn').addEventListener('click', async () => {
+  if (Sky.get('courseNotify', false)) { Sky.set('courseNotify', false); renderNotifyState(); return; }
+  const res = await Sky.askNotify();
+  if (res === 'granted') Sky.set('courseNotify', true);
+  renderNotifyState();
+  renderDeadlines();
+});
+
+/* ============================================================
+   СТАРТ
+   ============================================================ */
+function renderAll() {
+  buildQualityScale();
+  buildCatChips();
+  buildMinsSelect();
+  loadSleepDay();
+  renderSleepChart();
+  renderDay();
+  renderFood();
+  renderPatterns();
+  renderCourses();
+}
+
+$('#sDate').value = Sky.dayKey();
+$('#fDate').value = Sky.dayKey();
+renderAll();
+selectTab('sleep');
+
+document.addEventListener('langchange', renderAll);
+/* если life.html поменял данные в другой вкладке — подхватим */
+window.addEventListener('storage', e => { if (e.key && e.key.indexOf('life') >= 0) renderAll(); });
+</script>
+</body>
+</html>

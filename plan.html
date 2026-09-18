@@ -20,6 +20,36 @@
 .day.hit{border-color:var(--ok);background:var(--ok-soft)}
 .day.hit b{color:var(--ok)}
 .day.today{border-color:var(--accent);box-shadow:0 0 0 3px var(--m-learn-soft)}
+
+/* ---------- тесты: бейджи готовности ---------- */
+.test-badges{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+.test-badge{display:flex;align-items:center;gap:9px;border:1.5px solid var(--line);border-radius:99px;
+  padding:6px 14px 6px 8px;font-size:12.5px;font-weight:800;background:var(--panel);text-decoration:none;color:inherit;transition:.15s}
+.test-badge:hover{border-color:var(--line-2);transform:translateY(-1px)}
+.test-badge .ic{font-size:17px}
+.test-badge .lvl{font-size:10.5px;font-weight:900;padding:2px 8px;border-radius:99px}
+.lvl.none{background:var(--panel-2);color:var(--muted)}
+.lvl.start,.lvl.low{background:var(--no-soft);color:var(--no)}
+.lvl.mid{background:var(--warn-soft);color:var(--warn)}
+.lvl.adv,.lvl.high{background:var(--ok-soft);color:var(--ok)}
+
+/* ---------- динамический план по неделям ---------- */
+.plan-weeks{display:flex;flex-direction:column;gap:14px;margin-top:16px}
+.plan-week{border:1.5px solid var(--line);border-radius:var(--r);padding:16px}
+.plan-week.current{border-color:var(--accent);box-shadow:0 0 0 3px var(--m-plan-soft)}
+.plan-week-head{display:flex;align-items:baseline;gap:10px;margin-bottom:12px}
+.plan-week-head b{font-size:14px;font-weight:900}
+.plan-week-head span{font-size:11.5px;color:var(--muted);font-weight:700}
+.plan-subj{display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:var(--r-sm);
+  text-decoration:none;color:inherit;transition:.15s}
+.plan-subj:hover{background:var(--panel-2)}
+.plan-subj .ic{font-size:19px;flex:none}
+.plan-subj .info{flex:1;min-width:0}
+.plan-subj .info b{display:block;font-size:13px;font-weight:800}
+.plan-subj .info span{font-size:11px;color:var(--muted);font-weight:700}
+.plan-subj .progress{width:84px;flex:none}
+.plan-subj .cnt{font-size:11.5px;font-weight:800;color:var(--muted);flex:none;width:48px;text-align:right}
+.plan-subj.done .cnt{color:var(--ok)}
 </style>
 </head>
 <body>
@@ -60,6 +90,18 @@
         <div class="progress"><i id="todayBar"></i></div>
       </div>
     </div>
+  </div>
+
+  <div class="panel section">
+    <h2 data-i18n="testsTitle"></h2>
+    <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="testsLead"></p>
+    <div class="test-badges" id="testBadges"></div>
+  </div>
+
+  <div class="panel section">
+    <h2 data-i18n="weekPlanTitle"></h2>
+    <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="weekPlanLead"></p>
+    <div id="weekPlanBody"></div>
   </div>
 
   <div class="panel section">
@@ -130,6 +172,33 @@ Sky.init({
   week:{ru:'Последние 7 дней',en:'The last 7 days'},
   weekLead:{ru:'Зелёным отмечены дни, когда дневная цель выполнена. Смысл не в рекордах, а в том, чтобы не было длинных пропусков.',
             en:'Green marks the days you hit the goal. The point is not records but avoiding long gaps.'},
+
+  testsTitle:{ru:'Тесты',en:'Tests'},
+  testsLead:{ru:'IQ-тест и тест на уровень подготовки по предметам — их результаты используются ниже при сборке плана по неделям.',
+             en:'The IQ test and the subject-readiness test — their results are used below to build the weekly plan.'},
+  iqBadgeL:{ru:'IQ-тест',en:'IQ test'},
+  lvLevelNone:{ru:'не пройден',en:'not taken'},
+  lvLevelStart:{ru:'начальный',en:'beginner'},
+  lvLevelMid:{ru:'средний',en:'intermediate'},
+  lvLevelAdv:{ru:'продвинутый',en:'advanced'},
+  iqLevelLow:{ru:'низкий',en:'low'},
+  iqLevelMid:{ru:'средний',en:'medium'},
+  iqLevelHigh:{ru:'высокий',en:'high'},
+
+  weekPlanTitle:{ru:'План по неделям',en:'Weekly plan'},
+  weekPlanLead:{ru:'Собирается автоматически из даты экзамена, дневной цели и теста на уровень подготовки: слабым предметам достаётся больше заданий в неделю. Прогресс по каждому предмету считается из уже решённых заданий тренажёра.',
+                en:'Built automatically from the exam date, the daily goal and the readiness test: weaker subjects get more problems per week. Progress per subject comes from problems already solved in the trainer.'},
+  weekPlanNoExam:{ru:'Укажите дату экзамена и цель в блоке выше — тогда здесь появится план по неделям.',
+                  en:'Set the exam date and goal in the block above, and the weekly plan will appear here.'},
+  weekPlanNoLevel:{ru:'План ниже строится по умолчанию, как для среднего уровня. Чтобы он учитывал именно ваши сильные и слабые стороны, пройдите тест на уровень подготовки.',
+                   en:'The plan below defaults to an intermediate level for every subject. Take the readiness test so it reflects your actual strengths and weaknesses.'},
+  weekLabel:{ru:'Неделя %1',en:'Week %1'},
+  weekCurrent:{ru:'текущая',en:'current'},
+  weekMoreLeft:{ru:'И ещё %1 нед. до экзамена — тот же принцип повторяется каждую неделю.',
+                en:'%1 more weeks until the exam — the same pattern repeats every week.'},
+  weekTarget:{ru:'%1 в нед.',en:'%1 / wk'},
+  takeIqTest:{ru:'Пройти IQ-тест →',en:'Take the IQ test →'},
+  takeLevelTest:{ru:'Пройти тест на уровень →',en:'Take the readiness test →'},
 
   remind:{ru:'Напоминание',en:'Reminder'},
   remindLead:{ru:'Если к назначенному времени дневная цель не выполнена, браузер покажет уведомление.',
@@ -219,6 +288,129 @@ function render() {
   $('#notifyOn').textContent = Sky.t(p.notify ? 'disable' : 'enable');
 
   renderItems();
+  renderTestBadges();
+  renderWeekPlan();
+}
+
+/* ---------- предметы теста на уровень подготовки ----------
+   Те же 4 предмета, что и на test.html (id банков из data/bank-*.js).
+   Иконку и название дублируем здесь как константы, а не подключаем
+   сами файлы банков: на странице плана незачем грузить сотни
+   килобайт заданий ради названия предмета и эмодзи. */
+const PLAN_SUBJECTS = [
+  { id:'math',    icon:'∑',  name:{ru:'Математика',en:'Mathematics'} },
+  { id:'russian', icon:'Я',  name:{ru:'Русский язык',en:'Russian language'} },
+  { id:'english', icon:'🇬🇧', name:{ru:'Английский',en:'English'} },
+  { id:'history', icon:'📜', name:{ru:'История',en:'History'} }
+];
+const MAX_WEEKS_SHOWN = 8;
+
+function levelBadgeClass(level) { return level || 'none'; }
+function subjLevelLabel(level) {
+  return Sky.t(level === 'adv' ? 'lvLevelAdv' : level === 'mid' ? 'lvLevelMid' : level === 'start' ? 'lvLevelStart' : 'lvLevelNone');
+}
+/* вес предмета в распределении дневной цели: чем слабее уровень,
+   тем больше заданий в неделю ему достаётся */
+function subjWeight(level) { return level === 'adv' ? 1 : level === 'start' ? 3 : 2; /* mid и «не пройден» — по умолчанию 2 */ }
+
+function renderTestBadges() {
+  const box = $('#testBadges'); box.innerHTML = '';
+  const iqList = Sky.get('iqResults', []);
+  const iqLast = iqList.length ? iqList[iqList.length - 1] : null;
+
+  const iqBadge = document.createElement('a');
+  iqBadge.className = 'test-badge';
+  iqBadge.href = 'test.html#iq';
+  iqBadge.innerHTML = `<span class="ic">🧠</span><span>${Sky.t('iqBadgeL')}</span>` +
+    `<span class="lvl ${levelBadgeClass(iqLast ? iqLast.level : null)}">${iqLast ? Sky.t('iqLevel' + iqLast.level[0].toUpperCase() + iqLast.level.slice(1)) : Sky.t('lvLevelNone')}</span>`;
+  box.appendChild(iqBadge);
+
+  const results = Sky.get('levelResults', {});
+  PLAN_SUBJECTS.forEach(s => {
+    const res = results[s.id];
+    const b = document.createElement('a');
+    b.className = 'test-badge';
+    b.href = 'test.html#level';
+    b.innerHTML = `<span class="ic">${s.icon}</span><span>${Sky.L(s.name)}</span>` +
+      `<span class="lvl ${levelBadgeClass(res ? res.level : null)}">${res ? subjLevelLabel(res.level) : Sky.t('lvLevelNone')}</span>`;
+    box.appendChild(b);
+  });
+}
+
+/* Прогресс недели считается не по отдельной новой статистике, а по
+   уже существующей SRS-карточке (Sky.srs()): ключи там вида
+   «предмет:id_задания», а rec.last — время последнего ответа. Так
+   план обновляется сам собой из обычной работы в тренажёре — без
+   дополнительных полей в core.js и без риска что-то там сломать. */
+function subjectProgressInRange(subjectId, start, end) {
+  const all = Sky.srs();
+  let n = 0;
+  for (const key in all) {
+    if (!key.startsWith(subjectId + ':')) continue;
+    const rec = all[key];
+    if (rec && rec.last >= start && rec.last < end) n++;
+  }
+  return n;
+}
+
+function renderWeekPlan() {
+  const body = $('#weekPlanBody');
+  const p = plan();
+  const daysLeft = Sky.daysLeft(p.exam);
+
+  if (!p.exam || daysLeft === null || daysLeft < 0) {
+    body.innerHTML = `<p class="note">${Sky.t('weekPlanNoExam')}</p>`;
+    return;
+  }
+
+  const results = Sky.get('levelResults', {});
+  const anyTested = PLAN_SUBJECTS.some(s => results[s.id]);
+  const dailyGoal = p.goal || 10;
+
+  const weights = {};
+  PLAN_SUBJECTS.forEach(s => { weights[s.id] = subjWeight(results[s.id] ? results[s.id].level : null); });
+  const totalWeight = PLAN_SUBJECTS.reduce((sum, s) => sum + weights[s.id], 0);
+
+  const weeksLeft = Math.max(1, Math.ceil((daysLeft + 1) / 7));
+  const weeksShown = Math.min(weeksLeft, MAX_WEEKS_SHOWN);
+
+  const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+  let html = '';
+  if (!anyTested) html += `<p class="note" style="margin-bottom:14px">${Sky.t('weekPlanNoLevel')} <a href="test.html#level">${Sky.t('takeLevelTest')}</a></p>`;
+
+  html += '<div class="plan-weeks">';
+  for (let w = 1; w <= weeksShown; w++) {
+    const start = today0.getTime() + (w - 1) * 7 * 864e5;
+    const end = start + 7 * 864e5;
+    const isCurrent = w === 1;
+
+    html += `<div class="plan-week${isCurrent ? ' current' : ''}">` +
+      `<div class="plan-week-head"><b>${Sky.t('weekLabel').replace('%1', w)}</b>` +
+      (isCurrent ? `<span>${Sky.t('weekCurrent')}</span>` : '') + '</div>';
+
+    PLAN_SUBJECTS.forEach(s => {
+      const weeklyTarget = Math.max(1, Math.round(dailyGoal * weights[s.id] / totalWeight)) * 7;
+      const done = isCurrent ? subjectProgressInRange(s.id, start, end) : 0; /* прогресс есть только для текущей недели — будущее ещё не решено */
+      const pct = Math.min(100, Math.round(done / weeklyTarget * 100));
+      const link = `trainer.html?subject=${s.id}&mode=due&autostart=1`;
+
+      html += `<a class="plan-subj${done >= weeklyTarget ? ' done' : ''}" href="${isCurrent ? link : 'test.html#level'}">` +
+        `<span class="ic">${s.icon}</span>` +
+        `<span class="info"><b>${Sky.L(s.name)}</b><span>${subjLevelLabel(results[s.id] ? results[s.id].level : null)}</span></span>` +
+        (isCurrent ? `<span class="progress"><i style="width:${pct}%"></i></span><span class="cnt">${done}/${weeklyTarget}</span>`
+                    : `<span class="cnt">${Sky.t('weekTarget').replace('%1', weeklyTarget)}</span>`) +
+        `</a>`;
+    });
+
+    html += '</div>';
+  }
+  html += '</div>';
+
+  if (weeksLeft > MAX_WEEKS_SHOWN) {
+    html += `<p class="note" style="margin-top:12px">${Sky.t('weekMoreLeft').replace('%1', weeksLeft - MAX_WEEKS_SHOWN)}</p>`;
+  }
+
+  body.innerHTML = html;
 }
 
 function renderItems() {

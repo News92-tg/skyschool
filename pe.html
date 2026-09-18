@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Физрук — SkyySchool</title>
+<meta name="theme-color" content="#f6faff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon-512.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/sky.css">
+<style>
+.week-mini{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+.week-mini .wk{border:1.5px solid var(--line);border-radius:var(--r-sm);padding:10px;text-align:center}
+.week-mini .wk b{display:block;font-size:15px;font-weight:900}
+.week-mini .wk span{font-size:10px;color:var(--muted);font-weight:800}
+.week-mini .wk .progress{margin-top:6px}
+</style>
+</head>
+<body>
+<header id="appHeader"></header>
+
+<main class="wrap">
+  <h1 data-i18n="h1"></h1>
+  <p class="lead" data-i18n="lead"></p>
+
+  <div class="panel section">
+    <div class="row">
+      <div class="field" style="flex:0 0 150px">
+        <label data-i18n="ageL"></label>
+        <select id="ageSel"></select>
+      </div>
+    </div>
+
+    <h2 style="margin-top:20px" data-i18n="stdTitle"></h2>
+    <p class="lead" style="font-size:12.5px;margin-top:6px" data-i18n="stdLead"></p>
+    <div class="pe-standards" id="stdGrid"></div>
+  </div>
+
+  <div class="panel section">
+    <h2 data-i18n="tipTitle"></h2>
+    <div class="tip-box"><span class="ic">🗣️</span><p id="tipText"></p></div>
+    <button class="btn ghost small" id="tipMoreBtn" style="margin-top:12px" data-i18n="tipMore"></button>
+  </div>
+
+  <div class="panel section">
+    <h2 data-i18n="logTitle"></h2>
+    <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="logLead"></p>
+    <div class="row" style="margin-top:14px">
+      <div class="field"><label data-i18n="wDate"></label><input id="wDate" type="date"></div>
+      <div class="field"><label data-i18n="wPushups"></label><input id="wPushups" type="number" min="0" step="1" value="0"></div>
+      <div class="field"><label data-i18n="wSitups"></label><input id="wSitups" type="number" min="0" step="1" value="0"></div>
+      <div class="field"><label data-i18n="wRun"></label><input id="wRun" type="text" data-i18n-ph="wRunPh"></div>
+      <div class="field" style="flex:0 0 auto;display:flex;align-items:flex-end">
+        <button class="btn" id="addWorkoutBtn" data-i18n="add"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel section">
+    <h2 data-i18n="weekTitle"></h2>
+    <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="weekLead"></p>
+    <div class="week-mini" id="weekChart" style="margin-top:14px"></div>
+  </div>
+
+  <div class="panel section">
+    <div class="spread">
+      <h2 style="margin:0" data-i18n="achTitle"></h2>
+      <span class="pe-level" id="levelBadge"></span>
+    </div>
+    <p class="lead" style="font-size:13px;margin-top:10px" data-i18n="achLead"></p>
+    <div class="medal-row" id="medalRow"></div>
+  </div>
+
+  <div class="panel section">
+    <h2 data-i18n="listTitle"></h2>
+    <div class="list" id="workoutList" style="margin-top:12px"></div>
+  </div>
+</main>
+
+<footer id="appFooter"></footer>
+
+<script src="assets/config.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/db.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/roles.js"></script>
+<script>
+'use strict';
+Sky.init({
+  h1:{ru:'Физрук',en:'P.E. teacher'},
+  lead:{ru:'Нормативы по возрасту, журнал тренировок и советы физрука — всё в одном месте.',
+        en:'Age-based standards, a workout log and coaching tips — all in one place.'},
+
+  ageL:{ru:'Ваш возраст',en:'Your age'},
+  stdTitle:{ru:'Нормативы по возрасту',en:'Age-based standards'},
+  stdLead:{ru:'Ориентировочные средние показатели для самопроверки и мотивации — не официальные нормативы ГТО или школьной программы.',
+           en:'Approximate reference numbers for self-check and motivation — not the official GTO or school-curriculum standards.'},
+  stdPushups:{ru:'Отжимания',en:'Push-ups'},
+  stdSitups:{ru:'Пресс за 1 мин',en:'Sit-ups / 1 min'},
+
+  tipTitle:{ru:'Совет физрука',en:'Coach’s tip'},
+  tipMore:{ru:'Другой совет',en:'Another tip'},
+
+  logTitle:{ru:'Журнал тренировок',en:'Workout log'},
+  logLead:{ru:'Записывайте результат после каждой тренировки — прогресс и медали считаются по этим записям.',
+           en:'Log a result after every workout — progress and medals are calculated from these entries.'},
+  wDate:{ru:'Дата',en:'Date'},
+  wPushups:{ru:'Отжимания',en:'Push-ups'},
+  wSitups:{ru:'Пресс',en:'Sit-ups'},
+  wRun:{ru:'Бег',en:'Run'},
+  wRunPh:{ru:'Например: 60 м — 10,2 с',en:'e.g. 60 m — 10.2 s'},
+  add:{ru:'Добавить',en:'Add'},
+
+  weekTitle:{ru:'Прогресс по неделям',en:'Weekly progress'},
+  weekLead:{ru:'Лучший результат в отжиманиях за неделю относительно норматива вашего возраста.',
+            en:'Your best push-up result each week, relative to the standard for your age.'},
+  weekNone:{ru:'Пока нет ни одной тренировки — добавьте первую выше.',en:'No workouts yet — add your first one above.'},
+  sessionsN:{ru:'%1 трен.',en:'%1 wo.'},
+
+  achTitle:{ru:'Достижения',en:'Achievements'},
+  achLead:{ru:'Медали открываются за регулярность — по общему числу записанных тренировок.',
+           en:'Medals unlock for consistency — based on the total number of logged workouts.'},
+  levelLabel:{ru:'Уровень %1',en:'Level %1'},
+  medalNew:{ru:'Новая медаль: %1!',en:'New medal: %1!'},
+
+  listTitle:{ru:'Все записи',en:'All entries'},
+  listEmpty:{ru:'Записей ещё нет.',en:'No entries yet.'},
+  del:{ru:'Удалить',en:'Delete'}
+});
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+
+/* ============================================================
+   ВОЗРАСТ И НОРМАТИВЫ
+   ============================================================ */
+const ageSel = $('#ageSel');
+for (let a = 7; a <= 18; a++) { const o = document.createElement('option'); o.value = a; o.textContent = a; ageSel.appendChild(o); }
+
+const savedAge = SkyRoles.getPeProfile().age || SkyRoles.guessAgeFromClass(SkyRoles.studentClass()) || 13;
+ageSel.value = savedAge;
+
+function renderStandards() {
+  const age = +ageSel.value;
+  const active = SkyRoles.standardForAge(age);
+  const grid = $('#stdGrid'); grid.innerHTML = '';
+  SkyRoles.PE_STANDARDS.forEach(s => {
+    const card = document.createElement('div');
+    card.className = 'pe-std-card' + (s.id === active.id ? ' active' : '');
+    card.innerHTML = `<b>${Sky.L(s.label)}</b>` +
+      `<div class="row"><span>${Sky.t('stdPushups')}</span><b>${s.pushups}</b></div>` +
+      `<div class="row"><span>${Sky.t('stdSitups')}</span><b>${s.situps}</b></div>` +
+      `<div class="row"><span>${Sky.L(s.run.label)}</span><b>${s.run.value}</b></div>`;
+    grid.appendChild(card);
+  });
+}
+ageSel.addEventListener('change', () => { SkyRoles.savePeProfile({ age: +ageSel.value }); renderStandards(); renderWeeks(); });
+
+/* ============================================================
+   СОВЕТЫ ФИЗРУКА
+   ============================================================ */
+function renderTip() { $('#tipText').textContent = SkyRoles.randomTip(); }
+$('#tipMoreBtn').addEventListener('click', renderTip);
+
+/* ============================================================
+   ЖУРНАЛ ТРЕНИРОВОК
+   ============================================================ */
+$('#wDate').value = Sky.dayKey();
+
+$('#addWorkoutBtn').addEventListener('click', () => {
+  const rec = {
+    date: $('#wDate').value || Sky.dayKey(),
+    pushups: Math.max(0, +$('#wPushups').value || 0),
+    situps: Math.max(0, +$('#wSitups').value || 0),
+    run: $('#wRun').value.trim().slice(0, 40)
+  };
+  const before = SkyRoles.getWorkouts().length;
+  SkyRoles.addWorkout(rec);
+  $('#wPushups').value = 0; $('#wSitups').value = 0; $('#wRun').value = '';
+  render(before);
+});
+
+/* ---------- недельный прогресс ----------
+   Группируем по понедельнику недели (простая арифметика по дате, без
+   сторонних библиотек) и берём лучший результат в отжиманиях за
+   неделю — этого достаточно, чтобы увидеть тренд. */
+function mondayOf(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const day = (d.getDay() + 6) % 7; /* 0 = понедельник */
+  d.setDate(d.getDate() - day);
+  return d;
+}
+function renderWeeks() {
+  const workouts = SkyRoles.getWorkouts();
+  const box = $('#weekChart');
+  if (!workouts.length) { box.innerHTML = `<p class="note">${Sky.t('weekNone')}</p>`; return; }
+
+  const std = SkyRoles.standardForAge(+ageSel.value);
+  const byWeek = {};
+  workouts.forEach(w => {
+    const key = mondayOf(w.date).getTime();
+    byWeek[key] = byWeek[key] || { best: 0, n: 0 };
+    byWeek[key].best = Math.max(byWeek[key].best, w.pushups || 0);
+    byWeek[key].n++;
+  });
+  const weeks = Object.keys(byWeek).map(Number).sort((a, b) => a - b).slice(-8);
+
+  box.innerHTML = '';
+  weeks.forEach(ts => {
+    const w = byWeek[ts];
+    const pct = std.pushups ? Math.min(100, Math.round(w.best / std.pushups * 100)) : 0;
+    const d = new Date(ts);
+    const label = String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0');
+    const el = document.createElement('div');
+    el.className = 'wk';
+    el.innerHTML = `<b>${w.best}</b><span>${label} · ${Sky.t('sessionsN').replace('%1', w.n)}</span>${SkyRoles.progressBarHtml(pct)}`;
+    box.appendChild(el);
+  });
+}
+
+/* ============================================================
+   ДОСТИЖЕНИЯ
+   ============================================================ */
+function renderAchievements(prevTotal) {
+  const total = SkyRoles.getWorkouts().length;
+  $('#levelBadge').textContent = Sky.t('levelLabel').replace('%1', SkyRoles.levelFor(total));
+
+  const medals = SkyRoles.medalsState(total);
+  const row = $('#medalRow'); row.innerHTML = '';
+  medals.forEach(m => {
+    const el = document.createElement('div');
+    el.className = 'medal' + (m.unlocked ? ' unlocked' : '');
+    const justUnlocked = m.unlocked && prevTotal !== undefined && prevTotal < m.count && total >= m.count;
+    if (justUnlocked) { el.classList.add('pop'); Sky.toast(Sky.t('medalNew').replace('%1', Sky.L(m.label))); }
+    el.innerHTML = `<span class="ic">${m.emoji}</span><span>${Sky.L(m.label)}</span>`;
+    row.appendChild(el);
+  });
+}
+
+/* ============================================================
+   СПИСОК ЗАПИСЕЙ
+   ============================================================ */
+function renderList() {
+  const workouts = SkyRoles.getWorkouts();
+  const box = $('#workoutList');
+  if (!workouts.length) { box.innerHTML = `<div class="empty"><div class="big">🏃</div><p>${Sky.t('listEmpty')}</p></div>`; return; }
+  box.innerHTML = '';
+  workouts.map((w, i) => ({ w, i })).reverse().forEach(({ w, i }) => {
+    const parts = [];
+    if (w.pushups) parts.push(w.pushups + ' × ' + Sky.t('wPushups').toLowerCase());
+    if (w.situps) parts.push(w.situps + ' × ' + Sky.t('wSitups').toLowerCase());
+    if (w.run) parts.push(esc(w.run));
+    const el = document.createElement('div');
+    el.className = 'item';
+    el.innerHTML = `<div class="txt"><b>${esc(w.date)}</b><span>${esc(parts.join(' · '))}</span></div>` +
+      `<button class="btn small ghost" type="button">×</button>`;
+    el.querySelector('button').addEventListener('click', () => { SkyRoles.removeWorkout(i); render(); });
+    box.appendChild(el);
+  });
+}
+
+function render(prevTotal) {
+  renderList();
+  renderWeeks();
+  renderAchievements(prevTotal);
+}
+
+document.addEventListener('langchange', () => { renderStandards(); renderTip(); render(); });
+renderStandards();
+renderTip();
+render();
+</script>
+</body>
+</html>
