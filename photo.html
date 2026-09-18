@@ -136,6 +136,7 @@
 <script src="assets/core.js"></script>
 <script src="assets/db.js"></script>
 <script src="assets/auth.js"></script>
+<script src="assets/photo-ai.js"></script>
 <script src="data/ai-teachers.js"></script>
 <script src="assets/ai-teachers.js"></script>
 <script>
@@ -233,26 +234,17 @@ function closeCamera() {
 }
 
 /* ---------- сжатие ----------
-   Сжимаем в браузере, а не на сервере: снимок с телефона — это 3–6 МБ,
-   и гонять их целиком незачем. Для чтения текста хватает 1024 px по
-   длинной стороне, дальше качество подбираем под потолок размера. */
-const MAX_SIDE = 1024;
-const MAX_KB = 1200;
+   Раньше сжатие жило прямо здесь. Теперь оно в assets/photo-ai.js —
+   ровно то же самое, но одно на две страницы: фото появилось ещё и в
+   тренажёре, а две копии потолка размера разъезжаются на первой же
+   правке (подняли здесь, забыли там — и половина снимков отлетает
+   с 413 от Worker).
 
-function compress(srcImg) {
-  const scale = Math.min(1, MAX_SIDE / Math.max(srcImg.naturalWidth, srcImg.naturalHeight));
-  const c = document.createElement('canvas');
-  c.width = Math.round(srcImg.naturalWidth * scale);
-  c.height = Math.round(srcImg.naturalHeight * scale);
-  c.getContext('2d').drawImage(srcImg, 0, 0, c.width, c.height);
+   Потолки остались прежними: 1024 px по длинной стороне, 1200 КБ. */
+const MAX_SIDE = PhotoAI.MAX_SIDE;
+const MAX_KB = PhotoAI.MAX_KB;
 
-  for (const q of [0.82, 0.7, 0.58, 0.45, 0.35]) {
-    const url = c.toDataURL('image/jpeg', q);
-    /* длина base64 примерно на треть больше исходных байт */
-    if ((url.length - url.indexOf(',') - 1) * 0.75 <= MAX_KB * 1024) return url;
-  }
-  return null;
-}
+const compress = img => PhotoAI.compressImage(img);
 
 function showShot(dataUrl) {
   shotDataUrl = dataUrl;
@@ -265,14 +257,9 @@ function showShot(dataUrl) {
 }
 
 function captureFromVideo() {
-  const v = $('#video');
-  const c = document.createElement('canvas');
-  const scale = Math.min(1, MAX_SIDE / Math.max(v.videoWidth, v.videoHeight));
-  c.width = Math.round(v.videoWidth * scale);
-  c.height = Math.round(v.videoHeight * scale);
-  c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+  const shot = PhotoAI.compressVideoFrame($('#video'));
   closeCamera();
-  showShot(c.toDataURL('image/jpeg', 0.82));
+  showShot(shot);
 }
 
 /* ---------- проверка ---------- */

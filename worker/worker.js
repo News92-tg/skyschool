@@ -9,12 +9,21 @@
    Здесь ключи живут в переменных окружения Worker: браузер их не
    получает, они уходят только с этого сервера в модель.
 
-   Три эндпоинта:
+   Четыре эндпоинта:
      POST /explain       — разбор задания (DeepSeek)
-     POST /check-photo   — домашка по фото (Gemini Vision → DeepSeek)
+     POST /check-photo   — домашка по фото: оценка 1–5 голосом учителя
+                           (Gemini Vision → DeepSeek)
+     POST /photo-analyze — фото условия: распознать и решить по шагам
+                           (только Gemini, см. worker/photo-analyze.js)
      POST /chess-explain — объяснение уже посчитанной оценки хода
                            (DeepSeek; САМУ оценку считает движок в
                            браузере, см. assets/chess-review.js)
+
+   Два фото-эндпоинта делают разную работу и не дублируют друг друга:
+   /check-photo ставит оценку за работу ученика, /photo-analyze
+   объясняет сфотографированное условие. Лимит частоты у них ОБЩИЙ —
+   дорого именно распознавание, и считать его дважды по разным
+   счётчикам значило бы разрешить вдвое больше, чем написано.
 
    Как развернуть:
      npx wrangler login
@@ -28,6 +37,8 @@
    меняются часто, и менять их правкой кода с последующим деплоем —
    плохая идея: правится в панели Cloudflare без выкатки.
    ============================================================ */
+
+import { handleAnalyze } from './photo-analyze.js';
 
 /* ---------- настройки ----------
    Любое из этих значений переопределяется переменной окружения с тем
@@ -480,7 +491,7 @@ export default {
         service: 'skyschool-ai',
         hasKey: !!env.DEEPSEEK_API_KEY,
         hasVision: !!env.GEMINI_API_KEY,
-        endpoints: ['/explain', '/check-photo', '/chess-explain'],
+        endpoints: ['/explain', '/check-photo', '/photo-analyze', '/chess-explain'],
         limits: {
           ratePerMin: numCfg(env, 'RATE_PER_MIN'),
           photoSeconds: numCfg(env, 'RATE_PHOTO_SECONDS'),
@@ -490,9 +501,16 @@ export default {
       }, 200, origin, env);
     }
 
+    /* Разбор фото по шагам живёт в отдельном файле, но ходит через
+       общий вход: те же источники, те же лимиты, тот же ключ. */
+    const analyze = (body, e, o) => handleAnalyze(body, e, o, {
+      json, cut, numCfg, callGeminiVision, parseJsonLoose
+    });
+
     const routes = {
       '/explain': handleExplain,
       '/check-photo': handlePhoto,
+      '/photo-analyze': analyze,
       '/chess-explain': handleChessExplain
     };
     const handler = routes[url.pathname];
@@ -503,7 +521,11 @@ export default {
       return json({ error: 'origin not allowed' }, 403, origin, env);
     }
 
-    if (!env.DEEPSEEK_API_KEY) {
+    /* Ключ DeepSeek нужен не всем: /photo-analyze работает на одном
+       Gemini. Требовать оба значило бы выключить разбор фото у того,
+       кто завёл только Gemini, — причём с сообщением не про то. */
+    const NEEDS_DEEPSEEK = ['/explain', '/check-photo', '/chess-explain'];
+    if (NEEDS_DEEPSEEK.includes(url.pathname) && !env.DEEPSEEK_API_KEY) {
       return json({ error: 'Ключ не задан в настройках Worker. Выполните: npx wrangler secret put DEEPSEEK_API_KEY' }, 500, origin, env);
     }
 
@@ -512,10 +534,13 @@ export default {
       return json({ error: 'Слишком много запросов подряд. Подождите минуту.' }, 429, origin, env);
     }
 
-    /* дорогие эндпоинты — отдельный, более редкий шаг */
-    if (url.pathname === '/check-photo') {
+    /* дорогие эндпоинты — отдельный, более редкий шаг.
+       Счётчик у обоих фото-маршрутов ОДИН: платим мы за распознавание,
+       а не за имя маршрута, и чередование /check-photo с
+       /photo-analyze не должно удваивать разрешённое. */
+    if (url.pathname === '/check-photo' || url.pathname === '/photo-analyze') {
       const wait = intervalWait(ip + ':photo', numCfg(env, 'RATE_PHOTO_SECONDS'));
-      if (wait) return json({ error: `Следующая проверка фото будет доступна через ${wait} сек.` }, 429, origin, env);
+      if (wait) return json({ error: `Следующий разбор фото будет доступен через ${wait} сек.`, retryAfter: wait }, 429, origin, env);
     }
     if (url.pathname === '/chess-explain') {
       const wait = intervalWait(ip + ':chess', numCfg(env, 'RATE_CHESS_SECONDS'));
