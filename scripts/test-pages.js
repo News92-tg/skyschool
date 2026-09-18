@@ -196,6 +196,66 @@ const SKIP = new Set(['single.html']);   /* это собранная копия
   if (audio.withAudio && audio.withAudio !== audio.fallbackOk) {
     console.log('        • без голоса фраза не показана текстом — задание нерешаемо'); bad++;
   }
+  /* ---------- фото задания ----------
+     Настоящий Gemini здесь недоступен и не нужен: проверяем то, что
+     работает без сервера — сжатие до 1024 px и честный отказ, когда
+     Worker не настроен (в assets/config.js пустой AI_BASE). */
+  const photo = await tr.evaluate(async () => {
+    /* синтетическая «фотография тетради»: 1600×1200 с текстом */
+    const c = document.createElement('canvas');
+    c.width = 1600; c.height = 1200;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.fillStyle = '#111'; ctx.font = '64px sans-serif';
+    ctx.fillText('2x + 3 = 11', 80, 400);
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.95));
+
+    const input = document.querySelector('#paFile');
+    const dt = new DataTransfer();
+    dt.items.add(new File([blob], 'task.jpg', { type: 'image/jpeg' }));
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change'));
+    await new Promise(r => setTimeout(r, 500));
+
+    const preview = document.querySelector('#paPreview');
+    const img = new Image();
+    img.src = preview.src;
+    try { await img.decode(); } catch (e) {}
+
+    const before = Math.round(blob.size / 1024);
+    const after = Math.round((preview.src.length - preview.src.indexOf(',') - 1) * 0.75 / 1024);
+
+    /* разбор без настроенного Worker */
+    document.querySelector('#paRunBtn').click();
+    await new Promise(r => setTimeout(r, 300));
+    const fail = document.querySelector('#paFail');
+
+    /* и заодно: пауза между запросами считается */
+    const cooldownAfterSend = PhotoAI.cooldownLeft();
+
+    return {
+      shotShown: !document.querySelector('#paShot').classList.contains('hidden'),
+      side: Math.max(img.naturalWidth, img.naturalHeight),
+      before, after,
+      failShown: !fail.classList.contains('hidden'),
+      failText: (fail.textContent || '').slice(0, 60),
+      cooldownAfterSend
+    };
+  });
+  console.log('Фото: снимок показан — ' + (photo.shotShown ? 'да' : 'НЕТ') +
+              ', длинная сторона ' + photo.side + ' px, ' + photo.before + ' КБ → ' + photo.after + ' КБ');
+  console.log('      без Worker: отказ показан — ' + (photo.failShown ? 'да' : 'НЕТ') +
+              ' («' + photo.failText + '…»)');
+  if (!photo.shotShown) { console.log('        • превью снимка не появилось'); bad++; }
+  if (photo.side !== 1024) { console.log('        • сжатие не привело длинную сторону к 1024 px'); bad++; }
+  if (photo.after > 1200) { console.log('        • сжатый снимок больше потолка в 1200 КБ'); bad++; }
+  if (!photo.failShown) { console.log('        • без настроенного Worker страница промолчала'); bad++; }
+  /* Пауза не должна тикать, когда запрос даже не ушёл: иначе
+     ненастроенный Worker запирал бы кнопку на полминуты ни за что. */
+  if (photo.cooldownAfterSend) {
+    console.log('        • пауза 30 секунд включилась при неотправленном запросе'); bad++;
+  }
+
   trErrors.forEach(e => { console.log('        • exception: ' + e); bad++; });
 
   await browser.close();

@@ -12,6 +12,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/sky.css">
+<link rel="stylesheet" href="assets/photo-ai.css">
 </head>
 <body>
 <header id="appHeader"></header>
@@ -125,6 +126,60 @@
         <button class="btn hidden" id="nextBtn" data-i18n="next"></button>
         <button class="btn ghost" id="stopBtn" data-i18n="finish"></button>
       </div>
+
+      <!-- ==================== ФОТО ЗАДАНИЯ ====================
+           Ученик застрял на задании из банка, а рядом лежит учебник со
+           своим — сфотографировал, получил разбор, вернулся к заданию.
+           Текущее задание уходит на сервер как контекст: модель видит,
+           над чем ученик сейчас работает. -->
+      <div class="pa-wrap" id="paWrap">
+        <div class="pa-head">
+          <b data-i18n="paTitle"></b>
+        </div>
+        <p class="pa-hint" data-i18n="paHint"></p>
+
+        <div class="pa-actions">
+          <!-- capture="environment" открывает на телефоне камеру сразу
+               с задней стороны; на компьютере это обычный выбор файла -->
+          <input type="file" id="paFile" accept="image/*" capture="environment" hidden>
+          <button class="btn" id="paShootBtn" type="button" data-i18n="paShoot"></button>
+          <button class="btn ghost hidden" id="paRunBtn" type="button" data-i18n="paRun"></button>
+        </div>
+
+        <div class="pa-shot hidden" id="paShot">
+          <img id="paPreview" alt="">
+          <button class="pa-drop" id="paDrop" type="button" title="×">×</button>
+        </div>
+
+        <div class="pa-working hidden" id="paWorking">
+          <span class="pa-dot"></span><span id="paWorkingText"></span>
+        </div>
+
+        <div class="pa-fail hidden" id="paFail"></div>
+
+        <div class="hidden" id="paResult">
+          <div class="pa-label">
+            <span data-i18n="paTextL"></span>
+            <button type="button" id="paSaveText" data-i18n="paSaveText"></button>
+          </div>
+          <textarea class="pa-text" id="paText" spellcheck="false"></textarea>
+
+          <div class="hidden" id="paSolutionBox">
+            <div class="pa-label">
+              <span data-i18n="paStepsL"></span>
+              <button type="button" id="paMore" data-i18n="paMore"></button>
+            </div>
+            <ol class="pa-steps" id="paSteps"></ol>
+          </div>
+
+          <div class="hidden" id="paErrorsBox">
+            <div class="pa-label"><span data-i18n="paErrorsL"></span></div>
+            <div id="paErrors"></div>
+          </div>
+
+          <div class="pa-feedback hidden" id="paFeedback"></div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -138,6 +193,7 @@
 <script src="assets/auth.js"></script>
 <script src="assets/python-editor.js"></script>
 <script src="assets/speech.js"></script>
+<script src="assets/photo-ai.js"></script>
 <script src="data/ai-teachers.js"></script>
 <script src="assets/ai-teachers.js"></script>
 <script src="data/bank-math.js"></script>
@@ -214,6 +270,25 @@ Sky.init({
                 en:'This browser has no voice for that language, so the phrase is shown as text — the problem is still solvable, just not by ear. Chrome and Edge ship the voices.'},
   audioNoApi:{ru:'Этот браузер не умеет озвучивать текст, поэтому фраза показана текстом.',
               en:'This browser cannot speak text, so the phrase is shown as text instead.'},
+  /* ---------- фото задания ---------- */
+  paTitle:{ru:'📷 Фото задания',en:'📷 Photo of a task'},
+  paHint:{ru:'Сфотографируйте задание из учебника или свою работу. Распознаем текст, решим по шагам, а если на фото уже есть решение — разберём ошибки. Фото сжимается до 1024 px прямо в браузере, ключи остаются на сервере.',
+          en:'Photograph a task from a textbook or your own work. We will read the text, solve it step by step, and if the photo already has a solution, go through the mistakes. The photo is compressed to 1024 px in the browser; keys stay on the server.'},
+  paShoot:{ru:'📷 Загрузить фото задания',en:'📷 Upload a photo of the task'},
+  paRun:{ru:'Разобрать фото',en:'Analyse the photo'},
+  paTextL:{ru:'Распознанный текст',en:'Recognised text'},
+  paSaveText:{ru:'Сохранить исправления',en:'Save corrections'},
+  paStepsL:{ru:'Решение по шагам',en:'Step-by-step solution'},
+  paErrorsL:{ru:'Ошибки',en:'Mistakes'},
+  paMore:{ru:'Показать следующий шаг',en:'Show the next step'},
+  paAllShown:{ru:'Все шаги показаны',en:'All steps shown'},
+  paNoErrors:{ru:'Ошибок не нашлось.',en:'No mistakes found.'},
+  paWork1:{ru:'Сжимаю и отправляю фото…',en:'Compressing and sending the photo…'},
+  paWork2:{ru:'Gemini читает фото и решает задание…',en:'Gemini is reading the photo and solving the task…'},
+  paTextSaved:{ru:'Исправленный текст сохранён',en:'The corrected text is saved'},
+  paNotSaved:{ru:'Разбор показан, но в историю не записан: для этого нужно войти в аккаунт.',
+              en:'The analysis is shown but not saved to your history — that needs you to be signed in.'},
+
   catGrammar:{ru:'грамматика',en:'grammar'},
   catVocabulary:{ru:'лексика',en:'vocabulary'},
   catReading:{ru:'чтение',en:'reading'},
@@ -334,6 +409,7 @@ function hideExtras() {
 function nextTask() {
   hideExtras();
   Speech.stop();                       /* предыдущая фраза не должна звучать поверх новой */
+  paReset(false);                      /* разбор чужого фото над новым заданием только путает */
   if (pos >= queue.length) {
     current = null;
     document.querySelectorAll('.meta .tag').forEach(s => s.classList.add('hidden'));
@@ -640,21 +716,21 @@ function openAiSetup() {
   );
 }
 
-document.addEventListener('langchange', () => {
-  function renderAiState() {
-  const mode = Sky.aiMode();
-  const tag = $('#aiState'), btn = $('#aiSetupBtn');
-  tag.textContent = mode === 'key' ? Sky.t('aiOnKey')
-    : mode === 'worker' ? Sky.t('aiOnWorker') : Sky.t('aiTitle') + ' — ' + Sky.t('off');
-  tag.className = 'tag ' + (mode === 'off' ? 'gray' : 'ok');
-  btn.textContent = Sky.t(mode === 'off' ? 'aiSetup' : 'change');
-}
-$('#aiSetupBtn').addEventListener('click', openAiSetup);
-document.addEventListener('langchange', renderAiState);
+/* Смена языка: перерисовать подписи и, если идёт тренировка, само
+   задание.
 
-fillSubjectNames(); noteText(); renderStats(); renderAiState();
+   Тут был склеенный кусок: внутрь этого обработчика попала копия
+   всего блока инициализации — вместе с $('#aiSetupBtn')
+   .addEventListener и document.addEventListener('langchange', …).
+   Каждое переключение языка навешивало ещё один обработчик на кнопку
+   и ещё один слушатель смены языка: после двух переключений «Подключить
+   разбор» открывал окно три раза подряд. Оставлено только то, что и
+   должно происходить при смене языка. */
+document.addEventListener('langchange', () => {
+  fillSubjectNames(); noteText(); renderStats(); renderAiState();
   if (current) renderTask();
 });
+
 function renderAiState() {
   const mode = Sky.aiMode();
   const tag = $('#aiState'), btn = $('#aiSetupBtn');
@@ -667,6 +743,199 @@ $('#aiSetupBtn').addEventListener('click', openAiSetup);
 document.addEventListener('langchange', renderAiState);
 
 fillSubjectNames(); noteText(); renderStats(); renderAiState();
+
+/* ============================================================
+   ФОТО ЗАДАНИЯ
+
+   Что здесь делает тренажёр и чего не делает. Вся работа — сжатие,
+   запрос, бакет, строка в photo_checks — лежит в assets/photo-ai.js,
+   общем с photo.html. Здесь только разметка и порядок показа.
+
+   Разбор запускается ОТДЕЛЬНОЙ кнопкой, а не сразу после выбора фото.
+   Причина простая: между разборами тридцать секунд паузы, и смазанный
+   снимок, ушедший автоматически, стоит ученику этих тридцати секунд
+   ожидания. Сначала он видит, что снял, потом решает отправлять.
+   ============================================================ */
+let paShot = null;      /* data:image/jpeg;base64,… текущего снимка */
+let paData = null;      /* ответ Worker */
+let paRow = null;       /* строка photo_checks, если сохранилась */
+let paStepsShown = 0;
+
+function paReset(keepShot) {
+  if (!keepShot) {
+    paShot = null;
+    $('#paShot').classList.add('hidden');
+    $('#paPreview').removeAttribute('src');
+    $('#paRunBtn').classList.add('hidden');
+    $('#paFile').value = '';
+  }
+  paData = null; paRow = null; paStepsShown = 0;
+  ['paResult','paWorking','paFail','paSolutionBox','paErrorsBox','paFeedback']
+    .forEach(id => $('#' + id).classList.add('hidden'));
+}
+
+function paFail(message, kind) {
+  const box = $('#paFail');
+  box.textContent = message;
+  box.className = 'pa-fail' + (kind === 'warn' ? ' warn' : '');
+  box.classList.remove('hidden');
+}
+
+$('#paShootBtn').addEventListener('click', () => $('#paFile').click());
+$('#paDrop').addEventListener('click', () => paReset(false));
+
+$('#paFile').addEventListener('change', async e => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  paReset(false);
+  try {
+    paShot = await PhotoAI.compressFile(file);
+  } catch (err) {
+    const code = err && err.message;
+    paFail(Sky.t(code === 'toobig' ? 'paTooBig' : code === 'notimage' ? 'paNotImage' : 'paUnreadable'));
+    return;
+  }
+  $('#paPreview').src = paShot;
+  $('#paShot').classList.remove('hidden');
+  $('#paRunBtn').classList.remove('hidden');
+});
+
+$('#paRunBtn').addEventListener('click', async () => {
+  if (!paShot) return;
+  paReset(true);
+
+  $('#paRunBtn').disabled = true;
+  $('#paWorking').classList.remove('hidden');
+  $('#paWorkingText').textContent = Sky.t('paWork1');
+  /* Отдельного сигнала «распознавание пошло» с сервера нет, поэтому
+     вторую надпись показываем по времени — чтобы ожидание не
+     выглядело зависанием. */
+  const swap = setTimeout(() => { $('#paWorkingText').textContent = Sky.t('paWork2'); }, 2500);
+
+  /* Текущее задание уходит как контекст: если ученик снимает свою
+     работу по нему, модель видит, что именно требовалось. */
+  const res = await PhotoAI.analyze({
+    dataUrl: paShot,
+    subject: bank ? Sky.L(bank.name) : subjSel.value,
+    taskText: current ? Sky.L(current.text) : ''
+  });
+
+  clearTimeout(swap);
+  $('#paWorking').classList.add('hidden');
+  $('#paRunBtn').disabled = false;
+
+  if (!res.ok) { paFail(res.message, res.code === 'cooldown' ? 'warn' : ''); return; }
+  paData = res.data;
+  if (res.warning) paFail(res.warning, 'warn');
+  paRender();
+  paSave();
+});
+
+function paRender() {
+  $('#paResult').classList.remove('hidden');
+  $('#paText').value = paData.text || '';
+
+  /* Шаги открываются по одному. Решение, вывалившееся целиком,
+     читают глазами и закрывают; по одному шагу — думают. */
+  const steps = paData.solution || [];
+  $('#paSolutionBox').classList.toggle('hidden', !steps.length);
+  paStepsShown = steps.length ? 1 : 0;
+  paSteps();
+
+  const errs = paData.errors || [];
+  const box = $('#paErrors');
+  box.innerHTML = '';
+  /* Пустой список ошибок у проверки работы — это хорошая новость, и
+     сказать её надо словами, а не пустым местом. */
+  if (paData.kind === 'homework') {
+    $('#paErrorsBox').classList.remove('hidden');
+    if (!errs.length) {
+      const ok = document.createElement('div');
+      ok.className = 'pa-ok';
+      ok.textContent = Sky.t('paNoErrors');
+      box.appendChild(ok);
+    }
+  } else {
+    $('#paErrorsBox').classList.toggle('hidden', !errs.length);
+  }
+  errs.forEach(e => {
+    const d = document.createElement('div');
+    d.className = 'pa-err';
+    const b = document.createElement('b');
+    b.textContent = e.fragment || '';
+    const why = document.createElement('span');
+    why.textContent = e.why || '';
+    d.append(b, why);
+    if (e.fix) {
+      const fix = document.createElement('span');
+      fix.className = 'pa-fix';
+      fix.textContent = '→ ' + e.fix;
+      d.appendChild(fix);
+    }
+    box.appendChild(d);
+  });
+
+  const fb = $('#paFeedback');
+  fb.textContent = paData.feedback || '';
+  fb.classList.toggle('hidden', !paData.feedback);
+}
+
+function paSteps() {
+  const steps = (paData && paData.solution) || [];
+  const list = $('#paSteps');
+  list.innerHTML = '';
+  steps.slice(0, paStepsShown).forEach(s => {
+    const li = document.createElement('li');
+    li.textContent = s;
+    list.appendChild(li);
+  });
+  const all = paStepsShown >= steps.length;
+  $('#paMore').textContent = Sky.t(all ? 'paAllShown' : 'paMore');
+  $('#paMore').disabled = all;
+}
+
+$('#paMore').addEventListener('click', () => {
+  const steps = (paData && paData.solution) || [];
+  if (paStepsShown < steps.length) paStepsShown++;
+  paSteps();
+});
+
+/* Сохранение: снимок в закрытый бакет, разбор — строкой в photo_checks.
+   Ни то, ни другое не обязательно для показа: без входа в аккаунт
+   разбор всё равно виден, просто не попадает в историю — и об этом
+   говорим прямо, а не прячем. */
+async function paSave() {
+  const me = Sky.db && Sky.db.me && Sky.db.me();
+  let path = null;
+  const up = await PhotoAI.uploadShot(paShot, me ? me.id : null);
+  if (up && up.path) path = up.path;
+
+  paRow = await PhotoAI.saveCheck({
+    kind: paData.kind,
+    subject: bank ? bank.id : subjSel.value,
+    task_text: current ? Sky.L(current.text).slice(0, 800) : null,
+    recognized_text: paData.text || null,
+    errors: paData.errors || [],
+    feedback: paData.feedback || null,
+    image_path: path
+  });
+
+  if (!paRow && Sky.db && Sky.db.isCloud && Sky.db.isCloud() && !me) {
+    paFail(Sky.t('paNotSaved'), 'warn');
+  }
+}
+
+/* Исправленный руками текст — это то, что ученик считает написанным
+   на самом деле. В историю должен попасть он, а не то, что померещилось
+   распознаванию. */
+$('#paSaveText').addEventListener('click', async () => {
+  const text = $('#paText').value.trim();
+  if (paData) paData.text = text;
+  if (paRow && Sky.db) {
+    await Sky.db.update('photo_checks', paRow.id, { recognized_text: text, ocr_flagged: true });
+  }
+  Sky.toast(Sky.t('paTextSaved'));
+});
 
 /* Переход по ссылке вида trainer.html?subject=math&mode=due&autostart=1
    (например, из плана подготовки) сразу запускает тренировку, а не

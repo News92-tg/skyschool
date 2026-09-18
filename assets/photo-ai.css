@@ -1,0 +1,116 @@
+/* Стили блока «фото задания».
+
+   Отдельным файлом по той же причине, что и russian-en.css: sky.css —
+   общий файл, который правят с двух сторон, и именно на нём у проекта
+   уже разъезжались ветки. Страничные стили ничего не теряют от жизни
+   в своём файле.
+
+   Цвета только переменными sky.css — тёмная тема работает сама. */
+
+.pa-wrap{
+  margin-top:18px;padding:14px;
+  border:1px dashed var(--line-2);border-radius:14px;
+  background:var(--panel-2);
+}
+.pa-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.pa-head b{font-size:14px;font-weight:900;color:var(--ink)}
+.pa-hint{font-size:12px;color:var(--muted);line-height:1.45;margin-top:8px}
+
+/* Кнопка съёмки. Крупная и на всю ширину на телефоне: её жмут
+   одной рукой, держа тетрадь другой. */
+.pa-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.pa-actions .btn{flex:1 1 180px}
+
+/* Превью снимка. Ограничиваем высоту: вертикальное фото тетради
+   иначе занимает весь экран и прячет разбор под собой. */
+.pa-shot{
+  position:relative;margin-top:12px;border-radius:12px;overflow:hidden;
+  border:1px solid var(--line);background:var(--panel);
+}
+.pa-shot img{display:block;width:100%;max-height:260px;object-fit:contain;background:var(--bg-2)}
+.pa-drop{
+  position:absolute;top:8px;right:8px;
+  width:30px;height:30px;border-radius:50%;border:none;
+  background:rgba(14,27,46,.62);color:#fff;font-size:15px;cursor:pointer;
+}
+.pa-drop:hover{background:rgba(14,27,46,.82)}
+
+/* Ожидание ответа */
+.pa-working{display:flex;gap:10px;align-items:center;margin-top:12px;font-size:13px;color:var(--muted)}
+.pa-dot{
+  width:10px;height:10px;border-radius:50%;background:var(--accent);flex:none;
+  animation:paPulse .9s ease-in-out infinite;
+}
+@keyframes paPulse{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}
+
+/* Распознанный текст — редактируемый.
+   Правится руками намеренно: распознавание ошибается, и ученик должен
+   иметь возможность исправить условие, а не спорить с ним. */
+.pa-text{
+  width:100%;margin-top:6px;padding:11px 12px;
+  border:1px solid var(--line);border-radius:10px;
+  background:var(--panel);color:var(--ink);
+  font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;line-height:1.5;
+  resize:vertical;min-height:72px;
+}
+.pa-text:focus{outline:none;border-color:var(--accent)}
+.pa-label{
+  display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+  margin-top:14px;font-size:11px;font-weight:900;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--muted);
+}
+.pa-label button{
+  border:none;background:none;padding:0;cursor:pointer;
+  font:inherit;text-transform:none;letter-spacing:0;color:var(--accent);
+}
+
+/* Решение по шагам. Шаги открываются по одному: разом показанное
+   решение читают глазами и закрывают, по одному — думают. */
+.pa-steps{list-style:none;padding:0;margin:8px 0 0;counter-reset:pa}
+.pa-steps li{
+  display:flex;gap:10px;align-items:flex-start;
+  padding:10px 12px;margin-top:8px;
+  background:var(--panel);border:1px solid var(--line);
+  border-left:3px solid var(--m-learn);border-radius:10px;
+  font-size:14px;line-height:1.55;color:var(--ink);
+}
+.pa-steps li::before{
+  counter-increment:pa;content:counter(pa);
+  flex:none;width:22px;height:22px;border-radius:50%;
+  display:grid;place-items:center;
+  background:var(--m-learn-soft);color:var(--m-learn);
+  font-size:11px;font-weight:900;
+}
+
+/* Ошибки */
+.pa-err{
+  padding:10px 12px;margin-top:8px;
+  background:var(--no-soft);border:1px solid var(--line);
+  border-left:3px solid var(--no);border-radius:10px;font-size:13px;line-height:1.5;
+}
+.pa-err b{display:block;font-size:13px;color:var(--ink);margin-bottom:3px}
+.pa-err .pa-fix{display:block;margin-top:5px;color:var(--ok);font-weight:700}
+.pa-ok{
+  padding:10px 12px;margin-top:8px;border-radius:10px;
+  background:var(--ok-soft);color:var(--ok);font-size:13px;font-weight:700;
+}
+
+/* Обратная связь тренера */
+.pa-feedback{
+  margin-top:12px;padding:12px 14px;border-radius:12px;
+  background:var(--m-teach-soft);border-left:3px solid var(--m-teach);
+  font-size:13.5px;line-height:1.6;color:var(--ink);
+}
+
+/* Ошибка запроса */
+.pa-fail{
+  margin-top:12px;padding:11px 13px;border-radius:10px;
+  background:var(--no-soft);border-left:3px solid var(--no);
+  font-size:13px;line-height:1.55;color:var(--ink);
+}
+.pa-fail.warn{background:var(--warn-soft);border-left-color:var(--warn)}
+
+@media (max-width:560px){
+  .pa-actions .btn{flex:1 1 100%}
+  .pa-shot img{max-height:200px}
+}

@@ -123,6 +123,38 @@ Sky.db = (function () {
     return true;
   }
 
+  /* ---------- файлы (Supabase Storage) ----------
+     Нужны для фотографий домашки: строка разбора живёт в таблице, а
+     сам снимок — в бакете.
+
+     ПОЧЕМУ БАКЕТ ЗАКРЫТЫЙ И ССЫЛКИ ВРЕМЕННЫЕ. На фото детская тетрадь:
+     имя на обложке, почерк, иногда фамилия класса. Публичный бакет
+     отдаёт такой файл любому, кто знает или подберёт адрес, — а адрес
+     угадывается легче, чем кажется. Поэтому бакет private, читаем
+     через signedUrl на час, а правила доступа лежат в
+     sql/schema-storage.sql: ученик видит только свою папку.
+
+     Без облака (Supabase не настроен) сохранять некуда — возвращаем
+     понятный отказ, а вызывающий код продолжает работать: разбор
+     фотографии от этого не зависит. */
+  async function upload(bucket, path, blob, opts) {
+    if (mode !== 'cloud' || !sb) return { error: 'local' };
+    const { data, error } = await sb.storage.from(bucket).upload(path, blob, {
+      contentType: (opts && opts.contentType) || 'image/jpeg',
+      upsert: false,
+      cacheControl: '3600'
+    });
+    if (error) return { error: error.message };
+    return { path: (data && data.path) || path };
+  }
+
+  async function signedUrl(bucket, path, seconds) {
+    if (mode !== 'cloud' || !sb) return { error: 'local' };
+    const { data, error } = await sb.storage.from(bucket).createSignedUrl(path, seconds || 3600);
+    if (error) return { error: error.message };
+    return { url: data && data.signedUrl };
+  }
+
   async function signUp(email, password, meta) {
     if (mode === 'cloud' && sb) {
       const { data, error } = await sb.auth.signUp({
@@ -239,6 +271,7 @@ Sky.db = (function () {
     get mode() { return mode; },
     isCloud: () => mode === 'cloud',
     list, insert, update, remove, subscribe,
+    upload, signedUrl,
     signUp, signIn, signInGoogle, signOut, becomeLocal,
     me, isTeacher, isStudent,
     allProfiles: () => list('profiles'),
