@@ -51,6 +51,14 @@
   <h1 data-i18n="h1"></h1>
   <p class="lead" data-i18n="lead"></p>
 
+  <!-- Те же данные показывает trackers.html, только подробнее:
+       качество сна, категории в расписании, что именно ел, курсы.
+       Хранилище одно ('life'), поэтому страницы не расходятся. -->
+  <a class="role-card link" href="trackers.html" style="margin-bottom:18px">
+    <span class="ic">📊</span>
+    <span class="body"><b data-i18n="moreT"></b><span data-i18n="moreS"></span></span>
+  </a>
+
   <div class="tabs" role="tablist">
     <button type="button" data-tab="sleep" aria-selected="true" data-i18n="tabSleep"></button>
     <button type="button" data-tab="day" aria-selected="false" data-i18n="tabDay"></button>
@@ -155,6 +163,8 @@
 'use strict';
 Sky.init({
   h1:{ru:'Режим дня',en:'Daily life'},
+  moreT:{ru:'Подробные трекеры',en:'Detailed trackers'},
+  moreS:{ru:'Качество сна и график за 30 дней, категории в расписании с экспортом в картинку, что именно ел, курсы и дедлайны. Данные те же самые.',en:'Sleep quality and a 30-day chart, colour-coded schedule with image export, what exactly you ate, courses and deadlines. Same data.'},
   lead:{ru:'Сон, расписание, еда и экранное время. Смысл не в том, чтобы всё было идеально, а в том, чтобы видеть, как оно есть на самом деле.',
         en:'Sleep, schedule, meals and screen time. The point is not to be perfect but to see how things actually are.'},
 

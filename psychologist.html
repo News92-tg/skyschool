@@ -1,0 +1,1002 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Психолог — SkyySchool</title>
+<meta name="theme-color" content="#f6faff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon-512.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/sky.css">
+</head>
+<body>
+<header id="appHeader"></header>
+
+<main class="wrap">
+  <h1 data-i18n="h1"></h1>
+  <p class="lead" data-i18n="lead"></p>
+
+  <!-- Дисклеймер. Стоит выше всего остального и не закрывается:
+       это не баннер про куки, его не надо «принимать». -->
+  <div class="psy-disclaimer">
+    <span class="ic">💬</span>
+    <p><span data-i18n="disclaimerA"></span> <a href="tel:88002000122">8-800-2000-122</a><span data-i18n="disclaimerB"></span></p>
+  </div>
+
+  <div class="psy-seg" id="psySeg">
+    <button data-tab="tests"     data-i18n="tabTests"></button>
+    <button data-tab="diary"     data-i18n="tabDiary"></button>
+    <button data-tab="exercises" data-i18n="tabEx"></button>
+    <button data-tab="help"      data-i18n="tabHelp"></button>
+  </div>
+
+  <!-- ==================== A. ТЕСТЫ ==================== -->
+  <section id="tabTests">
+    <div class="panel section">
+      <h2 data-i18n="testsTitle"></h2>
+      <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="testsLead"></p>
+      <div class="psy-tests" id="testGrid"></div>
+    </div>
+
+    <div class="panel section hidden" id="historyPanel">
+      <h2 data-i18n="historyTitle"></h2>
+      <div id="historyList" style="margin-top:12px"></div>
+    </div>
+  </section>
+
+  <!-- ==================== B. ДНЕВНИК ==================== -->
+  <section id="tabDiary" class="hidden">
+    <div class="panel section">
+      <h2 data-i18n="diaryTitle"></h2>
+      <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="diaryLead"></p>
+
+      <div class="field section" style="max-width:220px">
+        <label data-i18n="dDate"></label>
+        <input id="dDate" type="date">
+      </div>
+
+      <div class="section">
+        <label class="chip-label" data-i18n="dMood"></label>
+        <div class="psy-scale" id="moodScale"></div>
+      </div>
+
+      <div class="section">
+        <label class="chip-label" data-i18n="dAnx"></label>
+        <div class="psy-scale" id="anxScale"></div>
+      </div>
+
+      <div class="row section">
+        <div class="field" style="flex:0 0 190px">
+          <label data-i18n="dSleep"></label>
+          <input id="dSleep" type="number" min="0" max="16" step="0.5" placeholder="7.5">
+        </div>
+      </div>
+
+      <div class="field section">
+        <label data-i18n="dNote"></label>
+        <textarea id="dNote" rows="2" data-i18n-ph="dNotePh"></textarea>
+      </div>
+
+      <button class="btn full big" id="saveDayBtn" data-i18n="dSave"></button>
+    </div>
+
+    <div class="panel section">
+      <h2 data-i18n="chartTitle"></h2>
+      <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="chartLead"></p>
+      <div class="mood-chart" id="moodChart"></div>
+      <div class="mood-legend"><span id="legendFrom"></span><span id="legendTo"></span></div>
+      <div class="stats section">
+        <div class="stat accent"><b id="stEntries">0</b><span data-i18n="stEntriesL"></span></div>
+        <div class="stat"><b id="stAvgMood">—</b><span data-i18n="stAvgMoodL"></span></div>
+        <div class="stat"><b id="stAvgSleep">—</b><span data-i18n="stAvgSleepL"></span></div>
+      </div>
+    </div>
+
+    <div class="panel section">
+      <h2 data-i18n="patTitle"></h2>
+      <div class="role-list" id="patternList"></div>
+    </div>
+  </section>
+
+  <!-- ==================== C. УПРАЖНЕНИЯ ==================== -->
+  <section id="tabExercises" class="hidden">
+    <div class="panel section">
+      <h2 data-i18n="breathTitle"></h2>
+      <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="breathLead"></p>
+      <div class="psy-disclaimer" style="margin-top:14px;margin-bottom:0">
+        <span class="ic">⚠️</span><p id="breathWarn"></p>
+      </div>
+      <div class="role-list" id="breathList"></div>
+    </div>
+
+    <div class="panel section">
+      <h2 data-i18n="groundTitle"></h2>
+      <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="groundLead"></p>
+      <div class="role-list" id="groundList"></div>
+    </div>
+
+    <div class="panel section">
+      <h2 data-i18n="meditTitle"></h2>
+      <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="meditLead"></p>
+      <p class="note" id="speechNote"></p>
+      <div class="role-list" id="meditList"></div>
+    </div>
+
+    <div class="panel section">
+      <h2 data-i18n="cbtTitle"></h2>
+      <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="cbtLead"></p>
+      <button class="btn" id="newThoughtBtn" style="margin-top:14px" data-i18n="cbtNew"></button>
+      <div class="role-list" id="thoughtList"></div>
+    </div>
+  </section>
+
+  <!-- ==================== D. ПОМОЩЬ ==================== -->
+  <section id="tabHelp" class="hidden">
+    <div class="panel section">
+      <h2 data-i18n="helpTitle"></h2>
+      <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="helpLead"></p>
+      <div class="psy-lines" id="helpLines"></div>
+    </div>
+
+    <div class="panel section">
+      <h2 data-i18n="helpWhoTitle"></h2>
+      <p class="lead" style="font-size:13.5px;margin-top:10px;line-height:1.7" data-i18n="helpWhoText"></p>
+    </div>
+
+    <div class="panel section">
+      <h2 data-i18n="privacyTitle"></h2>
+      <p class="lead" style="font-size:13.5px;margin-top:10px;line-height:1.7" data-i18n="privacyText"></p>
+      <button class="btn ghost" id="wipeBtn" style="margin-top:14px" data-i18n="wipeBtn"></button>
+    </div>
+  </section>
+</main>
+
+<!-- Красная кнопка. Вне <main>, position:fixed — видна на любой
+     вкладке и на любой прокрутке. -->
+<button class="psy-sos" id="sosBtn"><span class="ic">🆘</span><span data-i18n="sosBtn"></span></button>
+
+<footer id="appFooter"></footer>
+
+<script src="assets/config.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/db.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/psychologist.js"></script>
+<script>
+'use strict';
+Sky.init({
+  h1:{ru:'Психолог',en:'Psychologist'},
+  lead:{ru:'Место, где можно спокойно посмотреть на своё состояние: короткие тесты, дневник, упражнения на тревогу. Никаких диагнозов — только твои собственные наблюдения.',
+        en:'A place to look calmly at how you are doing: short check-ins, a diary, exercises for anxiety. No diagnoses — only your own observations.'},
+
+  disclaimerA:{ru:'Это не медицинский диагноз. Если тебе тяжело — позвони',
+               en:'This is not a medical diagnosis. If you are struggling, call'},
+  disclaimerB:{ru:' — бесплатно, анонимно, круглосуточно.',
+               en:' — free, anonymous, around the clock.'},
+
+  tabTests:{ru:'Тесты',en:'Check-ins'},
+  tabDiary:{ru:'Дневник',en:'Diary'},
+  tabEx:{ru:'Упражнения',en:'Exercises'},
+  tabHelp:{ru:'Помощь',en:'Help'},
+
+  /* ---------- тесты ---------- */
+  testsTitle:{ru:'Короткие тесты состояния',en:'Short check-ins'},
+  testsLead:{ru:'Каждый — 2–3 минуты. Это не обследование: результат показывает только то, сколько похожих переживаний ты сам(а) отметил(а) за последние недели.',
+             en:'Two or three minutes each. This is not an examination: the result only reflects how many similar experiences you marked yourself over recent weeks.'},
+  startTest:{ru:'Пройти →',en:'Start →'},
+  lastTaken:{ru:'Последний раз: %1 · уровень %2',en:'Last taken: %1 · level %2'},
+  neverTaken:{ru:'Ещё не проходил(а)',en:'Not taken yet'},
+  qOf:{ru:'Вопрос %1 из %2',en:'Question %1 of %2'},
+  next:{ru:'Дальше',en:'Next'},
+  back:{ru:'Назад',en:'Back'},
+  finish:{ru:'Посмотреть результат',en:'See the result'},
+  exitTest:{ru:'Выйти',en:'Leave'},
+  scoreOf:{ru:'%1 из %2 баллов',en:'%1 out of %2 points'},
+  lvlLow:{ru:'низкий',en:'low'},
+  lvlMid:{ru:'средний',en:'medium'},
+  lvlHigh:{ru:'высокий',en:'high'},
+  resultDone:{ru:'Готово',en:'Done'},
+  saveNote:{ru:'Результат сохранён в этом браузере. Сами ответы нигде не хранятся.',
+            en:'The result is saved in this browser. Your individual answers are not stored anywhere.'},
+  toDiary:{ru:'Записать состояние в дневник',en:'Log today in the diary'},
+  toExercises:{ru:'Упражнения на тревогу',en:'Exercises for anxiety'},
+  closeResult:{ru:'Закрыть',en:'Close'},
+
+  /* ---------- блок поддержки (после проверки безопасности) ---------- */
+  supportTitle:{ru:'Спасибо, что ответил(а) честно',en:'Thank you for answering honestly'},
+  supportText:{ru:'То, о чём ты сейчас сказал(а), — это то, с чем нельзя оставаться одному. Не потому что с тобой что-то не так, а потому что такие мысли забирают силы, и рядом должен быть кто-то живой. Позвони на телефон доверия: это бесплатно, анонимно, звонок не отобразится в детализации, и туда можно звонить просто чтобы поговорить — не обязательно «в самый крайний момент». И расскажи взрослому, которому доверяешь.',
+              en:'What you have just told us is not something to carry alone. Not because something is wrong with you, but because thoughts like these drain you, and someone real should be there. Call the helpline: it is free, anonymous, the call will not show on any bill, and you can call simply to talk — it does not have to be a last resort. And tell an adult you trust.'},
+  supportScoreNote:{ru:'Результат теста ниже — но сейчас он правда не самое важное.',
+                    en:'Your test result is below — but right now it really is not the important part.'},
+
+  /* ---------- история ---------- */
+  historyTitle:{ru:'История прохождений',en:'Your history'},
+  del:{ru:'Удалить',en:'Delete'},
+
+  /* ---------- дневник ---------- */
+  diaryTitle:{ru:'Как ты сегодня?',en:'How are you today?'},
+  diaryLead:{ru:'Минута в день. Чем больше дней подряд — тем понятнее, что именно влияет на твоё состояние.',
+             en:'One minute a day. The more days in a row, the clearer it becomes what actually affects how you feel.'},
+  dDate:{ru:'Дата',en:'Date'},
+  dMood:{ru:'Настроение',en:'Mood'},
+  dAnx:{ru:'Тревога',en:'Anxiety'},
+  dSleep:{ru:'Сон, часов',en:'Sleep, hours'},
+  dNote:{ru:'Заметка',en:'Note'},
+  dNotePh:{ru:'Что произошло, о чём думал(а) — в свободной форме',en:'What happened, what you thought about — free text'},
+  dSave:{ru:'Сохранить день',en:'Save the day'},
+  daySaved:{ru:'Записано',en:'Saved'},
+  anx1:{ru:'Спокойно',en:'Calm'},
+  anx5:{ru:'Очень',en:'A lot'},
+
+  chartTitle:{ru:'Настроение за 30 дней',en:'Mood over 30 days'},
+  chartLead:{ru:'Серые полоски — дни без записи. Пропуски это нормально: смотреть надо на общую форму, а не на каждый день.',
+             en:'Grey bars are days with no entry. Gaps are fine: look at the overall shape, not at individual days.'},
+  stEntriesL:{ru:'записей всего',en:'entries in total'},
+  stAvgMoodL:{ru:'настроение за 30 дней',en:'mood over 30 days'},
+  stAvgSleepL:{ru:'сон, часов',en:'sleep, hours'},
+
+  patTitle:{ru:'Что заметно',en:'What stands out'},
+  patNeed:{ru:'Пока записей мало. Закономерности начнут появляться после %1 — иначе это будут не закономерности, а случайность.',
+           en:'Not enough entries yet. Patterns will start showing after %1 — otherwise they would be coincidence, not patterns.'},
+  patNone:{ru:'Пока ничего заметного не выделяется — и это тоже нормальный результат. Продолжай записывать.',
+           en:'Nothing notable stands out yet — which is also a normal result. Keep logging.'},
+  entriesPl1:{ru:'ещё %1 записи',en:'%1 more entries'},
+
+  /* ---------- упражнения ---------- */
+  breathTitle:{ru:'Дыхательные практики',en:'Breathing practices'},
+  breathLead:{ru:'Работает не «глубокое дыхание» само по себе, а выдох длиннее вдоха — поэтому во всех практиках ниже выдох удлинён.',
+              en:'What works is not "deep breathing" as such, but an exhale longer than the inhale — which is why every practice below extends the exhale.'},
+  startEx:{ru:'Начать →',en:'Start →'},
+  roundsN:{ru:'%1 циклов · %2 сек',en:'%1 rounds · %2 s'},
+  breathDone:{ru:'Готово. Как сейчас?',en:'Done. How is it now?'},
+  stopEx:{ru:'Остановить',en:'Stop'},
+  again:{ru:'Ещё раз',en:'Again'},
+  close:{ru:'Закрыть',en:'Close'},
+
+  groundTitle:{ru:'Заземление',en:'Grounding'},
+  groundLead:{ru:'Когда тревога уносит в голову — эти упражнения возвращают внимание в тело и в комнату, где ты есть.',
+              en:'When anxiety pulls you into your head, these bring attention back to your body and the room you are in.'},
+  stepOf:{ru:'Шаг %1 из %2',en:'Step %1 of %2'},
+  nextStep:{ru:'Сделал(а) →',en:'Done →'},
+  groundDone:{ru:'Всё. Заметь, как ты сейчас.',en:'That is it. Notice how you are now.'},
+
+  meditTitle:{ru:'Мини-медитации',en:'Mini meditations'},
+  meditLead:{ru:'Короткие записи с паузами. Голос читает браузер — наушники не нужны, но с ними спокойнее.',
+             en:'Short scripts with pauses. Your browser reads them aloud — headphones are not required but make it calmer.'},
+  minsN:{ru:'%1 мин',en:'%1 min'},
+  speechOn:{ru:'Голос доступен. Если он молчит — проверь, не выключен ли звук.',
+            en:'Voice is available. If it stays silent, check that your sound is on.'},
+  speechOff:{ru:'Этот браузер не умеет читать вслух — медитации будут показаны текстом, по фразе за раз. Так тоже работает.',
+             en:'This browser cannot read aloud — meditations will be shown as text, one line at a time. That works too.'},
+  meditDone:{ru:'Конец. Не спеши вставать.',en:'The end. Do not rush to get up.'},
+
+  cbtTitle:{ru:'Записывание мыслей',en:'Thought records'},
+  cbtLead:{ru:'Приём из когнитивно-поведенческой терапии. Смысл не в том, чтобы «мыслить позитивно», а в том, чтобы разглядеть мысль целиком — обычно после этого она давит меньше.',
+           en:'A technique from cognitive behavioural therapy. The point is not to "think positive" but to see the thought in full — after which it usually presses less.'},
+  cbtNew:{ru:'Разобрать мысль',en:'Work through a thought'},
+  cbtBefore:{ru:'Насколько сильно это чувство сейчас?',en:'How strong is that feeling right now?'},
+  cbtAfter:{ru:'А насколько сильно после разбора?',en:'And how strong after working through it?'},
+  cbtSave:{ru:'Сохранить',en:'Save'},
+  cbtSaved:{ru:'Записано',en:'Saved'},
+  cbtEmpty:{ru:'Пока нет записей. Первую можно сделать прямо сейчас — это занимает минут пять.',
+            en:'No records yet. You can make your first one now — it takes about five minutes.'},
+  cbtWas:{ru:'Было',en:'Before'},
+  cbtNow:{ru:'Стало',en:'After'},
+  cbtFill:{ru:'Заполни хотя бы мысль и более спокойную формулировку.',en:'Fill in at least the thought and the calmer wording.'},
+
+  /* ---------- помощь ---------- */
+  sosBtn:{ru:'Мне плохо прямо сейчас',en:'I feel bad right now'},
+  sosTitle:{ru:'Ты не один(на)',en:'You are not alone'},
+  sosText:{ru:'Позвони. Прямо сейчас, не откладывая — это бесплатно и анонимно, и там не нужно называть имя, школу или фамилию.',
+           en:'Call. Right now, without putting it off — it is free and anonymous, and you do not have to give your name, school or surname.'},
+  sosGround:{ru:'Пока дозваниваешься — попробуй 5–4–3–2–1',en:'While you wait for an answer — try 5–4–3–2–1'},
+  sosClose:{ru:'Закрыть',en:'Close'},
+
+  helpTitle:{ru:'Куда звонить',en:'Where to call'},
+  helpLead:{ru:'Эти номера работают круглосуточно. Туда можно звонить не только «когда совсем плохо» — просто чтобы поговорить, тоже можно.',
+            en:'These lines work around the clock. You can call not only "when it is really bad" — just to talk is also a reason.'},
+  helpWhoTitle:{ru:'Кому ещё можно сказать',en:'Who else you can tell'},
+  helpWhoText:{ru:'Взрослому, которому ты доверяешь: родителю, старшему брату или сестре, школьному психологу, классному руководителю, тренеру, родителю друга. Не обязательно рассказывать всё сразу — можно начать с фразы «мне сейчас тяжело, я хочу об этом поговорить». Если первый человек отреагировал плохо, это не значит, что так отреагируют все: попробуй другого. Просить о помощи — это не слабость и не «выносить сор из избы».',
+               en:'An adult you trust: a parent, an older sibling, the school counsellor, your form teacher, a coach, a friend’s parent. You do not have to tell everything at once — you can start with "things are hard for me right now and I want to talk about it". If the first person reacts badly, it does not mean everyone will: try another. Asking for help is not weakness.'},
+
+  privacyTitle:{ru:'Где всё это хранится',en:'Where all this is stored'},
+  privacyText:{ru:'Дневник, результаты тестов и записи мыслей лежат только в этом браузере, на этом устройстве. Они не отправляются на сервер, их не видит школа, родители и мы. Обратная сторона: если почистить данные браузера — записи пропадут, и восстановить их будет неоткуда.',
+               en:'Your diary, test results and thought records stay in this browser on this device only. They are not sent to a server; not your school, your parents, nor we can see them. The flip side: clearing your browser data deletes them for good.'},
+  wipeBtn:{ru:'Удалить все мои записи',en:'Delete all my records'},
+  wipeConfirm:{ru:'Удалить дневник, результаты тестов и записи мыслей? Это нельзя отменить.',
+               en:'Delete the diary, test results and thought records? This cannot be undone.'},
+  wipeYes:{ru:'Да, удалить',en:'Yes, delete'},
+  cancel:{ru:'Отмена',en:'Cancel'},
+  wiped:{ru:'Всё удалено',en:'Everything deleted'}
+});
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+const lvlLabel = l => Sky.t(l === 'low' ? 'lvlLow' : l === 'mid' ? 'lvlMid' : 'lvlHigh');
+
+/* ============================================================
+   ВКЛАДКИ
+   ============================================================ */
+const TABS = { tests:'#tabTests', diary:'#tabDiary', exercises:'#tabExercises', help:'#tabHelp' };
+function selectTab(name) {
+  Object.keys(TABS).forEach(k => $(TABS[k]).classList.toggle('hidden', k !== name));
+  document.querySelectorAll('#psySeg button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+  if (name === 'diary') renderDiary();
+  if (name === 'tests') renderTests();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+document.querySelectorAll('#psySeg button').forEach(b => {
+  b.addEventListener('click', () => selectTab(b.dataset.tab));
+});
+
+/* ============================================================
+   A. ТЕСТЫ
+   ============================================================ */
+function renderTests() {
+  const grid = $('#testGrid');
+  grid.innerHTML = '';
+  SkyPsy.testList().forEach(test => {
+    const last = SkyPsy.lastResult(test.id);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'psy-test-card';
+    btn.innerHTML =
+      `<span class="ic">${test.icon}</span>` +
+      `<b>${esc(Sky.L(test.name))}</b>` +
+      `<span class="based">${esc(Sky.L(test.basedOn))}</span>` +
+      `<span class="last">${last
+          ? esc(Sky.t('lastTaken').replace('%1', last.date).replace('%2', lvlLabel(last.level)))
+          : esc(Sky.t('neverTaken'))}</span>`;
+    btn.addEventListener('click', () => runTest(test));
+    grid.appendChild(btn);
+  });
+
+  /* история */
+  const all = SkyPsy.results();
+  $('#historyPanel').classList.toggle('hidden', !all.length);
+  const list = $('#historyList');
+  list.innerHTML = '';
+  all.slice().reverse().forEach(r => {
+    const test = SkyPsy.TESTS[r.testId];
+    if (!test) return;
+    const row = document.createElement('div');
+    row.className = 'subj-stat-row';
+    row.innerHTML =
+      `<span class="ic">${test.icon}</span>` +
+      `<span class="name">${esc(Sky.L(test.name))}<br><span style="font-size:11px;color:var(--muted);font-weight:700">${esc(r.date)}</span></span>` +
+      `<span class="psy-level ${r.level}" style="margin:0;font-size:11.5px;padding:4px 12px">${esc(lvlLabel(r.level))}</span>` +
+      `<span class="n">${r.total}/${r.max}</span>`;
+    list.appendChild(row);
+  });
+}
+
+/* Прохождение теста — модальным окном, по одному вопросу на экран.
+   Так подросток не видит сразу все восемь пунктов про плохое
+   настроение: длинная простыня из таких формулировок сама по себе
+   давит. */
+function runTest(test) {
+  const answers = {};
+  let pos = 0;
+  let safetyAnswer = null;
+  const total = test.questions.length;
+  /* у теста настроения есть дополнительный экран проверки безопасности */
+  const hasSafety = !!test.safetyCheck;
+  const screens = total + (hasSafety ? 1 : 0);
+
+  const close = Sky.modal('<div id="testBody"></div>', () => {});
+  draw();
+
+  function draw() {
+    const body = document.getElementById('testBody');
+    if (!body) return;
+
+    /* экран проверки безопасности — после всех вопросов */
+    if (hasSafety && pos === total) {
+      const sc = test.safetyCheck;
+      body.innerHTML =
+        `<div class="psy-safety">
+           <div class="qtext">${esc(Sky.L(sc.text))}</div>
+           <div class="qnote">${esc(Sky.L(sc.note))}</div>
+           <div class="psy-opts">
+             ${sc.options.map(o => `<button type="button" class="psy-opt${safetyAnswer === o.v ? ' on' : ''}" data-v="${o.v}">
+                <span class="dot"></span><span>${esc(Sky.L(o.label))}</span></button>`).join('')}
+           </div>
+         </div>
+         <div class="row" style="margin-top:16px;gap:9px">
+           <button class="btn ghost" id="qBack">${esc(Sky.t('back'))}</button>
+           <button class="btn" id="qNext" style="flex:1" ${safetyAnswer === null ? 'disabled' : ''}>${esc(Sky.t('finish'))}</button>
+         </div>`;
+      body.querySelectorAll('.psy-opt').forEach(b => {
+        b.addEventListener('click', () => { safetyAnswer = +b.dataset.v; draw(); });
+      });
+      body.querySelector('#qBack').addEventListener('click', () => { pos--; draw(); });
+      body.querySelector('#qNext').addEventListener('click', () => finish());
+      return;
+    }
+
+    const q = test.questions[pos];
+    const picked = answers[q.id];
+    body.innerHTML =
+      `<div class="psy-q">
+         <div class="qnum">${esc(Sky.t('qOf').replace('%1', pos + 1).replace('%2', total))}</div>
+         <div class="qtext">${esc(Sky.L(q.text))}</div>
+         <div class="psy-opts">
+           ${test.options.map(o => `<button type="button" class="psy-opt${picked === o.v ? ' on' : ''}" data-v="${o.v}">
+              <span class="dot"></span><span>${esc(Sky.L(o.label))}</span></button>`).join('')}
+         </div>
+       </div>
+       <div class="progress" style="margin-top:14px"><i style="width:${Math.round((pos) / screens * 100)}%"></i></div>
+       <div class="row" style="margin-top:14px;gap:9px">
+         <button class="btn ghost" id="qBack" ${pos === 0 ? 'disabled' : ''}>${esc(Sky.t('back'))}</button>
+         <button class="btn" id="qNext" style="flex:1" ${picked === undefined ? 'disabled' : ''}>
+           ${esc(pos === total - 1 && !hasSafety ? Sky.t('finish') : Sky.t('next'))}</button>
+       </div>
+       <button class="btn ghost small full" id="qExit" style="margin-top:9px">${esc(Sky.t('exitTest'))}</button>`;
+
+    body.querySelectorAll('.psy-opt').forEach(b => {
+      b.addEventListener('click', () => { answers[q.id] = +b.dataset.v; draw(); });
+    });
+    body.querySelector('#qBack').addEventListener('click', () => { if (pos > 0) { pos--; draw(); } });
+    body.querySelector('#qNext').addEventListener('click', () => {
+      if (pos < total - 1 || hasSafety) { pos++; draw(); } else finish();
+    });
+    body.querySelector('#qExit').addEventListener('click', close);
+  }
+
+  function finish() {
+    const res = SkyPsy.scoreTest(test.id, answers);
+    SkyPsy.saveResult(res);
+    /* «Да, бывали» — единственный ответ, который меняет экран.
+       «Не хочу отвечать» тоже показываем мягко, но без большого
+       блока поддержки: человек явно попросил не углубляться. */
+    const needSupport = safetyAnswer === 1;
+    showResult(res, test, needSupport);
+  }
+
+  function showResult(res, test, needSupport) {
+    const body = document.getElementById('testBody');
+    if (!body) return;
+
+    const support = needSupport
+      ? `<div class="psy-support">
+           <h3>${esc(Sky.t('supportTitle'))}</h3>
+           <p>${esc(Sky.t('supportText'))}</p>
+           <div class="psy-lines">
+             ${SkyPsy.HELPLINES.filter(h => h.primary || h.id === 'mchs').map(helplineHtml).join('')}
+           </div>
+           <p style="margin-top:14px;font-size:12.5px;color:var(--muted)">${esc(Sky.t('supportScoreNote'))}</p>
+         </div>` : '';
+
+    body.innerHTML = support +
+      `<div class="psy-result">
+         <div class="big-ic">${test.icon}</div>
+         <div class="psy-level ${res.level}">${esc(Sky.L(res.band.title))}</div>
+         <div class="score">${esc(Sky.t('scoreOf').replace('%1', res.total).replace('%2', res.max))}</div>
+         <p class="band-text">${esc(Sky.L(res.band.text))}</p>
+       </div>
+       ${res.level === 'high' && !needSupport
+          ? `<div class="psy-lines">${SkyPsy.HELPLINES.filter(h => h.primary).map(helplineHtml).join('')}</div>` : ''}
+       <p class="note" style="margin-top:14px">${esc(Sky.t('saveNote'))}</p>
+       <div class="row" style="margin-top:16px;gap:9px">
+         <button class="btn ghost" id="rToDiary" style="flex:1">${esc(Sky.t('toDiary'))}</button>
+         <button class="btn ghost" id="rToEx" style="flex:1">${esc(Sky.t('toExercises'))}</button>
+       </div>
+       <button class="btn full big" id="rClose" style="margin-top:10px">${esc(Sky.t('closeResult'))}</button>`;
+
+    body.querySelector('#rToDiary').addEventListener('click', () => { close(); selectTab('diary'); });
+    body.querySelector('#rToEx').addEventListener('click', () => { close(); selectTab('exercises'); });
+    body.querySelector('#rClose').addEventListener('click', () => { close(); renderTests(); });
+  }
+}
+
+/* Разметка одного телефона доверия. Одна функция на всю страницу,
+   чтобы номера нигде не дублировались текстом. */
+function helplineHtml(h) {
+  return `<a class="psy-line${h.primary ? ' primary' : ''}" href="tel:${esc(h.tel)}">
+      <span class="ic">${h.primary ? '☎️' : '📞'}</span>
+      <span class="body">
+        <span class="num">${esc(h.phone)}</span>
+        <span class="who">${esc(Sky.L(h.name))}</span>
+        <span class="note">${esc(Sky.L(h.note))}</span>
+      </span></a>`;
+}
+
+/* ============================================================
+   B. ДНЕВНИК
+   ============================================================ */
+let dMood = null, dAnx = null;
+
+function buildScales() {
+  const moodBox = $('#moodScale');
+  moodBox.innerHTML = '';
+  SkyPsy.MOOD_FACES.forEach((face, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.innerHTML = `<span class="face">${face}</span><span class="lab">${esc(Sky.L(SkyPsy.MOOD_LABELS[i]))}</span>`;
+    b.addEventListener('click', () => { dMood = i + 1; paintScales(); });
+    moodBox.appendChild(b);
+  });
+
+  const anxBox = $('#anxScale');
+  anxBox.innerHTML = '';
+  for (let i = 1; i <= 5; i++) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    const lab = i === 1 ? Sky.t('anx1') : i === 5 ? Sky.t('anx5') : '';
+    b.innerHTML = `<span class="face">${i}</span><span class="lab">${esc(lab)}</span>`;
+    b.addEventListener('click', () => { dAnx = i; paintScales(); });
+    anxBox.appendChild(b);
+  }
+  paintScales();
+}
+function paintScales() {
+  $('#moodScale').querySelectorAll('button').forEach((b, i) => b.classList.toggle('on', dMood === i + 1));
+  $('#anxScale').querySelectorAll('button').forEach((b, i) => b.classList.toggle('on', dAnx === i + 1));
+}
+
+/* Смена даты подгружает уже сохранённую запись за этот день —
+   дневник должен показывать, что там было, а не пустую форму. */
+function loadDay() {
+  const e = SkyPsy.dayEntry($('#dDate').value);
+  dMood = e && typeof e.mood === 'number' ? e.mood : null;
+  dAnx  = e && typeof e.anxiety === 'number' ? e.anxiety : null;
+  $('#dSleep').value = e && e.sleep ? e.sleep : '';
+  $('#dNote').value  = e && e.note ? e.note : '';
+  paintScales();
+}
+$('#dDate').addEventListener('change', loadDay);
+
+$('#saveDayBtn').addEventListener('click', () => {
+  const sleepRaw = parseFloat($('#dSleep').value);
+  SkyPsy.saveDay({
+    date: $('#dDate').value || Sky.dayKey(),
+    mood: dMood,
+    anxiety: dAnx,
+    sleep: isNaN(sleepRaw) ? null : Math.max(0, Math.min(16, sleepRaw)),
+    note: $('#dNote').value.trim().slice(0, 500)
+  });
+  Sky.toast(Sky.t('daySaved'));
+  renderDiary();
+});
+
+function renderDiary() {
+  const days = SkyPsy.lastDays(30);
+  const chart = $('#moodChart');
+  chart.innerHTML = '';
+  days.forEach(d => {
+    const bar = document.createElement('div');
+    const has = !d.empty && typeof d.mood === 'number';
+    bar.className = 'bar' + (has ? ' m' + d.mood : ' empty');
+    bar.title = has
+      ? `${d.date}: ${Sky.L(SkyPsy.MOOD_LABELS[d.mood - 1])}`
+      : d.date;
+    bar.innerHTML = `<i style="height:${has ? d.mood / 5 * 100 : 3}%"></i>`;
+    chart.appendChild(bar);
+  });
+  $('#legendFrom').textContent = days[0].date;
+  $('#legendTo').textContent = days[days.length - 1].date;
+
+  const all = SkyPsy.diary();
+  const moods = days.filter(d => !d.empty && typeof d.mood === 'number').map(d => d.mood);
+  const sleeps = days.filter(d => !d.empty && typeof d.sleep === 'number' && d.sleep > 0).map(d => d.sleep);
+  $('#stEntries').textContent = all.length;
+  $('#stAvgMood').textContent = moods.length ? (moods.reduce((a,b)=>a+b,0) / moods.length).toFixed(1) : '—';
+  $('#stAvgSleep').textContent = sleeps.length ? (sleeps.reduce((a,b)=>a+b,0) / sleeps.length).toFixed(1) : '—';
+
+  const pat = SkyPsy.patterns();
+  const box = $('#patternList');
+  if (!pat.enough) {
+    box.innerHTML = `<p class="note">${esc(Sky.t('patNeed').replace('%1',
+      Sky.plural(pat.need, 'записи', 'записей', 'записей')))}</p>`;
+  } else if (!pat.items.length) {
+    box.innerHTML = `<p class="note">${esc(Sky.t('patNone'))}</p>`;
+  } else {
+    box.innerHTML = pat.items.map(p =>
+      `<div class="psy-pattern"><span class="ic">${p.icon}</span><p>${esc(Sky.L(p.text))}</p></div>`).join('');
+  }
+}
+
+/* ============================================================
+   C. УПРАЖНЕНИЯ
+   ============================================================ */
+
+/* ---------- дыхание ---------- */
+function renderBreathing() {
+  $('#breathWarn').textContent = Sky.L(SkyPsy.BREATH_WARNING);
+  const box = $('#breathList');
+  box.innerHTML = '';
+  SkyPsy.BREATHING.forEach(ex => {
+    const secs = ex.phases.reduce((a, p) => a + p[1], 0) * ex.rounds;
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'role-card link';
+    el.style.textAlign = 'left';
+    el.innerHTML =
+      `<span class="ic">🫁</span>
+       <span class="body"><b>${esc(Sky.L(ex.name))}</b>
+       <span>${esc(Sky.L(ex.desc))}</span>
+       <span style="margin-top:6px;font-weight:900;color:var(--m-psy)">${esc(Sky.t('roundsN').replace('%1', ex.rounds).replace('%2', secs))} · ${esc(Sky.t('startEx'))}</span></span>`;
+    el.addEventListener('click', () => runBreathing(ex));
+    box.appendChild(el);
+  });
+}
+
+function runBreathing(ex) {
+  let round = 0, phaseIdx = 0, left = 0, timer = null;
+
+  const close = Sky.modal(
+    `<h2 style="text-align:center">${esc(Sky.L(ex.name))}</h2>
+     <div class="breath-stage">
+       <div class="breath-circle" id="bCircle"></div>
+       <div class="breath-phase" id="bPhase"></div>
+       <div class="breath-count" id="bCount"></div>
+       <div class="breath-round" id="bRound"></div>
+     </div>
+     <button class="btn ghost full" id="bStop">${esc(Sky.t('stopEx'))}</button>`,
+    (box, closeFn) => {
+      box.querySelector('#bStop').addEventListener('click', () => { stop(); closeFn(); });
+    }
+  );
+
+  /* Останавливаем таймер при любом закрытии окна, иначе он продолжит
+     тикать в фоне и через минуту «допрыгает» до конца упражнения. */
+  function stop() { clearInterval(timer); timer = null; }
+
+  function startPhase() {
+    const [kind, secs] = ex.phases[phaseIdx];
+    left = secs;
+    const circle = document.getElementById('bCircle');
+    const phaseEl = document.getElementById('bPhase');
+    if (!circle || !phaseEl) { stop(); return; }
+
+    phaseEl.textContent = Sky.L(SkyPsy.PHASE_LABELS[kind]);
+    /* длительность анимации равна длительности фазы — круг растёт
+       ровно столько, сколько идёт вдох */
+    circle.style.transitionDuration = secs + 's';
+    if (kind === 'in' || kind === 'in2') circle.classList.add('grow'), circle.classList.remove('shrink');
+    else if (kind === 'out') circle.classList.add('shrink'), circle.classList.remove('grow');
+    tick();
+  }
+
+  function tick() {
+    const countEl = document.getElementById('bCount');
+    const roundEl = document.getElementById('bRound');
+    if (!countEl) { stop(); return; }
+    countEl.textContent = left;
+    if (roundEl) roundEl.textContent = `${round + 1} / ${ex.rounds}`;
+  }
+
+  timer = setInterval(() => {
+    const countEl = document.getElementById('bCount');
+    if (!countEl) { stop(); return; }   /* окно закрыли — выходим */
+    left--;
+    if (left > 0) { tick(); return; }
+
+    phaseIdx++;
+    if (phaseIdx >= ex.phases.length) {
+      phaseIdx = 0;
+      round++;
+      if (round >= ex.rounds) { stop(); done(); return; }
+    }
+    startPhase();
+  }, 1000);
+
+  startPhase();
+
+  function done() {
+    const box = document.querySelector('.modal-bg .modal');
+    if (!box) return;
+    box.innerHTML =
+      `<div class="psy-result">
+         <div class="big-ic">🫁</div>
+         <p class="band-text" style="text-align:center">${esc(Sky.t('breathDone'))}</p>
+       </div>
+       <div class="row" style="margin-top:16px;gap:9px">
+         <button class="btn ghost" id="bAgain" style="flex:1">${esc(Sky.t('again'))}</button>
+         <button class="btn" id="bClose" style="flex:1">${esc(Sky.t('close'))}</button>
+       </div>`;
+    box.querySelector('#bAgain').addEventListener('click', () => { close(); runBreathing(ex); });
+    box.querySelector('#bClose').addEventListener('click', close);
+  }
+}
+
+/* ---------- заземление ---------- */
+function renderGrounding() {
+  const box = $('#groundList');
+  box.innerHTML = '';
+  SkyPsy.GROUNDING.forEach(ex => {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'role-card link';
+    el.style.textAlign = 'left';
+    el.innerHTML =
+      `<span class="ic">🌱</span>
+       <span class="body"><b>${esc(Sky.L(ex.name))}</b>
+       <span>${esc(Sky.L(ex.desc))}</span>
+       <span style="margin-top:6px;font-weight:900;color:var(--m-psy)">${esc(Sky.t('startEx'))}</span></span>`;
+    el.addEventListener('click', () => runGrounding(ex));
+    box.appendChild(el);
+  });
+}
+
+function runGrounding(ex) {
+  let step = 0;
+  const close = Sky.modal('<div id="gBody"></div>', () => {});
+  draw();
+
+  function draw() {
+    const body = document.getElementById('gBody');
+    if (!body) return;
+    if (step >= ex.steps.length) {
+      body.innerHTML =
+        `<div class="psy-result"><div class="big-ic">🌱</div>
+           <p class="band-text" style="text-align:center">${esc(Sky.t('groundDone'))}</p></div>
+         <button class="btn full big" id="gClose" style="margin-top:14px">${esc(Sky.t('close'))}</button>`;
+      body.querySelector('#gClose').addEventListener('click', close);
+      return;
+    }
+    body.innerHTML =
+      `<h2 style="margin-bottom:4px">${esc(Sky.L(ex.name))}</h2>
+       <p class="note">${esc(Sky.t('stepOf').replace('%1', step + 1).replace('%2', ex.steps.length))}</p>
+       <div class="role-list" style="margin-top:16px">
+         ${ex.steps.map((s, i) => `
+           <div class="ground-step${i < step ? ' done' : i === step ? ' current' : ''}">
+             <span class="n">${s.n}</span><p>${esc(Sky.L(s.text))}</p>
+           </div>`).join('')}
+       </div>
+       <button class="btn full big" id="gNext" style="margin-top:16px">${esc(Sky.t('nextStep'))}</button>`;
+    body.querySelector('#gNext').addEventListener('click', () => { step++; draw(); });
+  }
+}
+
+/* ---------- мини-медитации (Web Speech API) ---------- */
+function renderMeditations() {
+  $('#speechNote').textContent = Sky.t(SkyPsy.speechAvailable() ? 'speechOn' : 'speechOff');
+  const box = $('#meditList');
+  box.innerHTML = '';
+  SkyPsy.MEDITATIONS.forEach(m => {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'role-card link';
+    el.style.textAlign = 'left';
+    el.innerHTML =
+      `<span class="ic">🧘</span>
+       <span class="body"><b>${esc(Sky.L(m.name))}</b>
+       <span>${esc(Sky.L(m.desc))}</span>
+       <span style="margin-top:6px;font-weight:900;color:var(--m-psy)">${esc(Sky.t('minsN').replace('%1', m.mins))} · ${esc(Sky.t('startEx'))}</span></span>`;
+    el.addEventListener('click', () => runMeditation(m));
+    box.appendChild(el);
+  });
+}
+
+function runMeditation(m) {
+  let idx = 0, timer = null, stopped = false;
+  const canSpeak = SkyPsy.speechAvailable();
+
+  const close = Sky.modal(
+    `<h2 style="text-align:center;margin-bottom:6px">${esc(Sky.L(m.name))}</h2>
+     <div class="medit-line" id="mLine"></div>
+     <div class="medit-progress" id="mProg">
+       ${m.script.map(() => '<i></i>').join('')}
+     </div>
+     <button class="btn ghost full" id="mStop" style="margin-top:18px">${esc(Sky.t('stopEx'))}</button>`,
+    (box, closeFn) => {
+      box.querySelector('#mStop').addEventListener('click', () => { stop(); closeFn(); });
+    }
+  );
+
+  /* Обязательно глушим синтез при закрытии: иначе браузер
+     продолжит читать вслух уже закрытую медитацию — в наушниках это
+     выглядит как «сайт говорит сам с собой». */
+  function stop() {
+    stopped = true;
+    clearTimeout(timer);
+    try { if (canSpeak) window.speechSynthesis.cancel(); } catch (e) {}
+  }
+
+  function step() {
+    if (stopped) return;
+    const lineEl = document.getElementById('mLine');
+    if (!lineEl) { stop(); return; }   /* окно закрыли */
+
+    if (idx >= m.script.length) {
+      lineEl.textContent = Sky.t('meditDone');
+      const btn = document.getElementById('mStop');
+      if (btn) btn.textContent = Sky.t('close');
+      return;
+    }
+
+    const [phrase, pause] = m.script[idx];
+    const text = Sky.L(phrase);
+    lineEl.textContent = text;
+
+    const prog = document.getElementById('mProg');
+    if (prog) prog.querySelectorAll('i').forEach((el, i) => el.classList.toggle('on', i <= idx));
+
+    if (canSpeak) {
+      try {
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = Sky.lang === 'en' ? 'en-US' : 'ru-RU';
+        u.rate = 0.85;   /* медленнее обычного — это медитация, а не новости */
+        u.pitch = 1;
+        /* Голос выбираем по языку, если он есть. Если подходящего
+           голоса нет, браузер прочитает голосом по умолчанию — это
+           хуже, но лучше тишины. */
+        const voices = window.speechSynthesis.getVoices() || [];
+        const want = Sky.lang === 'en' ? 'en' : 'ru';
+        const v = voices.find(x => (x.lang || '').toLowerCase().startsWith(want));
+        if (v) u.voice = v;
+        window.speechSynthesis.speak(u);
+      } catch (e) { /* не мешаем упражнению: текст на экране уже есть */ }
+    }
+
+    idx++;
+    timer = setTimeout(step, pause);
+  }
+
+  step();
+}
+
+/* ---------- запись мыслей (КПТ) ---------- */
+$('#newThoughtBtn').addEventListener('click', openThoughtForm);
+
+function openThoughtForm() {
+  let before = null, after = null;
+
+  const close = Sky.modal(
+    `<h2>${esc(Sky.t('cbtNew'))}</h2>
+     ${SkyPsy.CBT_FIELDS.map(f => `
+       <div class="cbt-field">
+         <label>${esc(Sky.L(f.label))}</label>
+         <span class="hint">${esc(Sky.L(f.hint))}</span>
+         <textarea id="cbt_${f.id}" rows="2"></textarea>
+       </div>`).join('')}
+     <div class="cbt-field">
+       <label>${esc(Sky.t('cbtBefore'))}</label>
+       <div class="psy-scale" id="cbtBefore"></div>
+     </div>
+     <div class="cbt-field">
+       <label>${esc(Sky.t('cbtAfter'))}</label>
+       <div class="psy-scale" id="cbtAfter"></div>
+     </div>
+     <button class="btn full big" id="cbtSave" style="margin-top:18px">${esc(Sky.t('cbtSave'))}</button>`,
+    (box, closeFn) => {
+      /* две шкалы 1–10, компактно: цифрами, без смайликов —
+         тут важна не эмоция, а её сила */
+      [['#cbtBefore', v => before = v], ['#cbtAfter', v => after = v]].forEach(([sel, setter]) => {
+        const holder = box.querySelector(sel);
+        for (let i = 1; i <= 10; i++) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.style.minWidth = '34px';
+          b.innerHTML = `<span class="face" style="font-size:14px">${i}</span>`;
+          b.addEventListener('click', () => {
+            setter(i);
+            holder.querySelectorAll('button').forEach((x, j) => x.classList.toggle('on', j === i - 1));
+          });
+          holder.appendChild(b);
+        }
+      });
+
+      box.querySelector('#cbtSave').addEventListener('click', () => {
+        const rec = {};
+        SkyPsy.CBT_FIELDS.forEach(f => {
+          rec[f.id] = (box.querySelector('#cbt_' + f.id).value || '').trim().slice(0, 600);
+        });
+        if (!rec.thought || !rec.balanced) { Sky.toast(Sky.t('cbtFill')); return; }
+        rec.before = before; rec.after = after;
+        SkyPsy.saveThought(rec);
+        Sky.toast(Sky.t('cbtSaved'));
+        closeFn();
+        renderThoughts();
+      });
+    }
+  );
+}
+
+function renderThoughts() {
+  const all = SkyPsy.thoughts();
+  const box = $('#thoughtList');
+  if (!all.length) { box.innerHTML = `<p class="note">${esc(Sky.t('cbtEmpty'))}</p>`; return; }
+  box.innerHTML = '';
+  all.map((r, i) => ({ r, i })).reverse().forEach(({ r, i }) => {
+    const el = document.createElement('div');
+    el.className = 'cbt-rec';
+    const delta = (typeof r.before === 'number' && typeof r.after === 'number')
+      ? `<div class="cbt-delta">${Sky.t('cbtWas')}: ${r.before}/10 → ${Sky.t('cbtNow')}: ${r.after}/10 ${r.after < r.before ? '↓' : ''}</div>` : '';
+    el.innerHTML =
+      `<div class="spread"><span class="date">${esc(r.date)}</span>
+         <button class="btn small ghost" type="button">×</button></div>
+       <div class="was">${esc(r.thought)}</div>
+       <div class="now">${esc(r.balanced)}</div>
+       ${delta}`;
+    el.querySelector('button').addEventListener('click', () => { SkyPsy.removeThought(i); renderThoughts(); });
+    box.appendChild(el);
+  });
+}
+
+/* ============================================================
+   D. ПОМОЩЬ И КРАСНАЯ КНОПКА
+   ============================================================ */
+function renderHelp() {
+  $('#helpLines').innerHTML = SkyPsy.HELPLINES.map(helplineHtml).join('');
+}
+
+$('#sosBtn').addEventListener('click', () => {
+  Sky.modal(
+    `<div style="text-align:center;font-size:40px;line-height:1">🤝</div>
+     <h2 style="text-align:center;margin-top:8px">${esc(Sky.t('sosTitle'))}</h2>
+     <p class="lead" style="text-align:center;font-size:13.5px;margin-top:8px;line-height:1.6">${esc(Sky.t('sosText'))}</p>
+     <div class="psy-lines">${SkyPsy.HELPLINES.map(helplineHtml).join('')}</div>
+     <button class="btn ghost full" id="sosGround" style="margin-top:16px">${esc(Sky.t('sosGround'))}</button>
+     <button class="btn full big" id="sosClose" style="margin-top:9px">${esc(Sky.t('sosClose'))}</button>`,
+    (box, close) => {
+      box.querySelector('#sosClose').addEventListener('click', close);
+      box.querySelector('#sosGround').addEventListener('click', () => {
+        close();
+        runGrounding(SkyPsy.GROUNDING[0]);   /* 5–4–3–2–1 */
+      });
+    }
+  );
+});
+
+/* Удаление всех записей — с подтверждением: это необратимо. */
+$('#wipeBtn').addEventListener('click', () => {
+  Sky.modal(
+    `<p class="lead" style="font-size:14px;line-height:1.6">${esc(Sky.t('wipeConfirm'))}</p>
+     <div class="row" style="margin-top:18px;gap:9px">
+       <button class="btn ghost" id="wCancel" style="flex:1">${esc(Sky.t('cancel'))}</button>
+       <button class="btn" id="wYes" style="flex:1">${esc(Sky.t('wipeYes'))}</button>
+     </div>`,
+    (box, close) => {
+      box.querySelector('#wCancel').addEventListener('click', close);
+      box.querySelector('#wYes').addEventListener('click', () => {
+        Object.keys(SkyPsy.KEYS).forEach(k => Sky.del(SkyPsy.KEYS[k]));
+        close();
+        Sky.toast(Sky.t('wiped'));
+        dMood = null; dAnx = null;
+        $('#dSleep').value = ''; $('#dNote').value = '';
+        renderAll();
+      });
+    }
+  );
+});
+
+/* ============================================================
+   СТАРТ
+   ============================================================ */
+function renderAll() {
+  renderTests();
+  buildScales();
+  renderDiary();
+  renderBreathing();
+  renderGrounding();
+  renderMeditations();
+  renderThoughts();
+  renderHelp();
+}
+
+$('#dDate').value = Sky.dayKey();
+loadDay();
+renderAll();
+selectTab('tests');
+
+document.addEventListener('langchange', renderAll);
+
+/* Если страницу закрыли или свернули во время медитации — глушим
+   синтез речи. Иначе голос продолжит читать в фоновой вкладке. */
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && SkyPsy.speechAvailable()) {
+    try { window.speechSynthesis.cancel(); } catch (e) {}
+  }
+});
+window.addEventListener('pagehide', () => {
+  if (SkyPsy.speechAvailable()) { try { window.speechSynthesis.cancel(); } catch (e) {} }
+});
+</script>
+</body>
+</html>

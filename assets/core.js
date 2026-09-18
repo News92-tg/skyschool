@@ -42,10 +42,17 @@ window.Sky = (function () {
     /* навигация */
     navHome:{ru:'Обзор',en:'Overview'},
     navLearn:{ru:'Тренажёр',en:'Trainer'},
+    navTest:{ru:'Тест',en:'Test'},
     navKids:{ru:'Детям',en:'Kids'},
     navChess:{ru:'Шахматы',en:'Chess'},
     navTeachers:{ru:'Учителя',en:'Teachers'},
+    navClassroom:{ru:'Класс',en:'Homeroom'},
+    navDean:{ru:'Завуч',en:'Dean'},
+    navPe:{ru:'Физрук',en:'P.E.'},
+    navPsy:{ru:'Психолог',en:'Psychologist'},
     navLife:{ru:'Режим дня',en:'Daily life'},
+    navTrack:{ru:'Трекеры',en:'Trackers'},
+    navBody:{ru:'Тело',en:'Body'},
     navPlan:{ru:'План',en:'Plan'},
     navTools:{ru:'Инструменты',en:'Tools'},
     navPhoto:{ru:'Домашка по фото',en:'Photo homework'},
@@ -199,10 +206,17 @@ window.Sky = (function () {
   const NAV = [
     { href:'index.html',    key:'navHome' },
     { href:'trainer.html',  key:'navLearn' },
+    { href:'test.html',     key:'navTest' },
     { href:'kids.html',     key:'navKids' },
     { href:'chess.html',    key:'navChess' },
     { href:'teachers.html', key:'navTeachers' },
+    { href:'classroom.html',   key:'navClassroom' },
+    { href:'headteacher.html', key:'navDean' },
+    { href:'pe.html',          key:'navPe' },
+    { href:'psychologist.html', key:'navPsy' },
     { href:'life.html',     key:'navLife' },
+    { href:'trackers.html',   key:'navTrack' },
+    { href:'body.html',       key:'navBody' },
     { href:'plan.html',     key:'navPlan' },
     { href:'photo.html',    key:'navPhoto' },
     { href:'tools.html',    key:'navTools' }
@@ -212,9 +226,12 @@ window.Sky = (function () {
      нечего показать, а меню и без того длинное. */
   function navItems() {
     const signedIn = !!(window.Sky && Sky.db && Sky.db.me && Sky.db.me());
-    return signedIn
-      ? NAV.slice(0, 5).concat([{ href:'homework.html', key:'navHomework' }], NAV.slice(5))
-      : NAV;
+    if (!signedIn) return NAV;
+    /* вставляем «Задания» сразу после «Учителей» — ищем позицию по
+       ключу, а не по номеру: так пункты меню можно свободно
+       добавлять и переставлять, не боясь сломать вставку. */
+    const idx = NAV.findIndex(n => n.key === 'navTeachers') + 1;
+    return NAV.slice(0, idx).concat([{ href:'homework.html', key:'navHomework' }], NAV.slice(idx));
   }
 
   function renderHeader() {

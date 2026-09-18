@@ -139,6 +139,7 @@
 <script src="data/bank-polish.js"></script>
 <script src="data/bank-spanish.js"></script>
 <script src="data/bank-german.js"></script>
+<script src="data/oge-bank.js"></script>
 <script>
 'use strict';
 Sky.init({
@@ -233,6 +234,7 @@ function fillSubjectNames() {
 const qs = new URLSearchParams(location.search);
 if (qs.get('subject') && BANKS[qs.get('subject')]) subjSel.value = qs.get('subject');
 if (['due','all','weak'].includes(qs.get('mode'))) $('#mode').value = qs.get('mode');
+if (['all','oge','ege'].includes(qs.get('exam'))) $('#exam').value = qs.get('exam');
 
 let queue = [], pos = 0, current = null, bank = null, picked = null, answered = false, order = [];
 
@@ -568,6 +570,12 @@ $('#aiSetupBtn').addEventListener('click', openAiSetup);
 document.addEventListener('langchange', renderAiState);
 
 fillSubjectNames(); noteText(); renderStats(); renderAiState();
+
+/* Переход по ссылке вида trainer.html?subject=math&mode=due&autostart=1
+   (например, из плана подготовки) сразу запускает тренировку, а не
+   просто выставляет фильтры — так клик по заданию в плане ведёт прямо
+   к вопросам, без лишнего «Начать». */
+if (qs.get('autostart') === '1') $('#startBtn').click();
 </script>
 </body>
 </html>

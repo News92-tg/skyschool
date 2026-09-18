@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Тест — SkyySchool</title>
+<meta name="theme-color" content="#f6faff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon-512.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/sky.css">
+<style>
+/* ---------- стили, специфичные для страницы тестов ---------- */
+.subj-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;margin-top:16px}
+.subj-card{border:1.5px solid var(--line);border-radius:var(--r);padding:16px;text-align:left;
+  background:var(--panel);cursor:pointer;transition:.18s;font:inherit;color:inherit;width:100%}
+.subj-card:hover{border-color:var(--line-2);transform:translateY(-2px);box-shadow:var(--shadow-sm)}
+.subj-card .ic{font-size:26px;line-height:1}
+.subj-card b{display:block;font-size:14.5px;font-weight:900;margin-top:10px}
+.subj-card .lvl{display:inline-flex;align-items:center;margin-top:9px;font-size:11px;font-weight:800;
+  padding:3px 10px;border-radius:99px;letter-spacing:.02em}
+.lvl.none{background:var(--panel-2);color:var(--muted)}
+.lvl.start{background:var(--no-soft);color:var(--no)}
+.lvl.mid{background:var(--warn-soft);color:var(--warn)}
+.lvl.adv{background:var(--ok-soft);color:var(--ok)}
+.timer{font-family:'JetBrains Mono',ui-monospace,monospace;font-weight:800}
+.timer.low{color:var(--no)}
+.part-pill{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.part-mini{border:1.5px solid var(--line);border-radius:var(--r-sm);padding:10px 8px;text-align:center}
+.part-mini b{display:block;font-size:17px;font-weight:900}
+.part-mini span{font-size:10.5px;color:var(--muted);font-weight:800}
+</style>
+</head>
+<body>
+<header id="appHeader"></header>
+
+<main class="wrap">
+  <h1 data-i18n="h1"></h1>
+  <p class="lead" data-i18n="lead"></p>
+
+  <div class="seg" id="tabSeg" style="max-width:460px;margin-top:18px">
+    <button type="button" data-tab="iq" aria-pressed="true"><span data-i18n="tabIq"></span></button>
+    <button type="button" data-tab="level" aria-pressed="false"><span data-i18n="tabLevel"></span></button>
+  </div>
+
+  <!-- ==================== ВКЛАДКА 1 — IQ-ТЕСТ ==================== -->
+  <section id="tabIq">
+
+    <div class="panel section" id="iqIntro">
+      <h2 data-i18n="iqTitle"></h2>
+      <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="iqLead"></p>
+      <p class="note hidden" id="iqRuNote"></p>
+
+      <div class="stats section hidden" id="iqLastBox">
+        <div class="stat accent"><b id="iqLastScore">—</b><span data-i18n="iqLastScoreL"></span></div>
+        <div class="stat"><b id="iqLastLevel">—</b><span data-i18n="iqLastLevelL"></span></div>
+        <div class="stat"><b id="iqLastDate">—</b><span data-i18n="iqLastDateL"></span></div>
+      </div>
+
+      <button class="btn full big" id="iqStartBtn" style="margin-top:16px" data-i18n="iqStart"></button>
+    </div>
+
+    <div class="panel section hidden" id="iqQuizBox">
+      <div class="spread">
+        <span class="tag" id="iqPartTag"></span>
+        <span class="tag gray" id="iqCountTag"></span>
+        <span class="tag gray timer" id="iqTimer"></span>
+      </div>
+      <div class="progress" style="margin:14px 0"><i id="iqBar"></i></div>
+      <div class="question" id="iqQText"></div>
+      <div class="options" id="iqOptions"></div>
+      <div class="actions">
+        <button class="btn ghost" id="iqStopBtn" data-i18n="testStop"></button>
+        <button class="btn" id="iqNextBtn" disabled data-i18n="next"></button>
+      </div>
+    </div>
+
+    <div class="panel section hidden" id="iqResultBox">
+      <div class="eyebrow" data-i18n="iqResultTitle"></div>
+      <div class="count" id="iqScoreOut" style="margin:8px 0 4px">—</div>
+      <span class="tag" id="iqLevelBadge" style="font-size:13px"></span>
+      <p class="lead" style="font-size:13px;margin-top:14px" id="iqLevelText"></p>
+
+      <div class="part-pill" id="iqPartsGrid"></div>
+
+      <div class="actions" style="margin-top:20px">
+        <button class="btn ghost" id="iqAgainBtn" data-i18n="iqAgain"></button>
+        <button class="btn" id="iqToLevelBtn" data-i18n="iqToLevel"></button>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ==================== ВКЛАДКА 2 — ТЕСТ НА УРОВЕНЬ ПОДГОТОВКИ ==================== -->
+  <section id="tabLevel" class="hidden">
+
+    <div class="panel section" id="levelIntro">
+      <h2 data-i18n="levelTitle"></h2>
+      <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="levelLead"></p>
+
+      <div class="subj-cards" id="subjCards"></div>
+
+      <div class="actions" style="margin-top:18px">
+        <a class="btn full big hidden" id="toPlanBtn" href="plan.html" data-i18n="toPlan"></a>
+      </div>
+    </div>
+
+    <div class="panel section hidden" id="levelQuizBox">
+      <div class="spread">
+        <span class="tag" id="lvSubjTag"></span>
+        <span class="tag gray" id="lvCountTag"></span>
+      </div>
+      <div class="progress" style="margin:14px 0"><i id="lvBar"></i></div>
+      <div class="question" id="lvQText"></div>
+      <div class="options" id="lvOptions"></div>
+      <div class="actions">
+        <button class="btn ghost" id="lvStopBtn" data-i18n="testStop"></button>
+        <button class="btn" id="lvNextBtn" disabled data-i18n="next"></button>
+      </div>
+    </div>
+
+    <div class="panel section hidden" id="levelResultBox">
+      <div class="eyebrow" id="lvResultSubj"></div>
+      <div class="count" id="lvScoreOut" style="margin:8px 0 4px">—</div>
+      <span class="tag" id="lvLevelBadge" style="font-size:13px"></span>
+      <p class="lead" style="font-size:13px;margin-top:14px" data-i18n="lvResultLead"></p>
+      <div class="actions" style="margin-top:20px">
+        <button class="btn ghost" id="lvBackBtn" data-i18n="lvBack"></button>
+        <a class="btn" id="lvPlanBtn" href="plan.html" data-i18n="toPlan"></a>
+      </div>
+    </div>
+
+  </section>
+
+</main>
+
+<footer id="appFooter"></footer>
+
+<script src="assets/config.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/db.js"></script>
+<script src="assets/auth.js"></script>
+<script src="data/iq-test.js"></script>
+<script src="data/bank-math.js"></script>
+<script src="data/bank-russian.js"></script>
+<script src="data/bank-english.js"></script>
+<script src="data/bank-history.js"></script>
+<script>
+'use strict';
+Sky.init({
+  h1:{ru:'Тесты',en:'Tests'},
+  lead:{ru:'Два коротких теста: общий IQ-тест на логику и тест на уровень подготовки по предметам. По их результатам можно собрать план на страницу «План».',
+        en:'Two short tests: a general IQ test on logic, and a subject-readiness test. Their results feed the study plan on the "Plan" page.'},
+
+  tabIq:{ru:'IQ-тест',en:'IQ test'},
+  tabLevel:{ru:'Тест на уровень подготовки',en:'Readiness test'},
+
+  testStop:{ru:'Прервать',en:'Stop'},
+  next:{ru:'Далее',en:'Next'},
+
+  /* IQ-тест */
+  iqTitle:{ru:'IQ-тест',en:'IQ test'},
+  iqLead:{ru:'30 вопросов на логику, последовательности, аналогии и счёт — по 10 вопросов простого, среднего и сложного уровня. На тест отводится 20 минут: таймер вверху экрана. Во время теста правильность ответов не показывается — только в самом конце.',
+          en:'30 questions on logic, sequences, analogies and counting — 10 easy, 10 medium and 10 hard. You have 20 minutes; a timer runs at the top. Answers are not revealed until the very end.'},
+  iqLastScoreL:{ru:'последний балл',en:'last score'},
+  iqLastLevelL:{ru:'уровень',en:'level'},
+  iqLastDateL:{ru:'дата',en:'date'},
+  iqStart:{ru:'Начать IQ-тест',en:'Start the IQ test'},
+  iqAgain:{ru:'Пройти ещё раз',en:'Take it again'},
+  iqToLevel:{ru:'К тесту на уровень подготовки',en:'To the readiness test'},
+  iqResultTitle:{ru:'Результат',en:'Result'},
+  iqScoreOf:{ru:'%1 из %2 баллов',en:'%1 of %2 points'},
+  iqLevelLow:{ru:'Низкий уровень',en:'Low level'},
+  iqLevelMid:{ru:'Средний уровень',en:'Medium level'},
+  iqLevelHigh:{ru:'Высокий уровень',en:'High level'},
+  iqLevelLowD:{ru:'Есть смысл не спешить с выбором ответа и тренировать внимательность на несложных задачах — регулярно, понемногу.',
+               en:'It is worth slowing down and practising simple problems regularly, a little at a time, to build up attention and speed.'},
+  iqLevelMidD:{ru:'Хороший рабочий результат. Сложные вопросы теста показывают, над чем стоит поработать в первую очередь.',
+               en:'A solid working result. The hard questions in the test show what is worth practising first.'},
+  iqLevelHighD:{ru:'Отличный результат — логика, последовательности и счёт даются уверенно.',
+                en:'An excellent result — logic, sequences and counting all came easily.'},
+  partEasy:{ru:'Простые',en:'Easy'},
+  partMedium:{ru:'Средние',en:'Medium'},
+  partHard:{ru:'Сложные',en:'Hard'},
+  timeUp:{ru:'Время вышло — тест завершён.',en:'Time is up — the test is finished.'},
+
+  /* тест на уровень подготовки */
+  levelTitle:{ru:'Тест на уровень подготовки',en:'Subject readiness test'},
+  levelLead:{ru:'По каждому предмету — 10 вопросов разной сложности. Результат определяет уровень: начальный, средний или продвинутый — и ложится в основу плана подготовки на странице «План».',
+             en:'10 questions of varying difficulty per subject. The result sets a level — beginner, intermediate or advanced — and feeds the study plan on the "Plan" page.'},
+  lvLevelNone:{ru:'Не пройден',en:'Not taken'},
+  lvLevelStart:{ru:'Начальный',en:'Beginner'},
+  lvLevelMid:{ru:'Средний',en:'Intermediate'},
+  lvLevelAdv:{ru:'Продвинутый',en:'Advanced'},
+  lvStart:{ru:'Начать',en:'Start'},
+  lvRetake:{ru:'Пройти заново',en:'Retake'},
+  lvScoreOf:{ru:'%1 из %2 верно',en:'%1 of %2 correct'},
+  lvBack:{ru:'К предметам',en:'Back to subjects'},
+  lvResultLead:{ru:'Результат сохранён. Его можно использовать при сборке плана подготовки.',
+                en:'The result is saved and can be used when building the study plan.'},
+  toPlan:{ru:'Собрать план подготовки →',en:'Build the study plan →'}
+});
+
+/* ---------- честная пометка: тесты только на русском ----------
+   Как и в тренажёре, содержание тестов (вопросы IQ-теста и банки
+   ЕГЭ/ОГЭ) остаётся на русском — переводить логическую задачу или
+   вопрос по русскому языку означало бы менять сам вопрос. */
+function updateRuNote() {
+  const note = document.querySelector('#iqRuNote');
+  const show = Sky.lang === 'en';
+  note.classList.toggle('hidden', !show);
+  if (show) note.textContent = Sky.t('ruOnlyNote');
+}
+document.addEventListener('langchange', updateRuNote);
+
+const $ = s => document.querySelector(s);
+
+/* ============================================================
+   ВСПОМОГАТЕЛЬНОЕ: перемешать варианты ответа, но помнить,
+   какой из них правильный. В базах заданий верный вариант обычно
+   стоит первым — так их удобно писать, но показывать в таком же
+   порядке нельзя. */
+function shuffledOrder(question) {
+  if (!question._order) question._order = Sky.shuffle(question.options.map((_, i) => i));
+  return question._order;
+}
+function renderOptions(container, question, picked, onPick) {
+  const order = shuffledOrder(question);
+  container.innerHTML = '';
+  order.forEach((oi, shown) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'opt';
+    b.setAttribute('aria-pressed', String(picked === oi));
+    b.innerHTML = `<span class="k">${'ABCDEF'[shown]}</span><span></span>`;
+    b.lastChild.textContent = Sky.L(question.options[oi]);
+    b.addEventListener('click', () => onPick(oi));
+    container.appendChild(b);
+  });
+}
+
+/* ============================================================
+   ВКЛАДКИ
+   ============================================================ */
+function selectTab(tab) {
+  $('#tabIq').classList.toggle('hidden', tab !== 'iq');
+  $('#tabLevel').classList.toggle('hidden', tab !== 'level');
+  $('#tabSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tab === tab)));
+  if (location.hash.slice(1) !== tab) history.replaceState(null, '', '#' + tab);
+}
+$('#tabSeg').addEventListener('click', e => {
+  const b = e.target.closest('button[data-tab]');
+  if (b) selectTab(b.dataset.tab);
+});
+
+/* ============================================================
+   IQ-ТЕСТ
+   ============================================================ */
+const IQ_STORE = 'iqResults';
+function iqFlatQuestions() {
+  const out = [];
+  IQ_TEST.parts.forEach(part => {
+    Sky.shuffle(part.questions).forEach(q => out.push(Object.assign({ partId: part.id, weight: part.weight }, q)));
+  });
+  return out;
+}
+
+let iq = null; /* состояние текущего прохождения */
+
+function iqLastResult() {
+  const list = Sky.get(IQ_STORE, []);
+  return list.length ? list[list.length - 1] : null;
+}
+function renderIqIntro() {
+  const last = iqLastResult();
+  const box = $('#iqLastBox');
+  box.classList.toggle('hidden', !last);
+  if (last) {
+    $('#iqLastScore').textContent = last.score + '/' + last.maxScore;
+    $('#iqLastLevel').textContent = Sky.t('iqLevel' + last.level[0].toUpperCase() + last.level.slice(1));
+    $('#iqLastDate').textContent = last.date;
+  }
+  updateRuNote();
+}
+
+$('#iqStartBtn').addEventListener('click', startIq);
+$('#iqAgainBtn').addEventListener('click', startIq);
+$('#iqToLevelBtn').addEventListener('click', () => selectTab('level'));
+
+function startIq() {
+  iq = {
+    questions: iqFlatQuestions(),
+    pos: 0,
+    picked: null,
+    answers: [],           /* { correct: bool, weight, partId } */
+    remaining: IQ_TEST.timeLimitSec,
+    timer: null
+  };
+  $('#iqIntro').classList.add('hidden');
+  $('#iqResultBox').classList.add('hidden');
+  $('#iqQuizBox').classList.remove('hidden');
+  iq.timer = setInterval(iqTick, 1000);
+  renderIqQuestion();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function iqTick() {
+  iq.remaining--;
+  renderIqTimer();
+  if (iq.remaining <= 0) finishIq(true);
+}
+function renderIqTimer() {
+  const m = Math.max(0, Math.floor(iq.remaining / 60));
+  const s = Math.max(0, iq.remaining % 60);
+  const el = $('#iqTimer');
+  el.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  el.classList.toggle('low', iq.remaining <= 60);
+}
+
+function renderIqQuestion() {
+  const q = iq.questions[iq.pos];
+  $('#iqPartTag').textContent = Sky.t('part' + q.partId[0].toUpperCase() + q.partId.slice(1));
+  $('#iqCountTag').textContent = Sky.t('countOf', '%1 / %2').replace('%1', iq.pos + 1).replace('%2', iq.questions.length);
+  $('#iqBar').style.width = Math.round(iq.pos / iq.questions.length * 100) + '%';
+  $('#iqQText').textContent = Sky.L(q.text);
+  /* renderOptions перерисовывается при каждом клике по варианту —
+     picked запоминается в iq.picked, а не сбрасывается тут, иначе
+     выбор пропадал бы сразу после клика (см. ту же логику в lv). */
+  renderOptions($('#iqOptions'), q, iq.picked, oi => { iq.picked = oi; renderIqQuestion(); });
+  $('#iqNextBtn').disabled = (iq.picked === null);
+  renderIqTimer();
+}
+
+$('#iqNextBtn').addEventListener('click', () => {
+  if (!iq || iq.picked === null) return;
+  const q = iq.questions[iq.pos];
+  iq.answers.push({ correct: iq.picked === q.answer, weight: q.weight, partId: q.partId });
+  iq.pos++;
+  iq.picked = null;
+  if (iq.pos >= iq.questions.length) finishIq(false);
+  else renderIqQuestion();
+});
+
+$('#iqStopBtn').addEventListener('click', () => {
+  if (iq && iq.timer) clearInterval(iq.timer);
+  iq = null;
+  $('#iqQuizBox').classList.add('hidden');
+  $('#iqIntro').classList.remove('hidden');
+  renderIqIntro();
+});
+
+function finishIq(timedOut) {
+  clearInterval(iq.timer);
+  const maxScore = IQ_TEST.parts.reduce((s, p) => s + p.questions.length * p.weight, 0);
+  const score = iq.answers.reduce((s, a) => s + (a.correct ? a.weight : 0), 0);
+  const percent = Math.round(score / maxScore * 100);
+  const level = percent < 40 ? 'low' : percent < 75 ? 'mid' : 'high';
+
+  const byPart = {};
+  IQ_TEST.parts.forEach(p => { byPart[p.id] = { correct: 0, total: p.questions.length }; });
+  iq.answers.forEach(a => { if (a.correct) byPart[a.partId].correct++; });
+
+  const result = { date: Sky.dayKey(), score, maxScore, percent, level, parts: byPart };
+  const list = Sky.get(IQ_STORE, []);
+  list.push(result);
+  Sky.set(IQ_STORE, list.slice(-10));
+
+  $('#iqQuizBox').classList.add('hidden');
+  $('#iqResultBox').classList.remove('hidden');
+  $('#iqScoreOut').textContent = Sky.t('iqScoreOf').replace('%1', score).replace('%2', maxScore);
+  const badge = $('#iqLevelBadge');
+  badge.className = 'tag ' + (level === 'high' ? 'ok' : level === 'mid' ? 'warn' : 'no');
+  badge.textContent = Sky.t('iqLevel' + level[0].toUpperCase() + level.slice(1));
+  $('#iqLevelText').textContent = Sky.t('iqLevel' + level[0].toUpperCase() + level.slice(1) + 'D');
+
+  const grid = $('#iqPartsGrid'); grid.innerHTML = '';
+  IQ_TEST.parts.forEach(p => {
+    const el = document.createElement('div');
+    el.className = 'part-mini';
+    el.innerHTML = `<b>${byPart[p.id].correct}/${byPart[p.id].total}</b><span>${Sky.t('part' + p.id[0].toUpperCase() + p.id.slice(1))}</span>`;
+    grid.appendChild(el);
+  });
+
+  if (timedOut) Sky.toast(Sky.t('timeUp'));
+  iq = null;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ============================================================
+   ТЕСТ НА УРОВЕНЬ ПОДГОТОВКИ
+   ============================================================ */
+const LEVEL_STORE = 'levelResults';
+const LEVEL_SUBJECTS = ['math', 'russian', 'english', 'history']; /* id банков из data/bank-*.js */
+
+function levelResults() { return Sky.get(LEVEL_STORE, {}); }
+
+/* Берём 10 вопросов из готового банка предмета: стараемся взять
+   3 простых + 4 средних + 3 сложных, а если в банке не хватает
+   какой-то сложности — просто добираем остальными заданиями. */
+function pickLevelQuestions(bank, n) {
+  const byDiff = { easy: [], medium: [], hard: [] };
+  bank.tasks.forEach(t => (byDiff[t.difficulty] || byDiff.medium).push(t));
+  const targets = { easy: 3, medium: 4, hard: 3 };
+  let picked = [];
+  ['easy', 'medium', 'hard'].forEach(d => { picked = picked.concat(Sky.shuffle(byDiff[d]).slice(0, targets[d])); });
+  if (picked.length < n) {
+    const have = new Set(picked.map(t => t.id));
+    const rest = Sky.shuffle(bank.tasks.filter(t => !have.has(t.id)));
+    picked = picked.concat(rest.slice(0, n - picked.length));
+  }
+  return Sky.shuffle(picked.slice(0, n));
+}
+
+function levelBadgeClass(level) {
+  return level === 'adv' ? 'adv' : level === 'mid' ? 'mid' : level === 'start' ? 'start' : 'none';
+}
+function levelLabel(level) {
+  return Sky.t(level === 'adv' ? 'lvLevelAdv' : level === 'mid' ? 'lvLevelMid' : level === 'start' ? 'lvLevelStart' : 'lvLevelNone');
+}
+
+function renderSubjCards() {
+  const results = levelResults();
+  const box = $('#subjCards'); box.innerHTML = '';
+  let anyDone = false;
+
+  LEVEL_SUBJECTS.forEach(id => {
+    const bank = window.BANKS && window.BANKS[id];
+    if (!bank) return; /* банк почему-то не подключился — просто пропускаем карточку */
+    const res = results[id];
+    if (res) anyDone = true;
+
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'subj-card';
+    card.innerHTML =
+      `<span class="ic">${bank.icon}</span><b>${Sky.L(bank.name)}</b>` +
+      `<span class="lvl ${levelBadgeClass(res ? res.level : null)}">${res ? levelLabel(res.level) + ' · ' + res.correct + '/10' : Sky.t('lvLevelNone')}</span>`;
+    card.addEventListener('click', () => startLevelTest(id));
+    box.appendChild(card);
+  });
+
+  $('#toPlanBtn').classList.toggle('hidden', !anyDone);
+}
+
+let lv = null;
+
+function startLevelTest(subjectId) {
+  const bank = window.BANKS[subjectId];
+  lv = { subjectId, bank, questions: pickLevelQuestions(bank, 10), pos: 0, picked: null, correct: 0 };
+  $('#levelIntro').classList.add('hidden');
+  $('#levelResultBox').classList.add('hidden');
+  $('#levelQuizBox').classList.remove('hidden');
+  renderLevelQuestion();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function renderLevelQuestion() {
+  const q = lv.questions[lv.pos];
+  $('#lvSubjTag').textContent = Sky.L(lv.bank.name);
+  $('#lvCountTag').textContent = Sky.t('countOf', '%1 / %2').replace('%1', lv.pos + 1).replace('%2', lv.questions.length);
+  $('#lvBar').style.width = Math.round(lv.pos / lv.questions.length * 100) + '%';
+  $('#lvQText').textContent = Sky.L(q.text);
+  renderOptions($('#lvOptions'), q, lv.picked, oi => { lv.picked = oi; renderLevelQuestion(); });
+  $('#lvNextBtn').disabled = (lv.picked === null);
+}
+
+$('#lvNextBtn').addEventListener('click', () => {
+  if (!lv || lv.picked === null) return;
+  const q = lv.questions[lv.pos];
+  if (lv.picked === q.answer) lv.correct++;
+  lv.pos++;
+  lv.picked = null;
+  if (lv.pos >= lv.questions.length) finishLevelTest();
+  else renderLevelQuestion();
+});
+
+$('#lvStopBtn').addEventListener('click', () => {
+  lv = null;
+  $('#levelQuizBox').classList.add('hidden');
+  $('#levelIntro').classList.remove('hidden');
+  renderSubjCards();
+});
+$('#lvBackBtn').addEventListener('click', () => {
+  $('#levelResultBox').classList.add('hidden');
+  $('#levelIntro').classList.remove('hidden');
+  renderSubjCards();
+});
+
+function finishLevelTest() {
+  const level = lv.correct <= 3 ? 'start' : lv.correct <= 7 ? 'mid' : 'adv';
+  const all = levelResults();
+  all[lv.subjectId] = { date: Sky.dayKey(), correct: lv.correct, total: lv.questions.length, level };
+  Sky.set(LEVEL_STORE, all);
+
+  $('#levelQuizBox').classList.add('hidden');
+  $('#levelResultBox').classList.remove('hidden');
+  $('#lvResultSubj').textContent = Sky.L(lv.bank.name);
+  $('#lvScoreOut').textContent = Sky.t('lvScoreOf').replace('%1', lv.correct).replace('%2', lv.questions.length);
+  const badge = $('#lvLevelBadge');
+  badge.className = 'tag ' + (level === 'adv' ? 'ok' : level === 'mid' ? 'warn' : 'no');
+  badge.textContent = levelLabel(level);
+
+  lv = null;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ============================================================
+   СТАРТ
+   ============================================================ */
+document.addEventListener('langchange', () => { renderIqIntro(); renderSubjCards(); });
+renderIqIntro();
+renderSubjCards();
+
+const startTab = ['iq', 'level'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'iq';
+selectTab(startTab);
+</script>
+</body>
+</html>

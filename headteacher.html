@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Завуч — SkyySchool</title>
+<meta name="theme-color" content="#f6faff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon-512.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/sky.css">
+</head>
+<body>
+<header id="appHeader"></header>
+
+<main class="wrap">
+  <h1 data-i18n="h1"></h1>
+  <p class="lead" data-i18n="lead"></p>
+
+  <div class="panel section">
+    <h2 data-i18n="addTitle"></h2>
+    <div class="row" style="margin-top:16px">
+      <div class="field"><label data-i18n="aDate"></label><input id="aDate" type="date"></div>
+      <div class="field"><label data-i18n="aSubject"></label><select id="aSubject"></select></div>
+      <div class="field"><label data-i18n="aReason"></label><input id="aReason" type="text" data-i18n-ph="aReasonPh"></div>
+      <div class="field" style="flex:0 0 auto;display:flex;align-items:flex-end">
+        <button class="btn" id="addAbsBtn" data-i18n="add"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel section">
+    <h2 data-i18n="statsTitle"></h2>
+    <div class="stats section">
+      <div class="stat accent"><b id="stTotal">0</b><span data-i18n="stTotalL"></span></div>
+      <div class="stat"><b id="stWeek">0</b><span data-i18n="stWeekL"></span></div>
+      <div class="stat"><b id="stSubjects">0</b><span data-i18n="stSubjectsL"></span></div>
+    </div>
+    <div id="subjStatList" style="margin-top:18px"></div>
+  </div>
+
+  <div class="panel section">
+    <h2 data-i18n="recTitle"></h2>
+    <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="recLead"></p>
+    <div class="role-list" id="recList"></div>
+  </div>
+
+  <div class="panel section">
+    <h2 data-i18n="notifyTitle"></h2>
+    <p class="lead" style="font-size:13px;margin-top:6px" data-i18n="notifyLead"></p>
+    <div class="row" style="margin-top:14px">
+      <div class="field" style="flex:0 0 auto;display:flex;align-items:flex-end;gap:9px">
+        <button class="btn" id="notifyOnBtn"></button>
+        <button class="btn ghost" id="notifyTestBtn" data-i18n="test"></button>
+      </div>
+    </div>
+    <p class="note" id="notifyState"></p>
+  </div>
+
+  <div class="panel section">
+    <h2 data-i18n="listTitle"></h2>
+    <div class="list" id="absList" style="margin-top:12px"></div>
+  </div>
+</main>
+
+<footer id="appFooter"></footer>
+
+<script src="assets/config.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/db.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/roles.js"></script>
+<script>
+'use strict';
+Sky.init({
+  h1:{ru:'Завуч',en:'Dean of studies'},
+  lead:{ru:'Отмечайте пропущенные уроки — здесь же статистика по предметам, рекомендации, как наверстать, и напоминание не запускать пропуски.',
+        en:'Log missed lessons here — you also get per-subject stats, catch-up recommendations, and a nudge not to let absences pile up.'},
+
+  addTitle:{ru:'Отметить пропуск',en:'Log an absence'},
+  aDate:{ru:'Дата',en:'Date'},
+  aSubject:{ru:'Предмет',en:'Subject'},
+  aReason:{ru:'Причина (необязательно)',en:'Reason (optional)'},
+  aReasonPh:{ru:'Например: болел',en:'e.g. was ill'},
+  add:{ru:'Добавить',en:'Add'},
+
+  statsTitle:{ru:'Статистика пропусков',en:'Absence statistics'},
+  stTotalL:{ru:'всего пропущено',en:'missed in total'},
+  stWeekL:{ru:'за 7 дней',en:'in the last 7 days'},
+  stSubjectsL:{ru:'предметов задето',en:'subjects affected'},
+
+  recTitle:{ru:'Как наверстать',en:'How to catch up'},
+  recLead:{ru:'По каждому предмету, где есть пропуски, — прямая ссылка на повторение в тренажёре.',
+           en:'For every subject with absences — a direct link to catch-up practice in the trainer.'},
+  recCard:{ru:'Пропущено: %1',en:'Missed: %1'},
+  recGo:{ru:'Наверстать →',en:'Catch up →'},
+  recNone:{ru:'Пропусков пока нет — и это отлично.',en:'No absences yet — and that is great.'},
+
+  notifyTitle:{ru:'Уведомления',en:'Notifications'},
+  notifyLead:{ru:'Если по предмету накопится 2 и больше пропусков, браузер пришлёт уведомление в духе «Догони!» — работает, пока открыта вкладка сайта.',
+              en:'Once a subject reaches 2 or more absences, the browser sends a "catch up!" notification — works while the site tab stays open.'},
+  enable:{ru:'Включить',en:'Turn on'},
+  disable:{ru:'Выключить',en:'Turn off'},
+  test:{ru:'Проверить',en:'Test it'},
+  stOff:{ru:'Уведомления выключены.',en:'Notifications are off.'},
+  stOn:{ru:'Уведомления включены.',en:'Notifications are on.'},
+  stDenied:{ru:'Браузер запретил уведомления для этого сайта. Разрешите их в настройках сайта — значок слева от адреса — и нажмите «Включить» ещё раз.',
+            en:'The browser has blocked notifications for this site. Allow them in the site settings — the icon left of the address — and press "Turn on" again.'},
+  stUnsupported:{ru:'Этот браузер не умеет показывать уведомления.',en:'This browser cannot show notifications.'},
+  notifyTitleText:{ru:'Завуч',en:'Dean of studies'},
+  notifyTestBody:{ru:'Вот так будет выглядеть уведомление о пропусках.',en:'This is what an absence notification will look like.'},
+
+  listTitle:{ru:'Журнал пропусков',en:'Absence log'},
+  listEmpty:{ru:'Пока пусто. Отметьте первый пропуск в форме выше.',en:'Nothing here yet. Log your first absence in the form above.'},
+  missedCount:{ru:'пропущено %1',en:'missed %1'}
+});
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+
+/* ---------- предмет ученика по умолчанию не спрашиваем заново ----------
+   Если анкета classroom.html уже заполнена, можно было бы поприветствовать
+   по имени — но эта страница адресована не столько ученику, сколько
+   тому, кто ведёт учёт (завучу), поэтому имя тут не выводим, а просто
+   используем список предметов из общего модуля assets/roles.js. */
+
+$('#aDate').value = Sky.dayKey();
+const subjSel = $('#aSubject');
+SkyRoles.SUBJECTS.forEach(s => {
+  const o = document.createElement('option');
+  o.value = s.id; o.dataset.bank = s.id;
+  subjSel.appendChild(o);
+});
+function fillSubjectNames() {
+  [...subjSel.options].forEach(o => { const s = SkyRoles.subjectById(o.value); if (s) o.textContent = s.icon + '  ' + Sky.L(s.name); });
+}
+fillSubjectNames();
+
+/* ============================================================
+   ДОБАВЛЕНИЕ ПРОПУСКА + «РУГАТЕЛЬНАЯ» МОДАЛКА
+   ============================================================ */
+$('#addAbsBtn').addEventListener('click', () => {
+  const subject = subjSel.value;
+  const date = $('#aDate').value || Sky.dayKey();
+  const reason = $('#aReason').value.trim().slice(0, 140);
+  if (!subject) return;
+
+  SkyRoles.addAbsence({ date, subject, reason });
+  const count = SkyRoles.absencesBySubject()[subject] || 1;
+  const s = SkyRoles.subjectById(subject);
+  const phrase = SkyRoles.scoldPhrase(Sky.L(s.name), count);
+
+  Sky.modal(
+    `<div style="font-size:40px;text-align:center;margin-bottom:6px">${count >= 3 ? '📢' : count === 2 ? '⚠️' : '📋'}</div>
+     <p class="lead" style="font-size:15px;text-align:center;font-weight:800;color:var(--ink)">${esc(phrase)}</p>
+     <button class="btn full big" style="margin-top:18px" id="scoldOk">${Sky.t('close')}</button>`,
+    (box, close) => box.querySelector('#scoldOk').addEventListener('click', close)
+  );
+
+  if (count >= 2 && Sky.get('deanNotifyOn', false) && 'Notification' in window && Notification.permission === 'granted') {
+    Sky.notify(Sky.t('notifyTitleText'), phrase);
+  }
+
+  $('#aReason').value = '';
+  render();
+});
+
+/* ============================================================
+   СТАТИСТИКА, РЕКОМЕНДАЦИИ, ЖУРНАЛ
+   ============================================================ */
+function render() {
+  const list = SkyRoles.getAbsences();
+  const bySubj = SkyRoles.absencesBySubject();
+
+  $('#stTotal').textContent = list.length;
+  const weekAgo = Date.now() - 7 * 864e5;
+  $('#stWeek').textContent = list.filter(a => new Date(a.date + 'T00:00:00').getTime() >= weekAgo).length;
+  $('#stSubjects').textContent = Object.keys(bySubj).length;
+
+  /* по предметам, от наибольшего числа пропусков */
+  const sortedIds = Object.keys(bySubj).sort((a, b) => bySubj[b] - bySubj[a]);
+  const maxCount = sortedIds.length ? bySubj[sortedIds[0]] : 1;
+  const statBox = $('#subjStatList');
+  statBox.innerHTML = sortedIds.length ? '' : `<p class="note">${Sky.t('recNone')}</p>`;
+  sortedIds.forEach(id => {
+    const s = SkyRoles.subjectById(id); if (!s) return;
+    const n = bySubj[id];
+    const row = document.createElement('div');
+    row.className = 'subj-stat-row';
+    row.innerHTML = `<span class="ic">${s.icon}</span><span class="name">${Sky.L(s.name)}</span>` +
+      `<span class="bar">${SkyRoles.progressBarHtml(n / maxCount * 100)}</span><span class="n">${n}</span>`;
+    statBox.appendChild(row);
+  });
+
+  /* рекомендации: наверстать по каждому предмету с пропусками */
+  const recBox = $('#recList');
+  recBox.innerHTML = sortedIds.length ? sortedIds.map(id => {
+    const s = SkyRoles.subjectById(id);
+    return `<a class="role-card link" href="trainer.html?subject=${id}&mode=due&autostart=1">` +
+      `<span class="ic">${s.icon}</span>` +
+      `<span class="body"><b>${Sky.L(s.name)}</b><span>${Sky.t('recCard').replace('%1', bySubj[id])} · ${Sky.t('recGo')}</span></span>` +
+      `</a>`;
+  }).join('') : `<p class="note">${Sky.t('recNone')}</p>`;
+
+  /* журнал — последние сверху */
+  const logBox = $('#absList');
+  if (!list.length) {
+    logBox.innerHTML = `<div class="empty"><div class="big">🗓️</div><p>${Sky.t('listEmpty')}</p></div>`;
+  } else {
+    logBox.innerHTML = '';
+    list.slice().map((a, i) => ({ a, i })).reverse().forEach(({ a, i }) => {
+      const s = SkyRoles.subjectById(a.subject);
+      const el = document.createElement('div');
+      el.className = 'item';
+      el.innerHTML = `<div class="absence-item" style="flex:1;min-width:0">` +
+        `<span class="ic">${s ? s.icon : '📘'}</span>` +
+        `<div class="info"><b>${s ? esc(Sky.L(s.name)) : esc(a.subject)}</b><span>${esc(a.date)}${a.reason ? ' · ' + esc(a.reason) : ''}</span></div>` +
+        `</div><button class="btn small ghost" type="button">×</button>`;
+      el.querySelector('button').addEventListener('click', () => { SkyRoles.removeAbsence(i); render(); });
+      logBox.appendChild(el);
+    });
+  }
+
+  renderNotifyState();
+}
+
+/* ============================================================
+   УВЕДОМЛЕНИЯ
+   ============================================================ */
+function renderNotifyState() {
+  const on = Sky.get('deanNotifyOn', false);
+  const state = $('#notifyState');
+  if (!('Notification' in window)) state.textContent = Sky.t('stUnsupported');
+  else if (Notification.permission === 'denied') state.textContent = Sky.t('stDenied');
+  else state.textContent = Sky.t(on ? 'stOn' : 'stOff');
+  $('#notifyOnBtn').textContent = Sky.t(on ? 'disable' : 'enable');
+}
+$('#notifyOnBtn').addEventListener('click', async () => {
+  const on = Sky.get('deanNotifyOn', false);
+  if (on) { Sky.set('deanNotifyOn', false); renderNotifyState(); return; }
+  const res = await Sky.askNotify();
+  if (res === 'granted') Sky.set('deanNotifyOn', true);
+  renderNotifyState();
+});
+$('#notifyTestBtn').addEventListener('click', async () => {
+  const res = await Sky.askNotify();
+  if (res === 'granted') Sky.notify(Sky.t('notifyTitleText'), Sky.t('notifyTestBody'));
+  else Sky.toast(Sky.t(res === 'denied' ? 'stDenied' : 'stUnsupported'));
+  renderNotifyState();
+});
+
+document.addEventListener('langchange', () => { fillSubjectNames(); render(); });
+render();
+</script>
+</body>
+</html>
