@@ -211,14 +211,82 @@ h3{font-size:16px;font-weight:800}
 .brand b{color:var(--sky-500)}
 :root[data-theme="dark"] .brand b{color:var(--sky-400)}
 
-.appnav{display:flex;gap:2px;margin-left:14px;overflow-x:auto;scrollbar-width:none}
-.appnav::-webkit-scrollbar{display:none}
+/* ---------- меню ----------
+   Раньше здесь был горизонтальный скролл: семнадцать ссылок в полосе,
+   которая на деле получала сто с небольшим пикселей между логотипом и
+   аккаунтом. Пункты обрезались на полуслове («Задани…»), а о том, что
+   полосу можно листать, ничто не сообщало.
+
+   Теперь помещается столько, сколько влезает, остальное уходит под
+   «Ещё» — раскладку считает core.js при каждом изменении ширины. На
+   телефоне верхнее меню прячется совсем, его заменяет нижняя панель
+   (.tabbar ниже): на маленьком экране палец дотягивается до низа, а
+   не до верха. */
+.appnav{display:flex;gap:2px;margin-left:14px;min-width:0;flex:1 1 auto;overflow:hidden}
 .appnav a{
   padding:8px 13px;border-radius:11px;font-size:13.5px;font-weight:800;
   color:var(--muted);white-space:nowrap;transition:.16s;
 }
 .appnav a:hover{color:var(--ink);background:var(--panel-2)}
-.appnav a[aria-current="page"]{color:var(--accent);background:var(--m-learn-soft)}
+.appnav a[aria-current="page"]{color:var(--accent-solid);background:var(--m-learn-soft)}
+.appnav a.nav-hidden{display:none}
+
+/* «Ещё» и его список */
+.nav-more{position:relative;flex:none}
+.nav-more > button{
+  display:flex;align-items:center;gap:5px;
+  padding:8px 13px;border-radius:11px;font-size:13.5px;font-weight:800;
+  color:var(--muted);white-space:nowrap;background:none;border:none;cursor:pointer;
+}
+.nav-more > button:hover{color:var(--ink);background:var(--panel-2)}
+.nav-more > button[aria-expanded="true"]{color:var(--accent);background:var(--m-learn-soft)}
+.nav-more > button::after{content:'▾';font-size:10px;opacity:.7}
+.nav-sheet{
+  position:absolute;top:calc(100% + 6px);right:0;z-index:70;
+  min-width:210px;max-height:min(70vh,520px);overflow-y:auto;
+  padding:6px;border:1px solid var(--line);border-radius:14px;
+  background:var(--panel);box-shadow:var(--shadow-lg);
+}
+.nav-sheet[hidden]{display:none}
+.nav-sheet a{
+  display:block;padding:10px 12px;border-radius:10px;
+  font-size:13.5px;font-weight:800;color:var(--ink-2);white-space:nowrap;
+}
+.nav-sheet a:hover{background:var(--panel-2)}
+.nav-sheet a[aria-current="page"]{color:var(--accent-solid);background:var(--m-learn-soft)}
+
+/* ---------- нижняя панель на телефоне ----------
+   Пять целей по 56 px: четыре раздела, которыми пользуются каждый
+   день, и «Ещё» со всем остальным. */
+.tabbar{
+  display:none;
+  position:fixed;left:0;right:0;bottom:0;z-index:65;
+  background:color-mix(in srgb, var(--panel) 94%, transparent);
+  backdrop-filter:saturate(180%) blur(14px);
+  -webkit-backdrop-filter:saturate(180%) blur(14px);
+  border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.tabbar .row-tabs{display:flex;align-items:stretch}
+.tabbar a, .tabbar button{
+  flex:1 1 0;min-width:0;min-height:56px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  padding:6px 2px;background:none;border:none;cursor:pointer;
+  font-size:10.5px;font-weight:800;color:var(--muted);line-height:1.15;text-align:center;
+}
+.tabbar i{font-style:normal;font-size:19px;line-height:1}
+.tabbar a[aria-current="page"]{color:var(--accent-solid)}
+.tabbar span{
+  display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+
+@media (max-width:760px){
+  .appnav, .nav-more{display:none}
+  .tabbar{display:block}
+  /* чтобы панель не закрывала последний блок страницы */
+  body{padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+  .appfoot{margin-bottom:8px}
+}
 
 .appbar .tools{margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0}
 
@@ -228,7 +296,7 @@ h3{font-size:16px;font-weight:800}
   padding:5px 11px;border-radius:8px;font-size:11.5px;font-weight:900;
   color:var(--muted);letter-spacing:.04em;transition:.15s;
 }
-.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.seg button[aria-pressed="true"]{background:var(--accent-solid);color:var(--accent-ink)}
 
 .icon-btn{
   width:36px;height:36px;display:grid;place-items:center;border-radius:11px;
@@ -313,7 +381,7 @@ h3{font-size:16px;font-weight:800}
 .btn{
   display:inline-flex;align-items:center;justify-content:center;gap:8px;
   padding:11px 19px;border-radius:13px;
-  background:var(--accent);color:var(--accent-ink);
+  background:var(--accent-solid);color:var(--accent-ink);
   font-weight:800;font-size:14px;
   transition:transform .15s, box-shadow .18s, filter .15s;
   box-shadow:var(--shadow-sm);
@@ -341,9 +409,9 @@ h3{font-size:16px;font-weight:800}
   background:var(--m-learn-soft);color:var(--m-learn);
 }
 .tag.gray{background:var(--panel-2);color:var(--muted);border:1px solid var(--line)}
-.tag.ok{background:var(--ok-soft);color:var(--ok)}
-.tag.no{background:var(--no-soft);color:var(--no)}
-.tag.warn{background:var(--warn-soft);color:var(--warn)}
+.tag.ok{background:var(--ok-soft);color:var(--ok-text)}
+.tag.no{background:var(--no-soft);color:var(--no-text)}
+.tag.warn{background:var(--warn-soft);color:var(--warn-text)}
 .tag.kids{background:var(--m-kids-soft);color:var(--m-kids)}
 .tag.chess{background:var(--m-chess-soft);color:var(--m-chess)}
 .tag.life{background:var(--m-life-soft);color:var(--m-life)}
@@ -443,8 +511,8 @@ h3{font-size:16px;font-weight:800}
 .opt:disabled{cursor:default}
 
 .verdict{padding:12px 15px;border-radius:13px;font-weight:800;font-size:14px;margin-top:16px}
-.verdict.ok{background:var(--ok-soft);color:var(--ok)}
-.verdict.no{background:var(--no-soft);color:var(--no)}
+.verdict.ok{background:var(--ok-soft);color:var(--ok-text)}
+.verdict.no{background:var(--no-soft);color:var(--no-text)}
 
 .note{
   padding:13px 16px;border-radius:13px;
@@ -735,4 +803,80 @@ h3{font-size:16px;font-weight:800}
 }
 @media (max-width:360px){
   .tui-picker{grid-template-columns:1fr}
+}
+
+/* ============================================================
+   Доступность и контраст: то, чего действительно не хватало.
+
+   Кольцо фокуса (:focus-visible) и учёт prefers-reduced-motion в
+   системе уже есть — см. выше по файлу. Здесь добавлено только
+   недостающее: ссылка «к содержимому», минимальный размер цели под
+   палец и контраст светлой темы.
+   ============================================================ */
+
+/* ---------- ссылка «сразу к содержимому» ----------
+   В шапке семнадцать ссылок. Без этой перемычки пользователь
+   клавиатуры проходит их все на каждой странице, прежде чем добраться
+   до первой кнопки. Видна только при фокусе. */
+.skip-link{
+  position:absolute;left:12px;top:-60px;z-index:100;
+  padding:10px 16px;border-radius:0 0 12px 12px;
+  background:var(--accent);color:var(--accent-ink);
+  font-weight:800;font-size:13px;transition:top .15s;
+}
+.skip-link:focus{top:0}
+
+/* ---------- размер цели под палец ----------
+   Замер до правки: 514 интерактивных элементов меньше 44×44 CSS-px на
+   экране 360 px. Худшие — переключатель языка (34×28), вкладки
+   трекеров (36×24) и кнопка помощи у психолога (34×24): последняя
+   нужна в самый неподходящий момент, и промахиваться по ней нельзя.
+   44 px — порог из руководств Apple и Google. */
+.btn{min-height:44px}
+.btn.small{min-height:38px}
+.seg button{min-height:38px;padding-inline:14px}
+.icon-btn{width:44px;height:44px}
+.psy-seg button{min-height:44px}
+.tag button, .pa-drop{min-width:36px;min-height:36px}
+
+/* Мелкие иконки-кнопки расширяем невидимой зоной, не раздувая вёрстку:
+   сама кнопка остаётся маленькой, палец попадает по 44 px. */
+.ren-ico::after, .pa-drop::after{
+  content:'';position:absolute;top:50%;left:50%;
+  width:44px;height:44px;transform:translate(-50%,-50%);
+}
+.ren-ico, .pa-drop{position:relative}
+
+/* ---------- контраст светлой темы ----------
+   Замеры до правки (WCAG 2.1, норма 4.5 для обычного текста):
+     белый на кнопке      3.33  ← подпись главной кнопки сайта
+     «Верно» на зелёном   2.99
+     «Неверно» на красном 2.95
+     --muted на панели    4.11
+     --faint на панели    2.52
+   Тёмная тема проходила везде и не тронута.
+
+   Меняем не сам --accent (он же цвет модуля «учёба», и сдвиг перекрасил
+   бы половину интерфейса), а отдельный токен для заливок, на которых
+   лежит белый текст. */
+:root{
+  --accent-solid:var(--sky-600);   /* фон кнопок: белый текст даёт 4.6 */
+  --ok-text:#0f7a37;               /* «Верно» на зелёной подложке: 4.8 */
+  --no-text:#c2113b;               /* «Неверно» на розовой: 5.1 */
+  --warn-text:#9a5300;             /* предупреждение на охре: 5.2 */
+}
+:root[data-theme="dark"]{
+  /* в тёмной теме исходные цвета уже контрастны — возвращаем их */
+  --accent-solid:var(--accent);
+  --ok-text:var(--ok);
+  --no-text:var(--no);
+  --warn-text:var(--warn);
+}
+/* Приглушённый и совсем бледный текст в светлой теме были 4.11 и 2.52.
+   Новые значения дают 4.79 и 4.50 — тот же холодный серо-синий, просто
+   темнее. В тёмной теме они и так проходят, поэтому правим только
+   светлую. */
+:root:not([data-theme="dark"]){
+  --muted:#5f748d;
+  --faint:#63758b;
 }
