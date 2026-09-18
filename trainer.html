@@ -84,15 +84,28 @@
         <span class="tag" id="qTopic"></span>
         <span class="tag gray" id="qExam"></span>
         <span class="tag gray" id="qLevel"></span>
+        <span class="tag gray hidden" id="qCefr"></span>
+        <span class="tag gray hidden" id="qCat"></span>
         <span class="tag gray" id="qCount"></span>
         <span class="tag warn" id="qBox"></span>
       </div>
       <div class="question" id="qText"></div>
+
+      <!-- Аудирование: фразу произносит сам браузер (Web Speech API),
+           никаких внешних сервисов и файлов. -->
+      <div class="hidden" id="qAudioBox" style="margin:0 0 16px">
+        <button class="btn ghost" id="qPlay" type="button"></button>
+        <p class="note hidden" id="qAudioNote" style="border-left-color:var(--warn)"></p>
+      </div>
+
       <div class="options" id="qOptions"></div>
 
       <div class="note hidden" id="qHint"></div>
       <div class="verdict hidden" id="qVerdict"></div>
       <div class="solution hidden" id="qSolution"></div>
+      <!-- Перевод разобранной фразы на русский и польский: показываем
+           только после ответа, иначе это подсказка. -->
+      <div class="solution hidden" id="qTr"></div>
       <div class="ai hidden" id="qAi"></div>
 
       <div class="pye-wrap hidden" id="pythonEditor">
@@ -124,6 +137,7 @@
 <script src="assets/db.js"></script>
 <script src="assets/auth.js"></script>
 <script src="assets/python-editor.js"></script>
+<script src="assets/speech.js"></script>
 <script src="data/ai-teachers.js"></script>
 <script src="assets/ai-teachers.js"></script>
 <script src="data/bank-math.js"></script>
@@ -191,7 +205,20 @@ Sky.init({
                en:'First load of Python is ~10–15 MB; after that it runs offline in this browser.'},
   pyeNoOutput:{ru:'(программа ничего не вывела)',en:'(no output)'},
   tchWith:{ru:'Объясняет: %1',en:'Explained by: %1'},
-  tchChange:{ru:'Сменить',en:'Change'}
+  tchChange:{ru:'Сменить',en:'Change'},
+
+  /* ---------- аудирование и языковые банки ---------- */
+  playAudio:{ru:'🔊 Прослушать',en:'🔊 Listen'},
+  playAgain:{ru:'🔊 Ещё раз',en:'🔊 Play again'},
+  audioNoVoice:{ru:'В этом браузере нет голоса нужного языка, поэтому фраза показана текстом — задание решаемо, но на слух его не отработать. Голоса есть в Chrome и Edge.',
+                en:'This browser has no voice for that language, so the phrase is shown as text — the problem is still solvable, just not by ear. Chrome and Edge ship the voices.'},
+  audioNoApi:{ru:'Этот браузер не умеет озвучивать текст, поэтому фраза показана текстом.',
+              en:'This browser cannot speak text, so the phrase is shown as text instead.'},
+  catGrammar:{ru:'грамматика',en:'grammar'},
+  catVocabulary:{ru:'лексика',en:'vocabulary'},
+  catReading:{ru:'чтение',en:'reading'},
+  catListening:{ru:'аудирование',en:'listening'},
+  trLine:{ru:'Перевод — RU: %1 · PL: %2',en:'Translation — RU: %1 · PL: %2'}
 });
 
 /* ---------- выбранный AI-учитель ----------
@@ -291,6 +318,8 @@ $('#startBtn').addEventListener('click', () => {
 });
 
 $('#stopBtn').addEventListener('click', () => {
+  Speech.stop();
+  $('#qAudioBox').classList.add('hidden');
   current = null;
   $('#quiz').classList.add('hidden');
   $('#setup').classList.remove('hidden');
@@ -299,14 +328,16 @@ $('#stopBtn').addEventListener('click', () => {
 });
 
 function hideExtras() {
-  ['qHint','qVerdict','qSolution','qAi'].forEach(id => $('#' + id).classList.add('hidden'));
+  ['qHint','qVerdict','qSolution','qTr','qAi'].forEach(id => $('#' + id).classList.add('hidden'));
 }
 
 function nextTask() {
   hideExtras();
+  Speech.stop();                       /* предыдущая фраза не должна звучать поверх новой */
   if (pos >= queue.length) {
     current = null;
     document.querySelectorAll('.meta .tag').forEach(s => s.classList.add('hidden'));
+    $('#qAudioBox').classList.add('hidden');
     $('#qText').textContent = '';
     $('#qOptions').innerHTML = `<div class="empty"><div class="big">🌤</div>
       <b>${Sky.t('doneT')}</b><p>${Sky.t('doneD')}</p></div>`;
@@ -332,6 +363,15 @@ function renderTask() {
   $('#qExam').textContent  = EXAM_LABEL[current.exam];
   $('#qLevel').textContent = Sky.t(current.difficulty);
   $('#qCount').textContent = Sky.t('countOf').replace('%1', pos + 1).replace('%2', queue.length);
+
+  /* Уровень по шкале CEFR (A1/A2/B1) и категория — только у языковых
+     банков. У остальных предметов этих полей нет, и теги скрыты. */
+  const cefr = $('#qCefr');
+  cefr.textContent = current.level || '';
+  cefr.classList.toggle('hidden', !current.level);
+  const cat = $('#qCat');
+  cat.textContent = current.cat ? Sky.t('cat' + current.cat[0].toUpperCase() + current.cat.slice(1)) : '';
+  cat.classList.toggle('hidden', !current.cat);
 
   const box = Sky.boxOf(bank.id, current.id);
   $('#qBox').textContent = box < 0 ? Sky.t('boxNew') : Sky.t('boxN').replace('%1', box);
@@ -370,10 +410,67 @@ function renderTask() {
     v.textContent = ok ? '✓ ' + Sky.t('right')
       : '✕ ' + Sky.t('wrong') + ' — ' + Sky.t('correctIs') + Sky.L(current.options[current.answer]);
     $('#qSolution').textContent = Sky.L(current.solution);
+
+    /* Перевод разобранной фразы — после ответа, иначе подсказка.
+       Русский и польский рядом: половина наших учеников учит оба, и
+       увидеть одну фразу в трёх языках полезнее, чем в двух. */
+    const tr = $('#qTr');
+    if (current.tr && (current.tr.ru || current.tr.pl)) {
+      tr.textContent = Sky.t('trLine')
+        .replace('%1', current.tr.ru || '—')
+        .replace('%2', current.tr.pl || '—');
+      tr.classList.remove('hidden');
+    } else {
+      tr.classList.add('hidden');
+    }
   }
 
+  syncAudio();
   syncPythonEditor();
 }
+
+/* ---------- аудирование ----------
+   Задание со звуком не показывает фразу текстом: иначе это чтение, а
+   не аудирование. Но если голоса нужного языка в браузере нет,
+   слушать нечего — и тогда честнее показать текст с пояснением, чем
+   оставить ученика с неразрешимым заданием. */
+let audioPlayedFor = null;
+function syncAudio() {
+  const box = $('#qAudioBox'), btn = $('#qPlay'), note = $('#qAudioNote');
+  const a = current && current.audio;
+  if (!a) { box.classList.add('hidden'); return; }
+
+  box.classList.remove('hidden');
+  const canApi = Speech.canSpeak();
+  const canVoice = canApi && Speech.hasVoice(a.lang);
+
+  btn.textContent = Sky.t('playAudio');
+  btn.classList.toggle('hidden', !canVoice);
+  btn.onclick = () => {
+    const r = Speech.speak(a.text, a.lang);
+    if (r.ok) btn.textContent = Sky.t('playAgain');
+    else syncAudio();
+  };
+
+  note.textContent = canVoice ? ''
+    : (canApi ? Sky.t('audioNoVoice') : Sky.t('audioNoApi')) + ' — “' + a.text + '”';
+  note.classList.toggle('hidden', canVoice);
+
+  /* Первое проигрывание — сразу, в цепочке клика «Начать»/«Дальше»,
+     поэтому автозапуск браузером не блокируется. Но ровно один раз на
+     задание: renderTask() вызывается и при выборе варианта, и фраза
+     перебивала бы сама себя на каждом клике. */
+  if (canVoice && !answered && audioPlayedFor !== current.id) {
+    audioPlayedFor = current.id;
+    const r = Speech.speak(a.text, a.lang);
+    if (r.ok) btn.textContent = Sky.t('playAgain');
+  }
+}
+
+/* Список голосов приезжает асинхронно — когда приедет, перерисуем
+   блок озвучки: до этого момента мы могли честно, но напрасно
+   сказать «голоса нет». */
+Speech.onReady(() => { if (current) syncAudio(); });
 
 /* ---------- встроенный Python-редактор ----------
    Показывается только для информатики и только у заданий с
