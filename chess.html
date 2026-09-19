@@ -15,9 +15,17 @@
 <style>
 .piece.w{color:#fff;text-shadow:0 0 1px #10233c,0 0 2px rgba(0,0,0,.8),0 1px 1px rgba(0,0,0,.4)}
 .piece.b{color:#141820;text-shadow:0 0 1px rgba(255,255,255,.35)}
-.tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin-bottom:24px;overflow:auto}
-.tabs button{padding:12px 15px;font-size:13.5px;font-weight:900;color:var(--muted);border-bottom:2.5px solid transparent;white-space:nowrap}
+.tabs-wrap{position:relative}
+.tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scroll-behavior:smooth;white-space:nowrap;padding-bottom:4px;scrollbar-width:none;-ms-overflow-style:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{padding:12px 15px;font-size:13.5px;font-weight:900;color:var(--muted);border-bottom:2.5px solid transparent;white-space:nowrap;flex:0 0 auto}
 .tabs button[aria-selected="true"]{color:var(--m-chess);border-bottom-color:var(--m-chess)}
+.tabs-arrow{display:none;position:absolute;top:0;bottom:8px;width:30px;align-items:center;justify-content:center;border:none;padding:0;color:var(--ink);font-size:18px;font-weight:900;cursor:pointer;z-index:2}
+.tabs-arrow.prev{left:0;background:linear-gradient(90deg,var(--bg) 45%,transparent)}
+.tabs-arrow.next{right:0;background:linear-gradient(270deg,var(--bg) 45%,transparent)}
+.tabs-wrap.has-overflow.can-prev .tabs-arrow.prev{display:flex}
+.tabs-wrap.has-overflow.can-next .tabs-arrow.next{display:flex}
+@media (hover:none),(pointer:coarse){.tabs-arrow{display:none!important}}
 .lesson{border:1px solid var(--line);border-radius:var(--r-lg);background:var(--panel);overflow:hidden;box-shadow:var(--shadow-sm)}
 .lesson > button{width:100%;text-align:left;padding:16px 19px;font-weight:800;font-size:14.5px;display:flex;gap:10px;align-items:center}
 .lesson > button .arrow{margin-left:auto;color:var(--muted);transition:.2s;font-size:19px}
@@ -40,12 +48,16 @@
   <div class="section-head"><h2>Выберите тренера</h2></div>
   <div id="chessTeacherPicker"></div>
 </div>
-  <div class="tabs section" role="tablist" style="margin-top:26px">
-    <button type="button" data-tab="lessons" aria-selected="true" data-i18n="tabLessons"></button>
-    <button type="button" data-tab="puzzles" aria-selected="false" data-i18n="tabPuzzles"></button>
-    <button type="button" data-tab="game" aria-selected="false" data-i18n="tabGame"></button>
-    <button type="button" data-tab="teacher" aria-selected="false" data-i18n="tabTeacher"></button>
-    <button type="button" data-tab="live" aria-selected="false" data-i18n="tabLive"></button>
+  <div class="tabs-wrap" style="margin-top:26px">
+    <button type="button" class="tabs-arrow prev" aria-label="◂" tabindex="-1">‹</button>
+    <div class="tabs section" role="tablist">
+      <button type="button" data-tab="lessons" aria-selected="true" data-i18n="tabLessons"></button>
+      <button type="button" data-tab="puzzles" aria-selected="false" data-i18n="tabPuzzles"></button>
+      <button type="button" data-tab="game" aria-selected="false" data-i18n="tabGame"></button>
+      <button type="button" data-tab="teacher" aria-selected="false" data-i18n="tabTeacher"></button>
+      <button type="button" data-tab="live" aria-selected="false" data-i18n="tabLive"></button>
+    </div>
+    <button type="button" class="tabs-arrow next" aria-label="▸" tabindex="-1">›</button>
   </div>
   <section id="tab-lessons"><div class="list" id="lessonList"></div></section>
   <section id="tab-puzzles" class="hidden"><div class="board-wrap"><div class="board" id="pBoard"></div><div class="side"><div class="meta"><span class="tag chess" id="pType"></span><span class="tag gray" id="pCount"></span><span class="tag gray" id="pTurn"></span></div><h2 id="pTitle" style="margin-top:10px"></h2><p class="lead" style="font-size:13px;margin-top:4px" id="pTask"></p><div class="note hidden" id="pIdea"></div><div class="gameinfo" id="pMsg" style="margin-top:12px"></div><div class="promo hidden" id="pPromo"></div><div class="actions"><button class="btn ghost small" id="pHint" data-i18n="showIdea"></button><button class="btn ghost small" id="pRetry" data-i18n="retry"></button><button class="btn chess small" id="pNext" data-i18n="nextPuzzle"></button></div><div class="stats" style="margin-top:18px"><div class="stat"><b id="pSolved">0</b><span data-i18n="pSolvedL"></span></div><div class="stat"><b id="pTotal">0</b><span data-i18n="pTotalL"></span></div></div></div></div></section>
@@ -73,7 +85,8 @@ function makeBoard(el,opts){const api={flipped:false,state:null,selected:-1,last
 const ANIM_MS=200;api.animateMove=function(move,done){const finish=(()=>{let called=false;return()=>{if(!called){called=true;done();}}})();if(prefersReduced())return finish();const fromCell=el.querySelector(`[data-sq="${move.from}"]`),toCell=el.querySelector(`[data-sq="${move.to}"]`),piece=fromCell&&fromCell.querySelector('.piece');if(!fromCell||!toCell||!piece)return finish();let victimSq=move.to;if(String(move.flags||'').includes('e'))victimSq=(move.piece&8)?move.to+16:move.to-16;const victim=el.querySelector(`[data-sq="${victimSq}"] .piece`);if(move.captured&&victim&&victim!==piece)victim.classList.add('taken');piece.style.transition='none';piece.style.transform='';fromCell.classList.add('flying');piece.classList.add('moving');requestAnimationFrame(()=>{piece.style.transition=`transform ${ANIM_MS}ms cubic-bezier(.2,.85,.3,1)`;piece.style.transform=`translate(${toCell.getBoundingClientRect().left-fromCell.getBoundingClientRect().left}px, ${toCell.getBoundingClientRect().top-fromCell.getBoundingClientRect().top}px)`;});let timer=setTimeout(finish,ANIM_MS+80);piece.addEventListener('transitionend',function(){clearTimeout(timer);piece.style.transition='';piece.style.transform='';piece.classList.remove('moving');fromCell.classList.remove('flying');finish();},{once:true});};return api;}
 function prefersReduced(){return window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;}
 function askPromotion(host,cb){host.classList.remove('hidden');host.innerHTML='';const label=document.createElement('div');label.style.cssText='font-size:12px;font-weight:800;width:100%;margin-bottom:4px';label.textContent=Sky.t('choosePromo');host.appendChild(label);for(const t of [E.QUEEN,E.ROOK,E.BISHOP,E.KNIGHT]){const b=document.createElement('button');b.type='button';b.textContent=GLYPH[t];b.addEventListener('click',()=>{host.classList.add('hidden');cb(t);});host.appendChild(b);}}
-document.querySelector('.tabs').addEventListener('click',e=>{const b=e.target.closest('button[data-tab]');if(!b)return;document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-selected',String(x===b)));for(const n of ['lessons','puzzles','game','teacher','live'])document.getElementById('tab-'+n).classList.toggle('hidden',n!==b.dataset.tab);if(b.dataset.tab==='puzzles')puzzleBoard.render();if(b.dataset.tab==='game')gameBoard.render();if(b.dataset.tab==='teacher')loadTeacherTasks();if(b.dataset.tab==='live'){renderLiveNote();if(liveGame)liveBoard.render();}});
+document.querySelector('.tabs').addEventListener('click',e=>{const b=e.target.closest('button[data-tab]');if(!b)return;document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-selected',String(x===b)));for(const n of ['lessons','puzzles','game','teacher','live'])document.getElementById('tab-'+n).classList.toggle('hidden',n!==b.dataset.tab);if(b.dataset.tab==='puzzles')puzzleBoard.render();if(b.dataset.tab==='game')gameBoard.render();if(b.dataset.tab==='teacher')loadTeacherTasks();if(b.dataset.tab==='live'){renderLiveNote();if(liveGame)liveBoard.render();}b.scrollIntoView({inline:'center',block:'nearest'});});
+(function initTabsScroll(){const wrap=document.querySelector('.tabs-wrap'),track=document.querySelector('.tabs'),prev=document.querySelector('.tabs-arrow.prev'),next=document.querySelector('.tabs-arrow.next');if(!wrap||!track)return;function update(){const overflow=track.scrollWidth>track.clientWidth+1;wrap.classList.toggle('has-overflow',overflow);wrap.classList.toggle('can-prev',track.scrollLeft>4);wrap.classList.toggle('can-next',track.scrollLeft<track.scrollWidth-track.clientWidth-4);}track.addEventListener('scroll',update,{passive:true});window.addEventListener('resize',update);prev.addEventListener('click',()=>track.scrollBy({left:-100,behavior:'smooth'}));next.addEventListener('click',()=>track.scrollBy({left:100,behavior:'smooth'}));new ResizeObserver(update).observe(track);update();})();
 function renderLessons(){const box=$('#lessonList');box.innerHTML='';for(const l of window.CHESS_LESSONS){const el=document.createElement('div');el.className='lesson';el.innerHTML='<button type="button"><span></span><span class="arrow">›</span></button><div class="body hidden"></div>';el.querySelector('button span').textContent=Sky.L(l.title);const body=el.querySelector('.body');body.textContent=Sky.L(l.body);if(l.fen){const bd=document.createElement('div');bd.className='board';body.appendChild(bd);const api=makeBoard(bd,{onMove(){}});api.interactive=false;api.state=E.create(l.fen);api.render();}el.querySelector('button').addEventListener('click',()=>{el.classList.toggle('open');body.classList.toggle('hidden');});box.appendChild(el);}}
 const PUZZLES=window.CHESS_PUZZLES;let pIndex=0,pState=null,pSolved=Sky.get('puzzlesSolved',[]);const puzzleBoard=makeBoard($('#pBoard'),{onMove:onPuzzleMove});
 function loadPuzzle(i){pIndex=(i+PUZZLES.length)%PUZZLES.length;const p=PUZZLES[pIndex];pState=E.create(p.fen);Object.assign(puzzleBoard,{state:pState,selected:-1,lastMove:null,interactive:true,flipped:pState.turn===E.BLACK});puzzleBoard.render();const typeKey=p.type==='mate1'?'tMate1':p.type==='defence'?'tDefence':'tTactic';$('#pType').textContent=Sky.t(typeKey);$('#pCount').textContent=Sky.t('pCountOf').replace('%1',pIndex+1).replace('%2',PUZZLES.length);$('#pTurn').textContent=Sky.t(pState.turn===E.WHITE?'whiteMove':'blackMove');$('#pTitle').textContent=Sky.L(p.title);$('#pTask').textContent=Sky.t('findMove').replace('%1',Sky.t(pState.turn===E.WHITE?'white':'black'));$('#pIdea').textContent=Sky.L(p.idea);$('#pIdea').classList.add('hidden');$('#pMsg').textContent='';$('#pMsg').className='gameinfo';$('#pPromo').classList.add('hidden');$('#pSolved').textContent=pSolved.length;$('#pTotal').textContent=PUZZLES.length;}
