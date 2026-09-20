@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Пробник — SkyySchool</title>
+<meta name="description" content="Полный пробный экзамен по предмету на время: результат сразу узнаёте не по вопросам, а в конце — как на настоящем ЕГЭ или ОГЭ. График показывает продвижение к вашей цели по баллам.">
+<meta name="theme-color" content="#f6faff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon-512.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/sky.css">
+<style>
+.exam-shell{max-width:720px;margin:0 auto}
+.exam-hero{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.exam-countdown{font-size:12.5px;font-weight:800;color:var(--muted);padding:8px 13px;border:1px solid var(--line);border-radius:12px;background:var(--panel-2)}
+.exam-countdown b{color:var(--ink)}
+
+.exam-bar{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.exam-progress{flex:1;height:8px;border-radius:99px;background:var(--panel-2);overflow:hidden}
+.exam-progress i{display:block;height:100%;background:var(--m-learn);border-radius:99px;transition:width .25s}
+.exam-timer{font-family:'JetBrains Mono',monospace;font-weight:800;font-size:15px;padding:6px 12px;border-radius:10px;background:var(--panel-2);border:1px solid var(--line);white-space:nowrap}
+.exam-timer.low{color:var(--no);border-color:var(--no);animation:examPulse 1s infinite}
+@keyframes examPulse{0%,100%{opacity:1}50%{opacity:.55}}
+
+.exam-qnum{font-size:11.5px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.exam-qtext{font-size:16.5px;font-weight:800;line-height:1.45;margin-bottom:16px}
+.exam-nav{display:flex;justify-content:space-between;gap:10px;margin-top:18px}
+.exam-jump{display:flex;flex-wrap:wrap;gap:6px;margin-top:16px}
+.exam-jump button{width:32px;height:32px;border-radius:9px;border:1px solid var(--line);background:var(--panel-2);font-size:11.5px;font-weight:800;color:var(--muted)}
+.exam-jump button.done{background:var(--m-learn-soft);color:var(--m-learn);border-color:var(--m-learn)}
+.exam-jump button.cur{border-color:var(--ink);color:var(--ink)}
+
+.exam-score-big{font-size:60px;font-weight:900;line-height:1;text-align:center}
+.exam-score-sub{text-align:center;font-size:13.5px;font-weight:800;color:var(--muted);margin-top:6px}
+.exam-target-row{display:flex;align-items:center;gap:10px;justify-content:center;margin-top:14px;font-size:12.5px;color:var(--muted)}
+.exam-breakdown{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:22px}
+.exam-breakdown>div{padding:12px 10px;border:1px solid var(--line);border-radius:13px;background:var(--panel-2);text-align:center}
+.exam-breakdown b{display:block;font-size:19px;font-weight:900}
+.exam-breakdown span{display:block;margin-top:3px;font-size:10.5px;color:var(--muted)}
+
+.exam-chart-wrap{margin-top:26px}
+.exam-chart{width:100%;height:150px}
+.exam-history{margin-top:14px;font-size:12px;color:var(--muted)}
+.exam-history table{width:100%;border-collapse:collapse;font-size:12.5px}
+.exam-history td{padding:6px 4px;border-top:1px solid var(--line)}
+.exam-history td.num{text-align:right;font-weight:800;font-family:'JetBrains Mono',monospace}
+
+.exam-review-item{padding:14px 15px;border:1px solid var(--line);border-radius:14px;margin-bottom:10px}
+.exam-review-item.ok{border-left:4px solid var(--ok)}
+.exam-review-item.no{border-left:4px solid var(--no)}
+.exam-review-item .q{font-weight:800;font-size:13.5px;margin-bottom:6px}
+.exam-review-item .a{font-size:12.5px;color:var(--muted);line-height:1.5}
+</style>
+</head>
+<body>
+<header id="appHeader"></header>
+
+<main class="wrap exam-shell">
+
+  <section id="examSetup">
+    <div class="exam-hero">
+      <div>
+        <h1 data-i18n="examH1"></h1>
+        <p class="lead" data-i18n="examLead"></p>
+      </div>
+      <div class="exam-countdown hidden" id="examCountdown"></div>
+    </div>
+
+    <div class="panel section">
+      <div class="row">
+        <div class="field">
+          <label data-i18n="subject"></label>
+          <select id="eSubject"></select>
+        </div>
+        <div class="field">
+          <label data-i18n="exam"></label>
+          <select id="eType">
+            <option value="oge">ОГЭ</option>
+            <option value="ege">ЕГЭ</option>
+          </select>
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <div class="field">
+          <label data-i18n="examLen"></label>
+          <select id="eLen">
+            <option value="10">10 · ~15 <span data-i18n="minShort"></span></option>
+            <option value="20" selected>20 · ~30 <span data-i18n="minShort"></span></option>
+            <option value="30">30 · ~45 <span data-i18n="minShort"></span></option>
+          </select>
+        </div>
+        <div class="field">
+          <label data-i18n="examTarget"></label>
+          <input type="number" id="eTarget" min="0" max="100" placeholder="85">
+        </div>
+      </div>
+      <p class="note" style="margin-top:14px" data-i18n="examScaleNote"></p>
+      <button class="btn chess full big" id="eStart" style="margin-top:16px" data-i18n="examStart"></button>
+    </div>
+
+    <div class="panel section hidden" id="examHistoryPanel">
+      <div class="section-head"><h2 data-i18n="examHistoryTitle"></h2></div>
+      <div class="exam-chart-wrap">
+        <svg class="exam-chart" id="examChart" viewBox="0 0 600 150" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="exam-history"><table id="examHistoryTable"></table></div>
+    </div>
+  </section>
+
+  <section id="examRun" class="hidden">
+    <div class="exam-bar">
+      <div class="exam-progress"><i id="examProgressFill" style="width:0%"></i></div>
+      <div class="exam-timer" id="examTimer">--:--</div>
+    </div>
+    <div class="panel section">
+      <div class="exam-qnum" id="examQNum"></div>
+      <div class="exam-qtext" id="examQText"></div>
+      <div class="list" id="examOpts"></div>
+      <div class="exam-nav">
+        <button class="btn ghost" id="examPrev" data-i18n="examPrev"></button>
+        <button class="btn" id="examNext" data-i18n="examNext"></button>
+      </div>
+      <div class="exam-jump" id="examJump"></div>
+      <button class="btn danger full" id="examFinish" style="margin-top:18px" data-i18n="examFinishNow"></button>
+    </div>
+  </section>
+
+  <section id="examResult" class="hidden">
+    <div class="panel section">
+      <div class="exam-score-big" id="erScore">0%</div>
+      <div class="exam-score-sub" id="erSub"></div>
+      <div class="exam-target-row hidden" id="erTargetRow"></div>
+      <div class="exam-breakdown">
+        <div><b id="erEasy">—</b><span data-i18n="easy"></span></div>
+        <div><b id="erMedium">—</b><span data-i18n="medium"></span></div>
+        <div><b id="erHard">—</b><span data-i18n="hard"></span></div>
+      </div>
+      <div class="actions" style="justify-content:center;margin-top:22px">
+        <button class="btn chess" id="erAgain" data-i18n="examAgain"></button>
+        <button class="btn ghost" id="erReview" data-i18n="examReview"></button>
+      </div>
+    </div>
+    <div class="panel section hidden" id="erReviewPanel"></div>
+  </section>
+
+</main>
+<footer id="appFooter"></footer>
+
+<script src="assets/config.js"></script><script src="assets/core.js"></script><script src="assets/streaks.js"></script><script src="assets/db.js"></script><script src="assets/auth.js"></script>
+<script src="data/bank-math.js"></script>
+<script src="data/bank-informatics.js"></script>
+<script src="data/bank-russian.js"></script>
+<script src="data/bank-physics.js"></script>
+<script src="data/bank-biology.js"></script>
+<script src="data/bank-chemistry.js"></script>
+<script src="data/bank-geography.js"></script>
+<script src="data/bank-social.js"></script>
+<script src="data/bank-history.js"></script>
+<script src="data/bank-english.js"></script>
+<script src="data/bank-polish.js"></script>
+<script src="data/bank-spanish.js"></script>
+<script src="data/bank-german.js"></script>
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+Sky.init({
+  navExam: { ru:'Пробник', en:'Mock exam' },
+  examH1: { ru:'Пробный экзамен', en:'Mock exam' },
+  examLead: { ru:'Полный тест по предмету на время — результат вы увидите только в конце, как на настоящем экзамене. История прогонов складывается в график, показывающий, движетесь ли вы к своей цели по баллам.', en:'A full timed subject test — you see the result only at the end, like a real exam. Past runs build a chart showing whether you are moving toward your target score.' },
+  examLen: { ru:'Сколько заданий', en:'How many questions' },
+  minShort: { ru:'мин', en:'min' },
+  examTarget: { ru:'Цель по баллам, %', en:'Target score, %' },
+  examScaleNote: { ru:'Это не официальный балл ЕГЭ/ОГЭ и не их реальная длительность — уменьшенная копия для тренировки под секундомером. Официальную шкалу и полную продолжительность экзамена смотрите на ФИПИ.', en:'This is not the official ЕГЭ/ОГЭ score or their real duration — a scaled-down copy for practising under a timer. See FIPI for the official scale and full exam length.' },
+  examStart: { ru:'Начать пробник', en:'Start the mock exam' },
+  examHistoryTitle: { ru:'Прогресс по прошлым пробникам', en:'Progress on past mock exams' },
+  examPrev: { ru:'← Назад', en:'← Back' },
+  examNext: { ru:'Дальше →', en:'Next →' },
+  examFinishNow: { ru:'Завершить и посмотреть результат', en:'Finish and see the result' },
+  examFinishConfirm: { ru:'Завершить пробник сейчас? Неотвеченные задания посчитаются неверными.', en:'Finish the mock exam now? Unanswered questions count as wrong.' },
+  examTimeUp: { ru:'Время вышло — подводим итог.', en:"Time's up — here's the result." },
+  examAgain: { ru:'Ещё один пробник', en:'Another mock exam' },
+  examReview: { ru:'Разбор по заданиям', en:'Review by question' },
+  examOf: { ru:'Задание %1 из %2', en:'Question %1 of %2' },
+  examResultSub: { ru:'%1 из %2 верно', en:'%1 out of %2 correct' },
+  examTargetHit: { ru:'🎯 Цель достигнута — %1% ≥ %2%', en:'🎯 Target reached — %1% ≥ %2%' },
+  examTargetMiss: { ru:'До цели %1% не хватило %2 п.п.', en:'%2 points short of the %1% target' },
+  examCountdownLabel: { ru:'до экзамена', en:'to your exam' },
+  examSetTargetOnPlan: { ru:'Дата экзамена задаётся на странице «План»', en:'The exam date is set on the "Plan" page' },
+  examEmptyHistory: { ru:'', en:'' },
+  examHistDate: { ru:'Дата', en:'Date' },
+  examHistScore: { ru:'Результат', en:'Score' }
+});
+
+/* ---------- банк заданий ---------- */
+const BANKS = window.BANKS || {};
+const subjSel = $('#eSubject');
+Object.keys(BANKS).sort((a, b) => Sky.L(BANKS[a].name).localeCompare(Sky.L(BANKS[b].name), 'ru')).forEach(id => {
+  const o = document.createElement('option');
+  o.value = id; o.textContent = Sky.L(BANKS[id].name);
+  subjSel.appendChild(o);
+});
+document.addEventListener('langchange', () => {
+  Array.from(subjSel.options).forEach(o => { o.textContent = Sky.L(BANKS[o.value].name); });
+});
+
+/* ---------- сборка пробника ---------- */
+const HIST_KEY = 'mockExams';
+const TARGET_KEY = 'examTargets';
+const history = () => Sky.get(HIST_KEY, []);
+const targets = () => Sky.get(TARGET_KEY, {});
+
+function pickExamTasks(subjectId, examType, count) {
+  const bank = BANKS[subjectId];
+  if (!bank) return [];
+  const pool = bank.tasks.filter(t => t.exam === examType || t.exam === 'both');
+  const byDiff = { easy: [], medium: [], hard: [] };
+  pool.forEach(t => (byDiff[t.difficulty] || byDiff.medium).push(t));
+  // пропорции похожи на реальный экзамен: больше лёгких и средних, меньше сложных
+  const wantEasy = Math.round(count * 0.35);
+  const wantHard = Math.round(count * 0.2);
+  const wantMedium = count - wantEasy - wantHard;
+  const take = (arr, n) => Sky.shuffle(arr).slice(0, n);
+  let chosen = take(byDiff.easy, wantEasy).concat(take(byDiff.medium, wantMedium)).concat(take(byDiff.hard, wantHard));
+  if (chosen.length < count) {
+    const used = new Set(chosen.map(t => t.id));
+    const rest = pool.filter(t => !used.has(t.id));
+    chosen = chosen.concat(Sky.shuffle(rest).slice(0, count - chosen.length));
+  }
+  return Sky.shuffle(chosen).slice(0, Math.min(count, chosen.length));
+}
+
+/* ---------- состояние прогона ---------- */
+let run = null; // { subject, examType, tasks, answers:[idx|null], startedAt, durationSec, timerId }
+
+function fmtTime(sec) {
+  sec = Math.max(0, Math.round(sec));
+  return String(Math.floor(sec / 60)).padStart(2, '0') + ':' + String(sec % 60).padStart(2, '0');
+}
+
+function startExam() {
+  const subject = subjSel.value;
+  const examType = $('#eType').value;
+  const count = +$('#eLen').value;
+  const targetVal = $('#eTarget').value.trim();
+  if (targetVal) {
+    const t = targets(); t[subject] = Math.max(0, Math.min(100, +targetVal)); Sky.set(TARGET_KEY, t);
+  }
+  const tasks = pickExamTasks(subject, examType, count);
+  if (!tasks.length) { Sky.toast(Sky.t('examOff', 'Нет заданий для этого набора')); return; }
+  const perTaskSec = 90; // масштаб: 1.5 мин на задание вместо часов настоящего экзамена
+  run = {
+    subject, examType, tasks,
+    answers: new Array(tasks.length).fill(null),
+    idx: 0,
+    startedAt: Date.now(),
+    durationSec: tasks.length * perTaskSec
+  };
+  $('#examSetup').classList.add('hidden');
+  $('#examResult').classList.add('hidden');
+  $('#examRun').classList.remove('hidden');
+  renderQuestion();
+  tickTimer();
+  run.timerId = setInterval(tickTimer, 1000);
+}
+
+function tickTimer() {
+  const el = $('#examTimer');
+  const elapsed = (Date.now() - run.startedAt) / 1000;
+  const left = run.durationSec - elapsed;
+  el.textContent = fmtTime(left);
+  el.classList.toggle('low', left <= 60);
+  if (left <= 0) { clearInterval(run.timerId); Sky.toast(Sky.t('examTimeUp')); finishExam(); }
+}
+
+function renderQuestion() {
+  const t = run.tasks[run.idx];
+  $('#examQNum').textContent = Sky.t('examOf').replace('%1', run.idx + 1).replace('%2', run.tasks.length);
+  $('#examQText').textContent = Sky.L(t.text);
+  $('#examProgressFill').style.width = Math.round(((run.idx) / run.tasks.length) * 100) + '%';
+
+  const box = $('#examOpts'); box.innerHTML = '';
+  (t.options || []).forEach((op, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'opt';
+    b.setAttribute('aria-pressed', String(run.answers[run.idx] === i));
+    b.innerHTML = `<span class="k">${String.fromCharCode(65 + i)}</span><span>${esc(Sky.L(op))}</span>`;
+    b.addEventListener('click', () => { run.answers[run.idx] = i; renderQuestion(); });
+    box.appendChild(b);
+  });
+
+  $('#examPrev').disabled = run.idx === 0;
+  $('#examNext').textContent = run.idx === run.tasks.length - 1 ? Sky.t('examFinishNow') : Sky.t('examNext');
+
+  const jump = $('#examJump'); jump.innerHTML = '';
+  run.tasks.forEach((_, i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = i + 1;
+    if (run.answers[i] != null) b.classList.add('done');
+    if (i === run.idx) b.classList.add('cur');
+    b.addEventListener('click', () => { run.idx = i; renderQuestion(); });
+    jump.appendChild(b);
+  });
+}
+
+$('#examPrev').addEventListener('click', () => { if (run.idx > 0) { run.idx--; renderQuestion(); } });
+$('#examNext').addEventListener('click', () => {
+  if (run.idx < run.tasks.length - 1) { run.idx++; renderQuestion(); }
+  else finishExam();
+});
+$('#examFinish').addEventListener('click', () => {
+  if (confirm(Sky.t('examFinishConfirm'))) finishExam();
+});
+
+function finishExam() {
+  if (run.timerId) clearInterval(run.timerId);
+  const byDiff = { easy: [0, 0], medium: [0, 0], hard: [0, 0] }; // [right, total]
+  let right = 0;
+  run.tasks.forEach((t, i) => {
+    const d = byDiff[t.difficulty] || byDiff.medium;
+    d[1]++;
+    if (run.answers[i] === t.answer) { right++; d[0]++; }
+  });
+  const percent = Sky.pct(right, run.tasks.length);
+
+  const entry = { date: Sky.dayKey(), ts: Date.now(), subject: run.subject, examType: run.examType, percent, right, total: run.tasks.length };
+  const h = history(); h.push(entry); Sky.set(HIST_KEY, h.slice(-200));
+
+  $('#examRun').classList.add('hidden');
+  $('#examResult').classList.remove('hidden');
+  $('#erScore').textContent = percent + '%';
+  $('#erSub').textContent = Sky.t('examResultSub').replace('%1', right).replace('%2', run.tasks.length);
+  $('#erEasy').textContent = byDiff.easy[1] ? byDiff.easy[0] + '/' + byDiff.easy[1] : '—';
+  $('#erMedium').textContent = byDiff.medium[1] ? byDiff.medium[0] + '/' + byDiff.medium[1] : '—';
+  $('#erHard').textContent = byDiff.hard[1] ? byDiff.hard[0] + '/' + byDiff.hard[1] : '—';
+
+  const tg = targets()[run.subject];
+  const row = $('#erTargetRow');
+  if (tg != null) {
+    row.classList.remove('hidden');
+    row.textContent = percent >= tg ? Sky.t('examTargetHit').replace('%1', percent).replace('%2', tg)
+                                      : Sky.t('examTargetMiss').replace('%1', tg).replace('%2', tg - percent);
+  } else row.classList.add('hidden');
+
+  $('#erReviewPanel').classList.add('hidden');
+  $('#erReviewPanel').dataset.built = '';
+  document.dispatchEvent(new CustomEvent('statschange'));
+}
+
+$('#erAgain').addEventListener('click', () => {
+  $('#examResult').classList.add('hidden');
+  $('#examSetup').classList.remove('hidden');
+  renderHistory();
+});
+$('#erReview').addEventListener('click', () => {
+  const panel = $('#erReviewPanel');
+  panel.classList.toggle('hidden');
+  if (panel.dataset.built) return;
+  panel.dataset.built = '1';
+  panel.innerHTML = run.tasks.map((t, i) => {
+    const ok = run.answers[i] === t.answer;
+    const given = run.answers[i] != null ? Sky.L(t.options[run.answers[i]]) : (Sky.lang === 'ru' ? '— пропущено —' : '— skipped —');
+    return `<div class="exam-review-item ${ok ? 'ok' : 'no'}">
+      <div class="q">${i + 1}. ${esc(Sky.L(t.text))}</div>
+      <div class="a">${ok ? '✓' : '✕'} ${esc(given)}${ok ? '' : '<br>' + esc(Sky.t('correctIs')) + esc(Sky.L(t.options[t.answer]))}</div>
+    </div>`;
+  }).join('');
+});
+
+/* ---------- график прогресса ---------- */
+function renderHistory() {
+  const subject = subjSel.value;
+  const rows = history().filter(e => e.subject === subject).slice(-20);
+  const panel = $('#examHistoryPanel');
+  if (!rows.length) { panel.classList.add('hidden'); return; }
+  panel.classList.remove('hidden');
+
+  const tg = targets()[subject];
+  const svg = $('#examChart');
+  const W = 600, H = 150, PAD = 10;
+  const pts = rows.map((r, i) => {
+    const x = rows.length === 1 ? W / 2 : PAD + (i / (rows.length - 1)) * (W - PAD * 2);
+    const y = H - PAD - (r.percent / 100) * (H - PAD * 2);
+    return [x, y];
+  });
+  let svgHtml = '';
+  if (tg != null) {
+    const ty = H - PAD - (tg / 100) * (H - PAD * 2);
+    svgHtml += `<line x1="0" y1="${ty}" x2="${W}" y2="${ty}" stroke="var(--warn)" stroke-width="1.5" stroke-dasharray="5,5"/>`;
+  }
+  const path = pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+  svgHtml += `<path d="${path}" fill="none" stroke="var(--m-learn)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+  svgHtml += pts.map(p => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="4" fill="var(--m-learn)"/>`).join('');
+  svg.innerHTML = svgHtml;
+
+  const table = $('#examHistoryTable');
+  table.innerHTML = rows.slice().reverse().slice(0, 8).map(r =>
+    `<tr><td>${r.date}</td><td class="num">${r.percent}%</td><td>${r.right}/${r.total}</td></tr>`
+  ).join('');
+}
+
+subjSel.addEventListener('change', () => {
+  const tg = targets()[subjSel.value];
+  $('#eTarget').value = tg != null ? tg : '';
+  renderHistory();
+});
+$('#eStart').addEventListener('click', startExam);
+
+/* ---------- обратный отсчёт до даты экзамена (страница «План») ---------- */
+function renderCountdown() {
+  const plan = Sky.get('plan', null);
+  const el = $('#examCountdown');
+  if (!plan || !plan.exam) { el.classList.add('hidden'); return; }
+  const days = Sky.daysLeft(plan.exam);
+  if (days == null) { el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  el.innerHTML = (days >= 0 ? `<b>${days}</b> ${Sky.plural(days, 'день', 'дня', 'дней').replace(days + ' ', '')}` : (Sky.lang === 'ru' ? 'дата прошла' : 'date has passed')) + ' ' + Sky.t('examCountdownLabel');
+}
+
+renderCountdown();
+renderHistory();
+document.addEventListener('langchange', () => { renderCountdown(); renderHistory(); });
+</script>
+</body></html>
