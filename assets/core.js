@@ -683,3 +683,4 @@ window.Sky = (function () {
     resetProgress() { ['stats','srs','puzzlesSolved','kids','life'].forEach(del); document.dispatchEvent(new CustomEvent('statschange')); }
   };
 })();
+ 
