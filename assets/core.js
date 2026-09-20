@@ -372,23 +372,31 @@ window.Sky = (function () {
   function stats() {
     return get('stats', { solved:0, right:0, streak:0, best:0, byDay:{}, bySubject:{} });
   }
-  function bumpStats(subject, correct) {
-    const s = stats();
-    s.solved++;
-    if (correct) { s.right++; s.streak++; if (s.streak > s.best) s.best = s.streak; }
-    else s.streak = 0;
+function bumpStats(subject, correct) {
+  const s = stats();
+  s.solved++;
+  if (correct) { s.right++; s.streak++; if (s.streak > s.best) s.best = s.streak; }
+  else s.streak = 0;
 
-    const k = dayKey();
-    s.byDay[k] = s.byDay[k] || { n:0, right:0 };
-    s.byDay[k].n++; if (correct) s.byDay[k].right++;
+  const k = dayKey();
+  s.byDay[k] = s.byDay[k] || { n:0, right:0 };
+  s.byDay[k].n++; if (correct) s.byDay[k].right++;
 
-    s.bySubject[subject] = s.bySubject[subject] || { n:0, right:0 };
-    s.bySubject[subject].n++; if (correct) s.bySubject[subject].right++;
+  s.bySubject[subject] = s.bySubject[subject] || { n:0, right:0 };
+  s.bySubject[subject].n++; if (correct) s.bySubject[subject].right++;
 
-    set('stats', s);
-    document.dispatchEvent(new CustomEvent('statschange'));
-    return s;
+  set('stats', s);
+
+  /* Стрик по дням: отмечаем, что ученик занимался сегодня,
+     и обновляем огонёк на главной, если он там есть. */
+  if (window.Streaks) {
+    Streaks.tick();
+    Streaks.render('#stStreak');
   }
+
+  document.dispatchEvent(new CustomEvent('statschange'));
+  return s;
+}
   const todayCount = () => (stats().byDay[dayKey()] || {}).n || 0;
 
   /* ---------- интервальное повторение (метод Лейтнера) ----------
@@ -660,14 +668,35 @@ window.Sky = (function () {
     });
   }
 
-  function init(extra) {
-    extendDict(extra);
-    renderHeader();
-    renderFooter();
-    applyI18n();
-    registerOffline();
-    document.addEventListener('langchange', () => { applyI18n(); renderFooter(); });
-  }
+function init(extra) {
+  extendDict(extra);
+  renderHeader();
+  renderFooter();
+  applyI18n();
+  registerOffline();
+
+  /* Автозагрузка streaks.js — один раз, работает на всех страницах.
+     Раньше приходилось подключать <script> вручную на каждой странице;
+     теперь достаточно одного core.js. */
+  (function loadStreaks() {
+    if (window.Streaks) {
+      Streaks.tick();
+      Streaks.render('#stStreak');
+      return;
+    }
+    const s = document.createElement('script');
+    s.src = 'assets/streaks.js';
+    s.onload = function () {
+      if (window.Streaks) {
+        Streaks.tick();
+        Streaks.render('#stStreak');
+      }
+    };
+    document.head.appendChild(s);
+  })();
+
+  document.addEventListener('langchange', () => { applyI18n(); renderFooter(); });
+}
 
   return {
     cfg: CFG, get, set, del, storageOk,
