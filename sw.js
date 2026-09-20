@@ -6,14 +6,14 @@
   browser error "Response body is already used" seen in DevTools.
 */
 'use strict';
-
+ 
 const CACHE_VERSION = 'sky-v3';
 const STATIC_CACHE = CACHE_VERSION + '-static';
-
+ 
 const PRECACHE_URLS = [
   './',
-  'index.html','trainer.html','kids.html','chess.html','teachers.html','homework.html','life.html','plan.html','tools.html','photo.html','offline.html','manifest.json',
-  'assets/config.js','assets/core.js','assets/db.js','assets/auth.js',
+  'index.html','trainer.html','kids.html','chess.html','teachers.html','homework.html','life.html','plan.html','tools.html','photo.html','offline.html','exam.html','essay.html','parent.html','manifest.json',
+  'assets/config.js','assets/core.js','assets/streaks.js','assets/db.js','assets/auth.js',
   'assets/chess-engine.js','assets/chess-ai.js','assets/chess-review.js',
   'assets/chess-teacher-ui.js','assets/chess-teacher-ui-core.js',
   'assets/chess-game-modes.js','assets/chess-puzzle-coach.js','assets/chess-game-flow.js',
@@ -24,7 +24,7 @@ const PRECACHE_URLS = [
   'data/bank-geography.js','data/bank-social.js','data/bank-history.js','data/bank-english.js','data/bank-polish.js','data/bank-spanish.js','data/bank-german.js',
   'data/bank-kids.js','data/chess-lessons.js','data/chess-puzzles.js'
 ];
-
+ 
 self.addEventListener('install',event=>{
   event.waitUntil(
     caches.open(STATIC_CACHE)
@@ -32,7 +32,7 @@ self.addEventListener('install',event=>{
       .then(()=>self.skipWaiting())
   );
 });
-
+ 
 self.addEventListener('activate',event=>{
   event.waitUntil(
     caches.keys()
@@ -40,19 +40,19 @@ self.addEventListener('activate',event=>{
       .then(()=>self.clients.claim())
   );
 });
-
+ 
 function isLiveEndpoint(url){
-  return /supabase\\.(co|in)|deepseek\\.com|\\/functions\\/v1\\//.test(url.href)
+  return /supabase\.(co|in)|deepseek\.com|\/functions\/v1\//.test(url.href)
       || url.pathname.includes('/rest/') || url.pathname.includes('/auth/v1/');
 }
-
+ 
 self.addEventListener('fetch',event=>{
   const req=event.request;
   if(req.method!=='GET')return;
   const url=new URL(req.url);
   if(isLiveEndpoint(url))return;
   if(url.origin!==self.location.origin)return;
-
+ 
   /* Online: always return the fresh network response.
      Offline: serve the cached response. No Response.clone()/cache.put()
      is performed in the fetch path, eliminating body-reuse races. */
