@@ -42,6 +42,12 @@
   --m-teach:#f43f5e;   --m-teach-soft:#ffecf0;
   --m-plan:#0ea5b7;    --m-plan-soft:#e3f7f9;
   --m-tools:#b45309;   --m-tools-soft:#fdf1e2;
+  --m-class:#ca8a04;   --m-class-soft:#fdf6e0;
+  --m-dean:#475569;    --m-dean-soft:#eef1f5;
+  --m-pe:#65a30d;      --m-pe-soft:#f1f9e2;
+  --m-psy:#0d9488;     --m-psy-soft:#e6f7f5;
+  --m-track:#4f46e5;   --m-track-soft:#ecebfd;
+  --m-body:#be185d;    --m-body-soft:#fdeaf2;
 
   /* доска */
   --board-light:#eaf2fc; --board-dark:#a9c3e0;
@@ -85,6 +91,12 @@
   --m-teach:#fb7185;  --m-teach-soft:#331520;
   --m-plan:#22d3ee;   --m-plan-soft:#0c2a31;
   --m-tools:#f0a94e;  --m-tools-soft:#33230f;
+  --m-class:#eab308;  --m-class-soft:#332705;
+  --m-dean:#94a3b8;   --m-dean-soft:#1e2733;
+  --m-pe:#a3e635;     --m-pe-soft:#263305;
+  --m-psy:#2dd4bf;    --m-psy-soft:#0b2e2b;
+  --m-track:#818cf8;  --m-track-soft:#1b1b42;
+  --m-body:#f472b6;   --m-body-soft:#3a1024;
 
   --board-light:#a9adcd; --board-dark:#6c7199;
 
@@ -128,6 +140,12 @@
   --m-teach:#fb7185;  --m-teach-soft:#331520;
   --m-plan:#22d3ee;   --m-plan-soft:#0c2a31;
   --m-tools:#f0a94e;  --m-tools-soft:#33230f;
+  --m-class:#eab308;  --m-class-soft:#332705;
+  --m-dean:#94a3b8;   --m-dean-soft:#1e2733;
+  --m-pe:#a3e635;     --m-pe-soft:#263305;
+  --m-psy:#2dd4bf;    --m-psy-soft:#0b2e2b;
+  --m-track:#818cf8;  --m-track-soft:#1b1b42;
+  --m-body:#f472b6;   --m-body-soft:#3a1024;
 
   --board-light:#a9adcd; --board-dark:#6c7199;
 
@@ -301,6 +319,9 @@ h3{font-size:16px;font-weight:800}
 .tile.teach .ico{background:var(--m-teach-soft);color:var(--m-teach)}
 .tile.plan  .ico{background:var(--m-plan-soft);color:var(--m-plan)}
 .tile.tools .ico{background:var(--m-tools-soft);color:var(--m-tools)}
+.tile.class .ico{background:var(--m-class-soft);color:var(--m-class)}
+.tile.dean  .ico{background:var(--m-dean-soft);color:var(--m-dean)}
+.tile.pe    .ico{background:var(--m-pe-soft);color:var(--m-pe)}
 .tile.learn:hover{border-color:var(--m-learn)}
 .tile.kids:hover{border-color:var(--m-kids)}
 .tile.chess:hover{border-color:var(--m-chess)}
@@ -308,6 +329,9 @@ h3{font-size:16px;font-weight:800}
 .tile.teach:hover{border-color:var(--m-teach)}
 .tile.plan:hover{border-color:var(--m-plan)}
 .tile.tools:hover{border-color:var(--m-tools)}
+.tile.class:hover{border-color:var(--m-class)}
+.tile.dean:hover{border-color:var(--m-dean)}
+.tile.pe:hover{border-color:var(--m-pe)}
 
 /* ---------- кнопки ---------- */
 .btn{
@@ -485,7 +509,7 @@ h3{font-size:16px;font-weight:800}
 /* Клетка, по которой сейчас летит фигура, поднимается над соседями,
    иначе фигура уезжает ПОД них и анимация выглядит сломанной. */
 .sqr.flying{z-index:6}
-.piece.moving{ pointer-events: none; will-change: transform; }
+.piece.moving{will-change:transform}
 /* Съеденная фигура не исчезает мгновенно, а сжимается — так видно,
    что именно её только что забрали. */
 .piece.taken{animation:takePiece .22s ease-in forwards;pointer-events:none}
@@ -687,52 +711,570 @@ h3{font-size:16px;font-weight:800}
 .pye-console .err{color:#ff9b9b}
 .pye-console .muted{color:#8fa6c9}
 .pye-run{margin-top:10px}
-/* ---------- панель выбора шахматного тренера ---------- */
-.tui-picker{
-  display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
-  gap:10px;
-}
-.tui-card{
-  display:flex;gap:12px;align-items:center;min-width:0;
-  padding:12px;border:1px solid var(--line);border-radius:var(--r-sm);
-  background:var(--panel);box-shadow:var(--shadow-sm);
-  cursor:pointer;text-align:left;
-  transition:transform .15s, border-color .15s, background .15s;
-}
-.tui-card:hover{transform:translateY(-2px);border-color:var(--line-2)}
-.tui-card:active{transform:translateY(0)}
-.tui-card.active{border-color:var(--m-chess);background:var(--m-chess-soft)}
 
-.tui-card-info{min-width:0;flex:1}
-.tui-card-info b{display:block;font-size:13px;font-weight:900;line-height:1.2;color:var(--ink)}
-.tui-card-info span{display:block;font-size:11px;color:var(--muted);margin-top:3px;line-height:1.25}
-.tui-card-info small{display:block;font-size:10px;letter-spacing:1px;color:var(--warn);margin-top:4px;line-height:1}
+/* ==========================================================================
+   Ролевые вкладки: classroom.html, headteacher.html, pe.html
+   (общая логика — assets/roles.js)
+   ========================================================================== */
 
-.tui-face{width:48px;height:48px;flex:none;border-radius:50%;overflow:hidden}
-.tui-face svg{display:block;width:100%;height:100%}
+/* ---------- выбор предметов чипами (чекбоксы-«таблетки») ---------- */
+.chip-label{display:block;font-size:11px;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.chip-select{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.chip-opt{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:8px 14px 8px 10px;border-radius:99px;
+  border:1.5px solid var(--line);background:var(--panel);
+  font-size:12.5px;font-weight:800;cursor:pointer;transition:.15s;color:var(--ink);
+}
+.chip-opt:hover{border-color:var(--line-2)}
+.chip-opt.on{border-color:var(--accent);background:var(--m-learn-soft);color:var(--accent)}
+.chip-opt .ic{font-size:15px}
 
-/* карточка учителя в блоке разбора хода (под доской) */
-.tui-inline{
-  display:flex;gap:11px;align-items:flex-start;
-  padding:10px 12px;margin-bottom:10px;
-  background:var(--panel);
-  border:1px solid var(--line);border-left-width:4px;border-radius:12px;
+/* ---------- карточка роли (задание / курс / рекомендация) ---------- */
+.role-card{
+  display:flex;align-items:flex-start;gap:12px;
+  border:1.5px solid var(--line);border-radius:var(--r);padding:14px 16px;
+  background:var(--panel);transition:.15s;
 }
-.tui-inline[data-quality="brilliant"]{border-left-color:#8b5cf6}
-.tui-inline[data-quality="good"]{border-left-color:var(--ok)}
-.tui-inline[data-quality="inaccuracy"]{border-left-color:var(--warn)}
-.tui-inline[data-quality="mistake"]{border-left-color:#e07a3f}
-.tui-inline[data-quality="blunder"]{border-left-color:var(--no)}
-.tui-inline .tui-text{min-width:0;flex:1}
-.tui-inline .tui-name{font-weight:900;font-size:13px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
-.tui-role{font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
-.tui-line{font-size:13px;line-height:1.5;margin-top:4px;color:var(--ink)}
+.role-card.link{text-decoration:none;color:inherit;cursor:pointer}
+.role-card.link:hover{border-color:var(--line-2);transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+.role-card .ic{font-size:22px;flex:none;line-height:1.3}
+.role-card .body{flex:1;min-width:0}
+.role-card .body b{display:block;font-size:14px;font-weight:900}
+.role-card .body span{display:block;font-size:12px;color:var(--muted);margin-top:3px;line-height:1.5}
+.role-card .body .progress{margin-top:9px}
+.role-list{display:flex;flex-direction:column;gap:10px;margin-top:14px}
 
-@media (max-width:600px){
-  .tui-picker{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .tui-card{gap:10px;padding:10px}
+/* ---------- дедлайны ---------- */
+.deadline-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.deadline-row:last-child{border-bottom:none}
+.deadline-row .txt{flex:1;min-width:0;font-size:13px;font-weight:700}
+.deadline-row .days{font-size:11.5px;font-weight:900;padding:3px 10px;border-radius:99px;flex:none}
+.deadline-row .days.far{background:var(--panel-2);color:var(--muted)}
+.deadline-row .days.soon{background:var(--warn-soft);color:var(--warn)}
+.deadline-row .days.over{background:var(--no-soft);color:var(--no)}
+
+/* ---------- завуч: пропуски ---------- */
+.absence-item{display:flex;align-items:center;gap:12px}
+.absence-item .ic{font-size:18px;flex:none}
+.absence-item .info{flex:1;min-width:0}
+.absence-item .info b{display:block;font-size:13.5px;font-weight:800}
+.absence-item .info span{font-size:11.5px;color:var(--muted);font-weight:700}
+.subj-stat-row{display:flex;align-items:center;gap:10px;padding:7px 0}
+.subj-stat-row .ic{width:26px;text-align:center;flex:none}
+.subj-stat-row .name{flex:1;font-size:13px;font-weight:700}
+.subj-stat-row .bar{width:120px;flex:none}
+.subj-stat-row .n{width:26px;text-align:right;font-size:12.5px;font-weight:900;color:var(--muted);flex:none}
+
+/* ---------- физрук: нормативы, тренировки, медали ---------- */
+.pe-standards{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:14px}
+.pe-std-card{border:1.5px solid var(--line);border-radius:var(--r);padding:14px;text-align:center;transition:.15s}
+.pe-std-card.active{border-color:var(--m-pe);background:var(--m-pe-soft)}
+.pe-std-card b{display:block;font-size:13px;font-weight:900;margin-bottom:8px}
+.pe-std-card .row{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);font-weight:700;margin-top:4px}
+.pe-std-card .row b{display:inline;font-size:11.5px;color:var(--ink)}
+
+.tip-box{
+  display:flex;align-items:center;gap:12px;border-radius:var(--r);
+  background:var(--m-pe-soft);border:1.5px solid transparent;padding:14px 16px;margin-top:14px;
 }
-@media (max-width:360px){
-  .tui-picker{grid-template-columns:1fr}
+.tip-box .ic{font-size:22px;flex:none}
+.tip-box p{flex:1;font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.5}
+
+.medal-row{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px}
+.medal{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  width:88px;padding:12px 6px;border-radius:var(--r);
+  border:1.5px solid var(--line);background:var(--panel);
+  opacity:.4;filter:grayscale(1);transition:.25s;
 }
+.medal.unlocked{opacity:1;filter:none;border-color:var(--m-pe);background:var(--m-pe-soft)}
+.medal .ic{font-size:30px;line-height:1}
+.medal span{font-size:10px;font-weight:800;color:var(--muted);text-align:center;line-height:1.3}
+.medal.unlocked span{color:var(--ink)}
+.medal.pop{animation:medalPop .6s cubic-bezier(.34,1.56,.64,1)}
+@keyframes medalPop{
+  0%{transform:scale(.4) rotate(-12deg);opacity:0}
+  60%{transform:scale(1.15) rotate(6deg);opacity:1}
+  100%{transform:scale(1) rotate(0)}
+}
+.pe-level{
+  display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:900;
+  background:var(--m-pe-soft);color:var(--m-pe);padding:6px 14px;border-radius:99px;
+}
+
+@media (max-width:560px){
+  .subj-stat-row .bar{width:70px}
+  .medal{width:74px}
+}
+
+/* ==========================================================================
+   Вкладка «Психолог»: psychologist.html
+   (логика и тексты — assets/psychologist.js)
+
+   Важно про цвет: здесь намеренно нет красного ни на результатах
+   тестов, ни на уровнях. Красный на экране «у тебя высокий уровень
+   тревоги» читается как тревога сама по себе. Высокий уровень
+   помечен спокойным янтарным, а единственный красный на странице —
+   кнопка экстренной помощи, чтобы её нельзя было ни с чем спутать.
+   ========================================================================== */
+
+/* ---------- плашка-дисклеймер (всегда на виду, не закрывается) ---------- */
+.psy-disclaimer{
+  display:flex;align-items:flex-start;gap:12px;
+  border:1.5px solid var(--line);border-left:4px solid var(--m-psy);
+  border-radius:var(--r);background:var(--m-psy-soft);
+  padding:14px 16px;margin-bottom:22px;
+}
+.psy-disclaimer .ic{font-size:20px;flex:none;line-height:1.2}
+.psy-disclaimer p{flex:1;font-size:13px;font-weight:700;color:var(--ink);line-height:1.55}
+.psy-disclaimer a{color:var(--m-psy);font-weight:900;white-space:nowrap}
+
+/* ---------- карточки тестов ---------- */
+.psy-tests{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-top:16px}
+.psy-test-card{
+  border:1.5px solid var(--line);border-radius:var(--r);padding:16px;
+  background:var(--panel);transition:.15s;text-align:left;cursor:pointer;
+  display:flex;flex-direction:column;gap:8px;font:inherit;color:inherit;width:100%;
+}
+.psy-test-card:hover{border-color:var(--m-psy);transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+.psy-test-card .ic{font-size:26px;line-height:1}
+.psy-test-card b{font-size:14.5px;font-weight:900}
+.psy-test-card .based{font-size:11.5px;color:var(--muted);font-weight:700;line-height:1.45}
+.psy-test-card .last{margin-top:auto;padding-top:8px;font-size:11.5px;font-weight:800;color:var(--muted)}
+
+/* ---------- вопрос шкалы ---------- */
+.psy-q{border:1.5px solid var(--line);border-radius:var(--r);padding:18px;background:var(--panel)}
+.psy-q .qnum{font-size:11px;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:var(--m-psy)}
+.psy-q .qtext{font-size:16px;font-weight:800;line-height:1.45;margin-top:8px}
+.psy-opts{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.psy-opt{
+  display:flex;align-items:center;gap:11px;padding:12px 14px;border-radius:var(--r-sm);
+  border:1.5px solid var(--line);background:var(--panel);cursor:pointer;transition:.13s;
+  font-size:13.5px;font-weight:700;text-align:left;color:var(--ink);width:100%;font-family:inherit;
+}
+.psy-opt:hover{border-color:var(--line-2);background:var(--panel-2)}
+.psy-opt.on{border-color:var(--m-psy);background:var(--m-psy-soft);color:var(--m-psy);font-weight:900}
+.psy-opt .dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--line-2);flex:none;transition:.13s}
+.psy-opt.on .dot{border-color:var(--m-psy);background:var(--m-psy);box-shadow:inset 0 0 0 3px var(--panel)}
+
+/* ---------- отдельный блок проверки безопасности ----------
+   Визуально не такой, как вопросы теста, — чтобы было видно, что это
+   не очередной пункт со шкалой, а разговор. */
+.psy-safety{
+  border:1.5px solid var(--m-psy);border-radius:var(--r);
+  background:var(--m-psy-soft);padding:18px;
+}
+.psy-safety .qtext{font-size:15.5px;font-weight:800;line-height:1.5}
+.psy-safety .qnote{font-size:12px;color:var(--muted);font-weight:700;margin-top:8px;line-height:1.5}
+.psy-safety .psy-opt{background:var(--panel)}
+
+/* ---------- результат ---------- */
+.psy-result{text-align:center;padding:8px 0 4px}
+.psy-result .big-ic{font-size:46px;line-height:1}
+.psy-level{
+  display:inline-block;margin-top:12px;padding:7px 18px;border-radius:99px;
+  font-size:13.5px;font-weight:900;
+}
+.psy-level.low{background:var(--ok-soft);color:var(--ok)}
+.psy-level.mid{background:var(--m-psy-soft);color:var(--m-psy)}
+.psy-level.high{background:var(--warn-soft);color:var(--warn)}
+.psy-result .score{font-size:12.5px;color:var(--muted);font-weight:800;margin-top:10px}
+.psy-result .band-text{font-size:14px;line-height:1.65;margin-top:14px;text-align:left;color:var(--ink);font-weight:600}
+
+/* блок поддержки — показывается вместо сухого результата, когда
+   человек отметил тяжёлые мысли */
+.psy-support{
+  border:2px solid var(--m-psy);border-radius:var(--r);
+  background:var(--m-psy-soft);padding:20px;margin-bottom:18px;text-align:left;
+}
+.psy-support h3{font-size:16px;font-weight:900;margin-bottom:10px}
+.psy-support p{font-size:13.5px;line-height:1.65;font-weight:600}
+
+/* ---------- телефоны доверия ---------- */
+.psy-lines{display:flex;flex-direction:column;gap:11px;margin-top:14px}
+.psy-line{
+  display:flex;align-items:center;gap:13px;text-decoration:none;color:inherit;
+  border:1.5px solid var(--line);border-radius:var(--r);padding:14px 16px;
+  background:var(--panel);transition:.15s;
+}
+.psy-line:hover{border-color:var(--m-psy);transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+.psy-line.primary{border-color:var(--m-psy);background:var(--m-psy-soft)}
+.psy-line .ic{font-size:22px;flex:none}
+.psy-line .body{flex:1;min-width:0}
+.psy-line .num{display:block;font-size:17px;font-weight:900;letter-spacing:.01em;font-family:var(--mono,inherit)}
+.psy-line .who{display:block;font-size:12.5px;font-weight:800;margin-top:2px}
+.psy-line .note{display:block;font-size:11.5px;color:var(--muted);font-weight:700;margin-top:4px;line-height:1.45}
+
+/* ---------- красная кнопка (единственный красный на странице) ---------- */
+.psy-sos{
+  position:fixed;right:18px;bottom:18px;z-index:60;
+  display:inline-flex;align-items:center;gap:9px;
+  padding:13px 20px;border-radius:99px;border:none;cursor:pointer;
+  background:var(--no);color:#fff;font-family:inherit;font-size:13.5px;font-weight:900;
+  box-shadow:0 6px 20px rgba(225,29,72,.35);transition:.18s;
+}
+.psy-sos:hover{transform:translateY(-2px);box-shadow:0 9px 26px rgba(225,29,72,.45)}
+.psy-sos .ic{font-size:16px}
+@media (max-width:560px){
+  .psy-sos{right:12px;bottom:12px;padding:12px 16px;font-size:12.5px}
+}
+
+/* ---------- дневник: шкалы 1–5 ---------- */
+.psy-scale{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.psy-scale button{
+  flex:1;min-width:58px;padding:11px 6px;border-radius:var(--r-sm);
+  border:1.5px solid var(--line);background:var(--panel);cursor:pointer;
+  font-family:inherit;transition:.13s;display:flex;flex-direction:column;align-items:center;gap:4px;
+}
+.psy-scale button:hover{border-color:var(--line-2)}
+.psy-scale button.on{border-color:var(--m-psy);background:var(--m-psy-soft)}
+.psy-scale button .face{font-size:21px;line-height:1}
+.psy-scale button .lab{font-size:10px;font-weight:800;color:var(--muted)}
+.psy-scale button.on .lab{color:var(--m-psy)}
+
+/* ---------- график настроения за 30 дней ---------- */
+.mood-chart{
+  display:flex;align-items:flex-end;gap:3px;height:120px;margin-top:16px;
+  padding:10px 0;border-bottom:1.5px solid var(--line);
+}
+.mood-chart .bar{flex:1;min-width:4px;display:flex;flex-direction:column;justify-content:flex-end;height:100%;position:relative}
+.mood-chart .bar i{
+  display:block;width:100%;border-radius:3px 3px 0 0;background:var(--m-psy);
+  transition:height .3s;min-height:3px;
+}
+.mood-chart .bar.m1 i{background:#f59e0b}
+.mood-chart .bar.m2 i{background:#fbbf24}
+.mood-chart .bar.m3 i{background:var(--m-psy)}
+.mood-chart .bar.m4 i{background:#14b8a6}
+.mood-chart .bar.m5 i{background:var(--ok)}
+.mood-chart .bar.empty i{background:var(--line);height:3px !important;opacity:.6}
+.mood-chart .bar:hover i{filter:brightness(1.1)}
+.mood-legend{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);font-weight:800;margin-top:6px}
+
+/* ---------- найденные закономерности ---------- */
+.psy-pattern{
+  display:flex;align-items:flex-start;gap:12px;padding:13px 15px;
+  border-radius:var(--r);background:var(--panel-2);border:1.5px solid var(--line);
+}
+.psy-pattern .ic{font-size:19px;flex:none;line-height:1.3}
+.psy-pattern p{flex:1;font-size:13px;line-height:1.6;font-weight:600}
+
+/* ---------- дыхательный круг ---------- */
+.breath-stage{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:18px;padding:26px 0 10px;min-height:260px;
+}
+.breath-circle{
+  width:130px;height:130px;border-radius:50%;
+  background:var(--m-psy-soft);border:3px solid var(--m-psy);
+  display:flex;align-items:center;justify-content:center;
+  font-size:15px;font-weight:900;color:var(--m-psy);text-align:center;
+  transform:scale(.55);transition:transform linear;
+}
+.breath-circle.grow{transform:scale(1)}
+.breath-circle.shrink{transform:scale(.55)}
+.breath-count{font-size:30px;font-weight:900;color:var(--m-psy);font-variant-numeric:tabular-nums}
+.breath-phase{font-size:17px;font-weight:900}
+.breath-round{font-size:12px;color:var(--muted);font-weight:800}
+@media (prefers-reduced-motion:reduce){
+  .breath-circle{transition:none}
+}
+
+/* ---------- шаги заземления ---------- */
+.ground-step{
+  display:flex;align-items:center;gap:14px;padding:15px 16px;border-radius:var(--r);
+  border:1.5px solid var(--line);background:var(--panel);transition:.18s;
+}
+.ground-step.done{border-color:var(--m-psy);background:var(--m-psy-soft);opacity:.65}
+.ground-step.current{border-color:var(--m-psy);box-shadow:var(--shadow-sm)}
+.ground-step .n{
+  width:34px;height:34px;border-radius:50%;flex:none;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--m-psy-soft);color:var(--m-psy);font-weight:900;font-size:15px;
+}
+.ground-step.done .n{background:var(--m-psy);color:#fff}
+.ground-step p{flex:1;font-size:13.5px;font-weight:700;line-height:1.5}
+
+/* ---------- медитация ---------- */
+.medit-line{
+  font-size:17px;font-weight:700;line-height:1.6;text-align:center;
+  min-height:80px;display:flex;align-items:center;justify-content:center;
+  padding:16px;color:var(--ink);
+}
+.medit-progress{display:flex;gap:4px;justify-content:center;margin-top:10px}
+.medit-progress i{width:18px;height:4px;border-radius:2px;background:var(--line);transition:.25s}
+.medit-progress i.on{background:var(--m-psy)}
+
+/* ---------- запись мыслей (КПТ) ---------- */
+.cbt-field{margin-top:14px}
+.cbt-field label{display:block;font-size:12px;font-weight:900;letter-spacing:.04em;color:var(--ink)}
+.cbt-field .hint{display:block;font-size:11.5px;color:var(--muted);font-weight:700;margin:4px 0 7px;line-height:1.5}
+.cbt-field textarea{width:100%;min-height:62px;resize:vertical}
+.cbt-rec{border:1.5px solid var(--line);border-radius:var(--r);padding:15px;background:var(--panel)}
+.cbt-rec .date{font-size:11px;font-weight:900;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.cbt-rec .was{font-size:13.5px;font-weight:800;margin-top:8px;line-height:1.5}
+.cbt-rec .now{font-size:13.5px;font-weight:700;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);color:var(--m-psy);line-height:1.5}
+.cbt-delta{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:900;color:var(--muted);margin-top:9px}
+
+/* ---------- вкладки внутри страницы ---------- */
+.psy-seg{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px}
+.psy-seg button{
+  padding:9px 16px;border-radius:99px;border:1.5px solid var(--line);
+  background:var(--panel);font-family:inherit;font-size:13px;font-weight:800;
+  cursor:pointer;transition:.13s;color:var(--ink);
+}
+.psy-seg button:hover{border-color:var(--line-2)}
+.psy-seg button.on{background:var(--m-psy);border-color:var(--m-psy);color:#fff}
+
+/* ---------- карточка модуля на главной ---------- */
+.tile.psy .ico{background:var(--m-psy-soft);color:var(--m-psy)}
+.tile.psy:hover{border-color:var(--m-psy)}
+
+/* ==========================================================================
+   Топ учителей и доступ к премиум-учителям (teachers.html)
+   Логика рейтинга — assets/ai-teachers.js
+   ========================================================================== */
+
+.top3{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-top:14px}
+.top-card{
+  display:flex;align-items:center;gap:12px;
+  border:1.5px solid var(--line);border-radius:var(--r);padding:14px 16px;
+  background:var(--panel);transition:.15s;
+}
+.top-card.first{border-color:var(--m-teach,var(--accent));background:var(--m-teach-soft,var(--panel-2))}
+.top-card .place{font-size:23px;flex:none;line-height:1}
+.top-card .ava{
+  width:38px;height:38px;border-radius:50%;flex:none;
+  display:flex;align-items:center;justify-content:center;font-size:20px;
+  background:var(--panel-2);
+}
+.top-card .who{flex:1;min-width:0}
+.top-card .who b{display:block;font-size:14px;font-weight:900}
+.top-card .who span{display:block;font-size:11.5px;color:var(--muted);font-weight:700;margin-top:2px}
+.top-card .stars-top{font-size:12px;letter-spacing:1px;color:#f59e0b;flex:none}
+
+.premium-box{padding:18px 20px}
+.premium-box h3{font-size:15px;font-weight:900;margin:0}
+.premium-box .pct{font-size:14px;font-weight:900;color:var(--accent)}
+.premium-box p{font-size:13px;color:var(--muted);font-weight:700;line-height:1.6;margin:10px 0 14px}
+.premium-box .left{display:block;font-size:11.5px;font-weight:800;color:var(--muted);margin-top:8px}
+
+.prem-badge{
+  display:inline-block;font-size:9.5px;font-weight:900;letter-spacing:.07em;text-transform:uppercase;
+  padding:2px 7px;border-radius:99px;background:var(--warn-soft);color:var(--warn);vertical-align:middle;
+}
+.tcard.locked{opacity:.72}
+.tcard.locked .ava{filter:grayscale(1)}
+
+/* ==========================================================================
+   Трекеры (trackers.html) и вкладка «Тело» (body.html)
+   Логика — assets/trackers.js и assets/body.js
+
+   Про цвет на этих страницах: оранжевым помечены короткие ночи и
+   невыполненные потребности, но нигде нет красного. Красный на
+   строчке «поел 1 раз из 3» читается как обвинение, а это дневник,
+   а не проверка.
+   ========================================================================== */
+
+/* ---------- график сна за 30 дней ---------- */
+.sleep-chart{
+  display:flex;align-items:flex-end;gap:3px;height:120px;margin-top:16px;
+  padding:10px 0;border-bottom:1.5px solid var(--line);
+}
+.sleep-chart .sbar{flex:1;min-width:4px;display:flex;align-items:flex-end;height:100%}
+.sleep-chart .sbar i{display:block;width:100%;border-radius:3px 3px 0 0;min-height:3px;transition:height .3s}
+.sleep-chart .sbar.ok    i{background:var(--m-track)}
+.sleep-chart .sbar.short i{background:#f59e0b}
+.sleep-chart .sbar.empty i{background:var(--line);opacity:.6}
+.sleep-chart .sbar:hover i{filter:brightness(1.12)}
+
+.verdict{
+  display:inline-block;padding:8px 16px;border-radius:99px;
+  font-size:13px;font-weight:900;margin-top:12px;
+}
+.verdict.ok{background:var(--ok-soft);color:var(--ok)}
+.verdict.warn{background:var(--warn-soft);color:var(--warn)}
+
+/* ---------- расписание блоками ---------- */
+.daygrid{display:flex;flex-direction:column;gap:8px;margin-top:20px}
+.dayblock{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  border:1.5px solid var(--line);border-left:5px solid var(--line-2);
+  border-radius:var(--r);padding:12px 14px;background:var(--panel);transition:.15s;
+}
+.dayblock.done{opacity:.55}
+.dayblock.done .what{text-decoration:line-through}
+.dayblock .time{
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+  font-size:14px;font-weight:700;flex:none;color:var(--ink);
+}
+.dayblock .cat{
+  font-size:11px;font-weight:900;padding:3px 10px;border-radius:99px;flex:none;
+}
+.dayblock .what{flex:1;min-width:120px;font-size:14px;font-weight:800}
+.dayblock .mins{font-size:11.5px;font-weight:800;color:var(--muted);flex:none}
+.dayblock-actions{display:flex;gap:7px;align-items:center;flex:none}
+.dayblock .check{
+  width:26px;height:26px;border-radius:8px;flex:none;cursor:pointer;
+  border:1.8px solid var(--line-2);background:var(--panel);
+  font-size:14px;font-weight:900;line-height:1;
+}
+
+/* сводка по категориям */
+.cat-summary{margin-top:20px}
+.cat-sum-title{font-size:11px;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.cat-bar{display:flex;height:12px;border-radius:99px;overflow:hidden;margin-top:9px;background:var(--panel-2)}
+.cat-bar i{display:block;height:100%}
+.cat-legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px}
+.cat-legend span{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:800;color:var(--muted)}
+.cat-legend i{width:10px;height:10px;border-radius:3px;flex:none}
+
+/* ---------- питание ---------- */
+.meal-card{
+  border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);
+  padding:12px 14px;transition:.15s;
+}
+.meal-card.on{border-color:var(--m-track);background:var(--m-track-soft)}
+.meal-head{
+  display:flex;align-items:center;gap:11px;width:100%;
+  background:none;border:none;cursor:pointer;font-family:inherit;padding:0;color:var(--ink);
+}
+.meal-head .ic{font-size:20px;flex:none}
+.meal-head .nm{flex:1;text-align:left;font-size:14px;font-weight:900}
+.meal-head .check{
+  width:24px;height:24px;border-radius:50%;flex:none;
+  border:1.8px solid var(--line-2);display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:900;
+}
+.meal-card.on .meal-head .check{background:var(--m-track);border-color:var(--m-track);color:#fff}
+.meal-note{
+  width:100%;margin-top:10px;padding:8px 11px;font-size:13px;
+  border:1.5px solid var(--line);border-radius:var(--r-sm);
+  background:var(--panel-2);color:var(--ink);font-family:inherit;
+}
+.meal-note:focus{outline:none;border-color:var(--m-track)}
+
+.water-row{display:flex;flex-wrap:wrap;gap:9px;margin-top:14px}
+.glass{
+  width:44px;height:52px;border-radius:8px 8px 14px 14px;cursor:pointer;
+  border:2px solid var(--line-2);background:var(--panel);
+  font-size:20px;line-height:1;transition:.15s;
+}
+.glass.on{border-color:var(--m-track);background:var(--m-track-soft)}
+.glass.extra{border-style:dashed}
+.glass:hover{transform:translateY(-2px)}
+
+/* тон подсказок — общий с психологом, добавляем оттенки */
+.psy-pattern.tone-ok{background:var(--ok-soft);border-color:transparent}
+.psy-pattern.tone-warn{background:var(--warn-soft);border-color:transparent}
+.psy-pattern.tone-info{background:var(--panel-2)}
+
+/* ---------- курсы ---------- */
+.course-card{
+  border:1.5px solid var(--line);border-radius:var(--r);
+  padding:16px;background:var(--panel);transition:.15s;
+}
+.course-card.full{border-color:var(--ok);background:var(--ok-soft)}
+.course-card b{font-size:14.5px;font-weight:900;display:block}
+.course-card .where{font-size:11.5px;color:var(--muted);font-weight:700}
+.course-card .pct{font-size:13px;font-weight:900;color:var(--m-track);flex:none}
+.course-card.full .pct{color:var(--ok)}
+.course-meta{display:flex;gap:14px;margin-top:9px;font-size:11.5px;font-weight:800;color:var(--muted)}
+.course-note{font-size:12.5px;color:var(--muted);font-weight:600;margin-top:9px;line-height:1.5}
+.course-actions{display:flex;gap:7px;margin-top:12px;flex-wrap:wrap}
+
+/* ---------- вкладка «Тело» ---------- */
+.body-note{border-left-color:var(--m-body);background:var(--m-body-soft)}
+.body-note p{font-weight:700}
+
+.need-pct{font-size:20px;font-weight:900;color:var(--m-body)}
+.progress.big{height:12px}
+.progress.big i{background:var(--m-body)}
+
+.needs-list{display:flex;flex-direction:column;gap:10px;margin-top:18px}
+.need-row{
+  display:flex;align-items:center;gap:13px;
+  border:1.5px solid var(--line);border-radius:var(--r);
+  padding:13px 15px;background:var(--panel);transition:.15s;
+}
+.need-row.ok{border-color:var(--m-body);background:var(--m-body-soft)}
+.need-row .ic{font-size:20px;flex:none}
+.need-row .txt{flex:1;min-width:0}
+.need-row .txt b{display:block;font-size:13.5px;font-weight:900}
+.need-row .txt span{display:block;font-size:11.5px;color:var(--muted);font-weight:800;margin-top:2px}
+.need-check{
+  width:30px;height:30px;border-radius:9px;flex:none;cursor:pointer;
+  border:1.8px solid var(--line-2);background:var(--panel);
+  font-size:15px;font-weight:900;color:var(--ink);transition:.15s;
+}
+.need-check.on{background:var(--m-body);border-color:var(--m-body);color:#fff}
+.need-link{
+  flex:none;width:30px;height:30px;border-radius:9px;text-decoration:none;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--muted);font-weight:900;background:var(--panel-2);transition:.15s;
+}
+.need-link:hover{color:var(--m-body);background:var(--m-body-soft)}
+
+/* график веса — след во времени, без нормы и без оценок */
+.weight-chart{
+  display:flex;align-items:flex-end;gap:6px;height:110px;margin-top:16px;
+  padding-bottom:4px;border-bottom:1.5px solid var(--line);
+}
+.weight-chart .wbar{flex:1;min-width:16px;display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:4px}
+.weight-chart .wbar i{display:block;width:100%;border-radius:4px 4px 0 0;background:var(--m-body);opacity:.8}
+.weight-chart .wbar span{font-size:9.5px;font-weight:800;color:var(--muted);text-align:center}
+
+.cbt-field .hint,.field .hint{
+  display:block;font-size:11.5px;color:var(--muted);font-weight:700;margin-top:6px;line-height:1.5;
+}
+
+/* ---------- плитки модулей ---------- */
+.tile.track .ico{background:var(--m-track-soft);color:var(--m-track)}
+.tile.track:hover{border-color:var(--m-track)}
+.tile.body .ico{background:var(--m-body-soft);color:var(--m-body)}
+.tile.body:hover{border-color:var(--m-body)}
+
+@media (max-width:560px){
+  .dayblock .what{min-width:100%;order:5}
+  .glass{width:38px;height:46px}
+}
+
+/* ==========================================================================
+   Ежедневный стрик (assets/streaks.js)
+   Значок в шапке рядом с аккаунтом + окно с подробностями.
+   ========================================================================== */
+.streak-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:6px 12px 6px 10px;margin-right:8px;
+  border:1.5px solid var(--line);border-radius:99px;
+  background:var(--panel);cursor:pointer;font-family:inherit;
+  font-size:13px;font-weight:900;color:var(--ink);
+  transition:.15s;vertical-align:middle;
+}
+.streak-badge:hover{border-color:#f59e0b;background:var(--warn-soft)}
+.streak-badge .fl{font-size:15px;line-height:1}
+.streak-badge .fl.off{filter:grayscale(1);opacity:.45}
+.streak-badge .n{color:#f59e0b;font-variant-numeric:tabular-nums}
+
+.streak-modal{text-align:center;padding:4px 0}
+.streak-big{font-size:46px;font-weight:900;line-height:1.1;color:#f59e0b}
+.streak-sub{font-size:13.5px;font-weight:800;color:var(--muted);margin-top:6px}
+.streak-stats{
+  display:flex;gap:12px;margin-top:20px;
+}
+.streak-stats>div{
+  flex:1;border:1.5px solid var(--line);border-radius:var(--r);
+  padding:14px 10px;background:var(--panel-2);
+}
+.streak-stats b{display:block;font-size:20px;font-weight:900;line-height:1.2}
+.streak-stats span{display:block;font-size:11px;font-weight:800;color:var(--muted);margin-top:5px}
+.streak-note{
+  font-size:13px;line-height:1.6;font-weight:600;color:var(--ink);
+  margin-top:18px;text-align:left;
+}
+
+@media (max-width:560px){
+  .streak-badge{padding:5px 9px 5px 8px;font-size:12px;margin-right:5px}
+}
+ 
