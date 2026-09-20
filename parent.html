@@ -1,32 +1,347 @@
--- =====================================================================
--- SkyySchool — доступ родителя к домашним заданиям
---
--- Это ДОПОЛНЕНИЕ, а не замена. Порядок применения:
---   1. sql/schema.sql          (тут появились homework и submissions)
---   2. sql/schema-classes.sql  (тут появились family_links и can_view_student())
---   3. sql/schema-parent.sql   ← этот файл
---
--- Выполнять можно повторно: всё через "drop policy if exists" перед
--- каждым "create policy", дублей не создаст.
---
--- Зачем отдельный файл, а не правка schema.sql на месте: политики
--- hw_read_own и sub_read объявлены в schema.sql, который уже применён
--- на живой базе — до того, как в schema-classes.sql появилась функция
--- can_view_student(). Тогда её просто не существовало, поэтому парой
--- политик родитель пройти не мог, что бы ни было в family_links.
--- Правим политику, а не таблицу: она просто объявляется заново поверх
--- старой версии (drop policy + create policy), данные не трогаются.
--- =====================================================================
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Родителям — SkyySchool</title>
+<meta name="theme-color" content="#f6faff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon-512.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/sky.css">
+<style>
+.plink-row{display:flex;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}
+.plink-row:last-child{border-bottom:none}
+.plink-row .txt{flex:1;min-width:0}
+.plink-row .txt b{font-size:13.5px;display:block}
+.plink-row .txt span{font-size:11.5px;color:var(--muted)}
 
--- ---------- homework: родитель тоже видит, что задано ----------
-drop policy if exists hw_read_own on homework;
-create policy hw_read_own on homework for select
-  using (auth.uid() = teacher_id or can_view_student(student_id));
+.childcard{border:1.5px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:14px}
+.childcard .head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.childcard .head b{font-size:15px}
+.childcard .stats3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.childcard .stats3 .s{background:var(--panel-2);border-radius:12px;padding:10px;text-align:center}
+.childcard .stats3 .s b{display:block;font-size:19px;font-weight:900}
+.childcard .stats3 .s span{font-size:11px;color:var(--muted)}
+.weak-chip{
+  display:inline-flex;align-items:center;gap:6px;background:var(--panel-2);border-radius:20px;
+  padding:5px 11px;font-size:12px;font-weight:700;margin:0 6px 6px 0;
+}
+.weak-chip b{color:var(--no)}
+.recent-line{font-size:12.5px;line-height:1.7;color:var(--muted)}
+.recent-line b{color:var(--ink,#0e2540)}
+.empty-note{font-size:13px;color:var(--muted);text-align:center;padding:20px 10px}
+</style>
+</head>
+<body>
+<header id="appHeader"></header>
 
--- ---------- submissions: родитель видит, что сдано и с каким результатом ----------
-drop policy if exists sub_read on submissions;
-create policy sub_read on submissions for select
-  using (
-    can_view_student(student_id)
-    or auth.uid() in (select teacher_id from homework where homework.id = submissions.homework_id)
-  );
+<main class="wrap">
+  <h1 data-i18n="h1"></h1>
+  <p class="lead" data-i18n="lead"></p>
+
+  <!-- не вошли -->
+  <div class="section hidden" id="gateAuth">
+    <div class="panel" style="text-align:center;padding:28px 18px">
+      <p class="lead" data-i18n="needAuth"></p>
+      <button class="btn big" id="gateAuthBtn" style="margin-top:10px" data-i18n="signIn"></button>
+    </div>
+  </div>
+
+  <!-- роль не подходит -->
+  <div class="section hidden" id="gateRole">
+    <div class="panel" style="text-align:center;padding:28px 18px">
+      <p class="lead" data-i18n="wrongRole"></p>
+    </div>
+  </div>
+
+  <!-- вид ребёнка: пригласить родителя -->
+  <div class="section hidden" id="childView">
+    <div class="panel">
+      <h2 data-i18n="inviteH"></h2>
+      <p class="lead" style="font-size:13px;margin-top:4px" data-i18n="inviteLead"></p>
+      <div class="row" style="margin-top:14px">
+        <div class="field"><input type="email" id="pMail" data-i18n-ph="parentMailPh" autocomplete="off"></div>
+        <div class="field" style="flex:0 0 auto"><button class="btn" id="inviteBtn" data-i18n="inviteBtn"></button></div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:14px">
+      <div class="section-head"><h2 data-i18n="myParentsH"></h2></div>
+      <div id="myParents"><p class="empty-note" data-i18n="noneYet"></p></div>
+    </div>
+  </div>
+
+  <!-- вид родителя: дашборд -->
+  <div class="section hidden" id="parentView">
+    <div id="childrenList"></div>
+  </div>
+</main>
+
+<footer id="appFooter"></footer>
+
+<script src="assets/config.js"></script>
+<script src="assets/core.js"></script><script src="assets/streaks.js"></script>
+<script src="assets/db.js"></script>
+<script src="assets/auth.js"></script>
+<script>
+'use strict';
+Sky.init({
+  h1:{ru:'Родителям',en:'For parents'},
+  lead:{ru:'Родитель привязывается к аккаунту ребёнка и видит его прогресс: решённые задания, разбор фото домашки, проверки сочинений — без пароля от аккаунта ребёнка и без доступа к его переписке с учителем.',
+        en:'A parent links to the child\'s account and sees their progress: solved tasks, photo homework reviews, essay checks — without the child\'s password and without access to their messages with a teacher.'},
+
+  needAuth:{ru:'Эта страница про семейный доступ — сначала войдите в свой аккаунт.',
+            en:'This page is about family access — sign in first.'},
+  signIn:{ru:'Войти',en:'Sign in'},
+  wrongRole:{ru:'Семейный доступ работает для ролей «ученик» и «родитель». Ваша роль — другая; ничего настраивать тут не нужно.',
+             en:'Family access works for the "student" and "parent" roles. Your role is different — nothing to set up here.'},
+
+  inviteH:{ru:'Пригласить родителя',en:'Invite a parent'},
+  inviteLead:{ru:'Привязку создаёт сам ученик — это защита от того, чтобы кто-то посторонний назвался вашим родителем и получил доступ к вашим данным. Родителю нужен свой аккаунт на сайте (роль «родитель») — если его ещё нет, пусть сначала зарегистрируется.',
+              en:'The link is created by the student themselves — this stops a stranger from claiming to be your parent and getting access to your data. The parent needs their own account on the site (role "parent") — if they do not have one yet, ask them to sign up first.'},
+  parentMailPh:{ru:'почта родителя',en:'parent\'s email'},
+  inviteBtn:{ru:'Пригласить',en:'Invite'},
+  needMail:{ru:'Введите почту',en:'Enter an email'},
+  notFound:{ru:'На сайте нет аккаунта с такой почтой. Пусть родитель сначала зарегистрируется (роль «родитель»), потом повторите.',
+            en:'No account on the site with that email. Ask the parent to sign up first (role "parent"), then try again.'},
+  selfLink:{ru:'Это ваша собственная почта.',en:'That is your own email.'},
+  alreadyLinked:{ru:'Этот родитель уже привязан.',en:'That parent is already linked.'},
+  invited:{ru:'Готово: %1 теперь видит ваш прогресс.',en:'Done: %1 can now see your progress.'},
+
+  myParentsH:{ru:'Кто видит ваш прогресс',en:'Who can see your progress'},
+  noneYet:{ru:'Пока никто не привязан.',en:'No one linked yet.'},
+  unlink:{ru:'Отвязать',en:'Unlink'},
+  unlinked:{ru:'Отвязано',en:'Unlinked'},
+
+  noChildren:{ru:'Пока никто из детей вас не пригласил. Попросите ребёнка открыть эту же страницу в своём аккаунте (роль «ученик») и указать вашу почту в разделе «Пригласить родителя».',
+              en:'No child has invited you yet. Ask them to open this same page from their own account (role "student") and enter your email under "Invite a parent".'},
+
+  statSolved:{ru:'решено',en:'solved'},
+  statAcc:{ru:'точность',en:'accuracy'},
+  statPhoto:{ru:'фото ДЗ',en:'photo HW'},
+  weakH:{ru:'Слабые темы',en:'Weak topics'},
+  noWeak:{ru:'Слабых тем пока не видно — либо мало попыток, либо всё ровно.',en:'No weak spots yet — either too few attempts, or things are even.'},
+  lastPhoto:{ru:'Последнее фото ДЗ: оценка %1, %2',en:'Last photo homework: grade %1, %2'},
+  lastEssay:{ru:'Последнее сочинение: средний балл %1 из 5, %2',en:'Last essay: average score %1 of 5, %2'},
+  noActivity:{ru:'Активности пока не было.',en:'No activity yet.'},
+  newChildToast:{ru:'Список привязанных детей обновился',en:'Your linked children list was updated'}
+});
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- рендер по роли ----------
+   Роль решает всё содержимое страницы: у ребёнка и родителя разный
+   смысл одной и той же таблицы family_links (кто кого добавляет), а
+   учителю/админу тут пока просто нечего делать — семейный доступ не
+   про них. */
+async function render() {
+  const me = Sky.db.me();
+  ['gateAuth', 'gateRole', 'childView', 'parentView'].forEach(id => $('#' + id).classList.add('hidden'));
+
+  if (!me) { $('#gateAuth').classList.remove('hidden'); return; }
+
+  if (me.role === 'student') {
+    $('#childView').classList.remove('hidden');
+    await renderMyParents();
+  } else if (me.role === 'parent') {
+    $('#parentView').classList.remove('hidden');
+    await renderChildren();
+  } else {
+    $('#gateRole').classList.remove('hidden');
+  }
+}
+
+/* ---------- вид ребёнка ---------- */
+async function renderMyParents() {
+  const me = Sky.db.me();
+  let rows = [];
+  try { rows = await Sky.db.list('family_links', { child_id: me.id }); } catch (e) { rows = []; }
+
+  const box = $('#myParents');
+  if (!rows.length) { box.innerHTML = `<p class="empty-note">${Sky.t('noneYet')}</p>`; return; }
+
+  const withProfiles = await Promise.all(rows.map(async r => {
+    let p = null;
+    try { const found = await Sky.db.list('profiles', { id: r.parent_id }); p = found[0] || null; } catch (e) {}
+    return { link: r, profile: p };
+  }));
+
+  box.innerHTML = withProfiles.map(({ link, profile }) => `
+    <div class="plink-row" data-link="${esc(link.id)}">
+      ${profile ? Sky.avatar(profile.name, '', profile.emoji) : ''}
+      <div class="txt">
+        <b>${esc(profile ? profile.name : '—')}</b>
+        <span>${esc(profile ? profile.email : link.parent_id)}</span>
+      </div>
+      <button class="btn ghost small unlink-btn">${Sky.t('unlink')}</button>
+    </div>`).join('');
+
+  box.querySelectorAll('.unlink-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const row = btn.closest('.plink-row');
+      const id = row.getAttribute('data-link');
+      btn.disabled = true;
+      try { await Sky.db.remove('family_links', id); } catch (e) {}
+      Sky.toast(Sky.t('unlinked'));
+      await renderMyParents();
+    });
+  });
+}
+
+async function invite() {
+  const me = Sky.db.me();
+  const mail = $('#pMail').value.trim().toLowerCase();
+  if (!mail) return Sky.toast(Sky.t('needMail'));
+  if (mail === (me.email || '').toLowerCase()) return Sky.toast(Sky.t('selfLink'));
+
+  const btn = $('#inviteBtn');
+  btn.disabled = true;
+  try {
+    const found = await Sky.db.list('profiles', { email: mail });
+    const parent = found && found[0];
+    if (!parent) { Sky.toast(Sky.t('notFound'), 5500); return; }
+
+    const existing = await Sky.db.list('family_links', { child_id: me.id });
+    if ((existing || []).some(r => r.parent_id === parent.id)) {
+      Sky.toast(Sky.t('alreadyLinked'));
+      return;
+    }
+
+    const rec = await Sky.db.insert('family_links', { parent_id: parent.id, child_id: me.id });
+    if (!rec) return; // insert() уже показал причину тостом (например, RLS)
+
+    $('#pMail').value = '';
+    Sky.toast(Sky.t('invited').replace('%1', parent.name || mail));
+    await renderMyParents();
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* ---------- вид родителя ---------- */
+function pct(part, total) { return total ? Math.round((part / total) * 100) : 0; }
+
+async function childStats(childId) {
+  let attempts = [], photos = [], essays = [];
+  try { attempts = await Sky.db.list('task_attempts', { student_id: childId }); } catch (e) {}
+  try { photos = await Sky.db.list('photo_checks', { student_id: childId }); } catch (e) {}
+  try { essays = await Sky.db.list('essay_checks', { student_id: childId }); } catch (e) {}
+
+  const solved = attempts.length;
+  const correct = attempts.filter(a => a.correct).length;
+
+  const byTopic = {};
+  attempts.forEach(a => {
+    if (!a.topic) return;
+    const key = a.bank + '::' + a.topic;
+    byTopic[key] = byTopic[key] || { bank: a.bank, topic: a.topic, total: 0, wrong: 0 };
+    byTopic[key].total++;
+    if (!a.correct) byTopic[key].wrong++;
+  });
+  const weak = Object.values(byTopic)
+    .filter(t => t.total >= 3 && t.wrong / t.total >= 0.4)
+    .sort((a, b) => (b.wrong / b.total) - (a.wrong / a.total))
+    .slice(0, 4);
+
+  photos.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+  essays.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+
+  const avgEssay = e => {
+    const s = e.scores || {};
+    const vals = ['relevance', 'structure', 'argumentation', 'language', 'overall_impression'].map(k => Number(s[k]) || 0);
+    const n = vals.filter(Boolean).length || 1;
+    return Math.round(vals.reduce((a, b) => a + b, 0) / n * 10) / 10;
+  };
+
+  return {
+    solved, accuracy: pct(correct, solved), photoCount: photos.length,
+    weak, lastPhoto: photos[0] || null, lastEssay: essays[0] || null
+  };
+}
+
+async function renderChildren() {
+  const me = Sky.db.me();
+  let links = [];
+  try { links = await Sky.db.list('family_links', { parent_id: me.id }); } catch (e) { links = []; }
+
+  const box = $('#childrenList');
+  if (!links.length) { box.innerHTML = `<div class="panel"><p class="empty-note">${Sky.t('noChildren')}</p></div>`; return; }
+
+  const children = await Promise.all(links.map(async l => {
+    let p = null;
+    try { const found = await Sky.db.list('profiles', { id: l.child_id }); p = found[0] || null; } catch (e) {}
+    const stats = await childStats(l.child_id);
+    return { profile: p, stats };
+  }));
+
+  box.innerHTML = children.map(({ profile, stats }) => `
+    <div class="panel childcard">
+      <div class="head">
+        ${profile ? Sky.avatar(profile.name, '', profile.emoji) : ''}
+        <b>${esc(profile ? profile.name : '—')}</b>
+      </div>
+
+      <div class="stats3">
+        <div class="s"><b>${stats.solved}</b><span>${Sky.t('statSolved')}</span></div>
+        <div class="s"><b>${stats.accuracy}%</b><span>${Sky.t('statAcc')}</span></div>
+        <div class="s"><b>${stats.photoCount}</b><span>${Sky.t('statPhoto')}</span></div>
+      </div>
+
+      <div style="margin-bottom:10px">
+        <b style="font-size:12.5px">${Sky.t('weakH')}</b><br>
+        ${stats.weak.length
+          ? '<div style="margin-top:8px">' + stats.weak.map(w => `<span class="weak-chip">${esc(w.topic)} <b>${w.wrong}/${w.total}</b></span>`).join('') + '</div>'
+          : `<span class="recent-line">${Sky.t('noWeak')}</span>`}
+      </div>
+
+      <div class="recent-line">
+        ${stats.lastPhoto ? Sky.t('lastPhoto').replace('%1', esc(stats.lastPhoto.grade || '—')).replace('%2', esc(new Date(stats.lastPhoto.created_at).toLocaleDateString())) + '<br>' : ''}
+        ${stats.lastEssay ? Sky.t('lastEssay').replace('%1', avgOf(stats.lastEssay)).replace('%2', esc(new Date(stats.lastEssay.created_at).toLocaleDateString())) : ''}
+        ${(!stats.lastPhoto && !stats.lastEssay) ? Sky.t('noActivity') : ''}
+      </div>
+    </div>`).join('');
+}
+
+function avgOf(e) {
+  const s = e.scores || {};
+  const vals = ['relevance', 'structure', 'argumentation', 'language', 'overall_impression'].map(k => Number(s[k]) || 0);
+  const n = vals.filter(Boolean).length || 1;
+  return Math.round(vals.reduce((a, b) => a + b, 0) / n * 10) / 10;
+}
+
+/* ---------- живые обновления ----------
+   Пока страница открыта, ребёнок может пригласить родителя в другом
+   окне — список должен обновиться сам, без перезагрузки. В облачном
+   режиме это настоящий realtime от Supabase, в локальном — событие
+   dbchange от вкладки, которая писала. Кросс-вкладочная синхронизация
+   в локальном режиме и так ограничена (данные в localStorage одного
+   браузера), поэтому большего тут не обещаем. */
+let unsub = null;
+function wireLive() {
+  if (unsub) unsub();
+  const me = Sky.db.me();
+  if (!me) return;
+  unsub = Sky.db.subscribe('family_links', async () => {
+    const wasParent = me.role === 'parent';
+    await render();
+    if (wasParent) Sky.toast(Sky.t('newChildToast'));
+  });
+}
+
+/* ---------- события ---------- */
+$('#gateAuthBtn').addEventListener('click', () => Sky.auth.openAuth());
+$('#inviteBtn').addEventListener('click', invite);
+$('#pMail').addEventListener('keydown', e => { if (e.key === 'Enter') invite(); });
+document.addEventListener('authchange', () => { render(); wireLive(); });
+document.addEventListener('langchange', render);
+
+/* ---------- запуск ---------- */
+Sky.db.ready.then(() => { render(); wireLive(); });
+</script>
+</body>
+</html>
