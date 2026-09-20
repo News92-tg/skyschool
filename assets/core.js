@@ -43,6 +43,9 @@ window.Sky = (function () {
     navHome:{ru:'Обзор',en:'Overview'},
     navLearn:{ru:'Тренажёр',en:'Trainer'},
     navTest:{ru:'Тест',en:'Test'},
+    navExam:{ru:'Пробник',en:'Mock exam'},
+    navEssay:{ru:'Сочинение',en:'Essay'},
+    navParent:{ru:'Родителям',en:'For parents'},
     navKids:{ru:'Детям',en:'Kids'},
     navChess:{ru:'Шахматы',en:'Chess'},
     navTeachers:{ru:'Учителя',en:'Teachers'},
@@ -207,6 +210,7 @@ window.Sky = (function () {
     { href:'index.html',    key:'navHome' },
     { href:'trainer.html',  key:'navLearn' },
     { href:'test.html',     key:'navTest' },
+    { href:'exam.html',     key:'navExam' },
     { href:'kids.html',     key:'navKids' },
     { href:'chess.html',    key:'navChess' },
     { href:'teachers.html', key:'navTeachers' },
@@ -219,6 +223,8 @@ window.Sky = (function () {
     { href:'body.html',       key:'navBody' },
     { href:'plan.html',     key:'navPlan' },
     { href:'photo.html',    key:'navPhoto' },
+    { href:'essay.html',    key:'navEssay' },
+    { href:'parent.html',   key:'navParent' },
     { href:'tools.html',    key:'navTools' }
   ];
 
@@ -527,6 +533,110 @@ window.Sky = (function () {
     return { error: t('aiOff') };
   }
 
+  /* ---------- проверка сочинений ----------
+     Тот же дуальный режим, что и у explain(): свой ключ DeepSeek — идёт
+     прямо из браузера, Worker — идёт через /grade-essay. В отличие от
+     проверки фото (там без Worker никак: рукопись читает Gemini,
+     а её ключ в браузере не спрячешь), для текста своего ключа
+     достаточно — фото не требуется. */
+  function essayPrompt(payload) {
+    const subjName = payload.subject === 'english'
+      ? (lang === 'ru' ? 'английскому языку' : 'English')
+      : (lang === 'ru' ? 'русскому языку' : 'Russian');
+    const system = lang === 'ru'
+      ? `Ты проверяешь сочинение школьника по предмету «${subjName}» в формате, близком к ЕГЭ.\n` +
+        'ВАЖНО: ты не выставляешь официальные баллы по критериям К1–К12 ФИПИ — у тебя нет доступа к их точной методике. ' +
+        'Вместо этого оцени пять сторон работы по шкале 1–5 и дай развёрнутый словесный разбор. Не выдумывай фактов. ' +
+        'Верни СТРОГО JSON без markdown и без пояснений вокруг.'
+      : `You are marking a student's essay for "${subjName}", in a format close to the Russian state exam (ЕГЭ).\n` +
+        'IMPORTANT: you do not assign official scores against the FIPI К1–К12 criteria — you do not have that exact methodology. ' +
+        'Instead rate five aspects of the work on a 1–5 scale and give a detailed written review. Do not invent facts. ' +
+        'Return STRICT JSON, no markdown, no commentary around it.';
+    const shape = '{"scores":{"relevance":1-5,"structure":1-5,"argumentation":1-5,"language":1-5,"overall_impression":1-5},' +
+      '"strengths":["..."],"issues":[{"quote":"...","problem":"...","fix":"..."}],"overall_feedback":"...","next_step":"..."}';
+    const user = lang === 'ru'
+      ? (payload.prompt ? `Тема/задание сочинения:\n"""\n${payload.prompt}\n"""\n\n` : '') +
+        `Текст сочинения:\n"""\n${payload.essay}\n"""\n\nОцени работу. Формат ответа: ${shape}`
+      : (payload.prompt ? `The essay prompt:\n"""\n${payload.prompt}\n"""\n\n` : '') +
+        `Essay text:\n"""\n${payload.essay}\n"""\n\nReview the work. Reply shape: ${shape}`;
+    return { system, user };
+  }
+
+  function parseJsonLoose(raw) {
+    let s = String(raw || '').trim();
+    s = s.replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
+    const a = s.indexOf('{'), b = s.lastIndexOf('}');
+    if (a >= 0 && b > a) s = s.slice(a, b + 1);
+    try { return JSON.parse(s); } catch (e) { return null; }
+  }
+
+  function shapeEssayResult(parsed) {
+    const clamp = v => Math.min(5, Math.max(1, Number(v) || 3));
+    const s = (parsed && parsed.scores) || {};
+    return {
+      scores: {
+        relevance: clamp(s.relevance), structure: clamp(s.structure), argumentation: clamp(s.argumentation),
+        language: clamp(s.language), overall_impression: clamp(s.overall_impression)
+      },
+      strengths: Array.isArray(parsed.strengths) ? parsed.strengths.slice(0, 8) : [],
+      issues: Array.isArray(parsed.issues) ? parsed.issues.slice(0, 15) : [],
+      overall_feedback: String(parsed.overall_feedback || ''),
+      next_step: String(parsed.next_step || '')
+    };
+  }
+
+  async function gradeEssayWithKey(payload) {
+    const { system, user } = essayPrompt(payload);
+    try {
+      const r = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + aiKey() },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          messages: [{ role:'system', content: system }, { role:'user', content: user }],
+          temperature: 0.3, max_tokens: 900,
+          response_format: { type: 'json_object' }
+        })
+      });
+      if (r.status === 401) return { error: t('aiKeyBad') };
+      if (r.status === 402) return { error: t('aiNoMoney') };
+      if (r.status === 429) return { error: t('aiTooFast') };
+      if (!r.ok) return { error: t('aiHttp').replace('%1', r.status) };
+      const data = await r.json();
+      const content = data && data.choices && data.choices[0] && data.choices[0].message.content;
+      const parsed = content && parseJsonLoose(content);
+      return parsed ? { result: shapeEssayResult(parsed) } : { error: t('aiNoNet') };
+    } catch (e) {
+      return { error: t('aiKeyBlocked') };
+    }
+  }
+
+  async function gradeEssayWithWorker(payload) {
+    const base = (CFG.AI_BASE || '').trim();
+    if (!/^https?:\/\//i.test(base)) return { error: t('aiBadUrl') };
+    try {
+      const teacherId = (window.SkyTeachers && window.SkyTeachers.selectedId) ? window.SkyTeachers.selectedId() : null;
+      const r = await fetch(base.replace(/\/+$/, '') + '/grade-essay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(Object.assign({ lang, teacher: teacherId }, payload))
+      });
+      const data = await r.json().catch(() => null);
+      if (!r.ok) return { error: (data && data.error) || t('aiHttp').replace('%1', r.status) };
+      if (data && data.scores) return { result: data };
+      return { error: (data && data.error) ? String(data.error) : t('aiNoNet') };
+    } catch (e) {
+      return { error: t('aiNoNet') };
+    }
+  }
+
+  async function gradeEssay(payload) {
+    const mode = aiMode();
+    if (mode === 'key') return gradeEssayWithKey(payload);
+    if (mode === 'worker') return gradeEssayWithWorker(payload);
+    return { error: t('aiOff') };
+  }
+
   /* ---------- уведомления ---------- */
   async function askNotify() {
     if (!('Notification' in window)) return 'unsupported';
@@ -569,7 +679,7 @@ window.Sky = (function () {
     pct, plural, shuffle, dayKey, daysLeft, avatar, avaClass, initials,
     stats, bumpStats, todayCount,
     srs, record, dueIds, weakIds, boxOf, INTERVALS,
-    explain, aiKey, setAiKey, aiMode, askNotify, notify,
+    explain, gradeEssay, aiKey, setAiKey, aiMode, askNotify, notify,
     resetProgress() { ['stats','srs','puzzlesSolved','kids','life'].forEach(del); document.dispatchEvent(new CustomEvent('statschange')); }
   };
 })();
