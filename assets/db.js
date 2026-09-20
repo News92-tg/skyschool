@@ -1,34 +1,35 @@
 /* ============================================================
    SkyySchool — данные и аккаунты
-
+ 
    Работает в двух режимах и сам выбирает нужный:
-
+ 
    • «облако» — если в config.js заполнены SUPABASE_URL и ANON_KEY.
      Настоящие аккаунты, данные видны с любого устройства.
-
+ 
    • «локально» — пока ключи не заполнены. Всё лежит в этом браузере.
      Сайт полностью рабочий, просто учитель и ученик должны быть
      за одним устройством.
-
+ 
    Вызовы одинаковые в обоих режимах, поэтому страницы про режим ничего
    не знают: заполнили ключи — сайт стал сетевым, ничего не переписывая.
    ============================================================ */
 'use strict';
-
+ 
 Sky.db = (function () {
-
+ 
   const CFG = window.SKY_CONFIG || {};
   const hasCloud = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
-
+ 
   let sb = null;
   let profile = null;
   let mode = hasCloud ? 'cloud' : 'local';
   let readyResolve;
   const ready = new Promise(r => { readyResolve = r; });
-
+ 
   const TABLES = ['profiles','links','homework','submissions','messages','chess_tasks','chess_games',
-                  'teachers_ai','teacher_reviews','photo_checks','chess_sessions','task_attempts','chess_custom_tasks'];
-
+                  'teachers_ai','teacher_reviews','photo_checks','chess_sessions','task_attempts','chess_custom_tasks',
+                  'family_links','essay_checks'];
+ 
   function loadScript(src) {
     return new Promise((resolve, reject) => {
       const s = document.createElement('script');
@@ -38,7 +39,7 @@ Sky.db = (function () {
       document.head.appendChild(s);
     });
   }
-
+ 
   async function initCloud() {
     try {
       if (!window.supabase) {
@@ -57,22 +58,22 @@ Sky.db = (function () {
       sb = null;
     }
   }
-
+ 
   async function loadProfile(user) {
     if (!sb || !user) { profile = null; return; }
     const { data } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
     profile = data || { id: user.id, email: user.email, name: (user.user_metadata && user.user_metadata.full_name) || user.email.split('@')[0], role: 'student' };
   }
-
+ 
   function localTable(name) { return Sky.get('tbl_' + name, []); }
   function saveTable(name, rows) {
     Sky.set('tbl_' + name, rows);
     document.dispatchEvent(new CustomEvent('dbchange', { detail: { table: name } }));
   }
-
+ 
   function seedLocal() { return; }
   function uid() { return 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
-
+ 
   async function list(table, filter) {
     if (mode === 'cloud' && sb) {
       let q = sb.from(table).select('*');
@@ -85,7 +86,7 @@ Sky.db = (function () {
     for (const [k, v] of Object.entries(filter || {})) rows = rows.filter(r => r[k] === v);
     return rows;
   }
-
+ 
   async function insert(table, row) {
     const rec = Object.assign({ id: uid(), created_at: new Date().toISOString() }, row);
     if (mode === 'cloud' && sb) {
@@ -98,7 +99,7 @@ Sky.db = (function () {
     saveTable(table, rows);
     return rec;
   }
-
+ 
   async function update(table, id, patch) {
     if (mode === 'cloud' && sb) {
       const { data, error } = await sb.from(table).update(patch).eq('id', id).select().maybeSingle();
@@ -112,7 +113,7 @@ Sky.db = (function () {
     saveTable(table, rows);
     return rows[i];
   }
-
+ 
   async function remove(table, id) {
     if (mode === 'cloud' && sb) {
       const { error } = await sb.from(table).delete().eq('id', id);
@@ -122,7 +123,7 @@ Sky.db = (function () {
     saveTable(table, localTable(table).filter(r => r.id !== id));
     return true;
   }
-
+ 
   async function signUp(email, password, meta) {
     if (mode === 'cloud' && sb) {
       const { data, error } = await sb.auth.signUp({
@@ -137,7 +138,7 @@ Sky.db = (function () {
         }
       });
       if (error) return { error: error.message };
-
+ 
       /* Профиль создаёт server-side trigger из auth metadata.
          Не делаем upsert из браузера: при включённом подтверждении почты
          у нового пользователя ещё нет JWT, поэтому RLS корректно
@@ -145,7 +146,7 @@ Sky.db = (function () {
       if (data.user && data.session) await loadProfile(data.user);
       return { ok: true, needsConfirm: !data.session };
     }
-
+ 
     const rec = { id: uid(), email, name: meta.name, role: meta.role, emoji: meta.emoji || null };
     const rows = localTable('profiles');
     rows.push(rec);
@@ -155,7 +156,7 @@ Sky.db = (function () {
     document.dispatchEvent(new CustomEvent('authchange'));
     return { ok: true };
   }
-
+ 
   async function signIn(email, password) {
     if (mode === 'cloud' && sb) {
       const { data, error } = await sb.auth.signInWithPassword({ email, password });
@@ -171,7 +172,7 @@ Sky.db = (function () {
     document.dispatchEvent(new CustomEvent('authchange'));
     return { ok: true };
   }
-
+ 
   async function signInGoogle() {
     if (mode !== 'cloud' || !sb) return { error: Sky.lang === 'ru' ? 'Сначала подключите Supabase в assets/config.js' : 'Connect Supabase in assets/config.js first' };
     const { data, error } = await sb.auth.signInWithOAuth({
@@ -181,14 +182,14 @@ Sky.db = (function () {
     if (error) return { error: error.message };
     return { ok: true, url: data?.url || null };
   }
-
+ 
   async function signOut() {
     if (mode === 'cloud' && sb) await sb.auth.signOut();
     profile = null;
     Sky.del('me');
     document.dispatchEvent(new CustomEvent('authchange'));
   }
-
+ 
   function becomeLocal(id) {
     const found = localTable('profiles').find(p => p.id === id);
     if (!found) return false;
@@ -197,11 +198,11 @@ Sky.db = (function () {
     document.dispatchEvent(new CustomEvent('authchange'));
     return true;
   }
-
+ 
   const me = () => profile;
   const isTeacher = () => !!profile && profile.role === 'teacher';
   const isStudent = () => !!profile && profile.role === 'student';
-
+ 
   function subscribe(table, cb) {
     if (mode === 'cloud' && sb) {
       const ch = sb.channel('rt-' + table + '-' + Math.random().toString(36).slice(2))
@@ -218,7 +219,7 @@ Sky.db = (function () {
       document.removeEventListener('dbchange', onLocal);
     };
   }
-
+ 
   (async function boot() {
     if (hasCloud) await initCloud();
     if (mode === 'local') {
@@ -233,7 +234,7 @@ Sky.db = (function () {
     document.dispatchEvent(new CustomEvent('authchange'));
     document.dispatchEvent(new CustomEvent('dbready', { detail: { mode } }));
   })();
-
+ 
   return {
     ready, TABLES,
     get mode() { return mode; },
