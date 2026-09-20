@@ -1,34 +1,36 @@
 /* ============================================================
    SkyySchool — прокси к моделям на Cloudflare Workers
-
+ 
    Зачем он нужен. Ключи нельзя класть в файлы сайта: GitHub Pages
    отдаёт их как есть, и ключ увидит любой, кто откроет исходник
    страницы. По GitHub круглосуточно ходят боты, которые ищут строки
    вида sk-… и тратят чужие деньги.
-
+ 
    Здесь ключи живут в переменных окружения Worker: браузер их не
    получает, они уходят только с этого сервера в модель.
-
-   Три эндпоинта:
+ 
+   Четыре эндпоинта:
      POST /explain       — разбор задания (DeepSeek)
      POST /check-photo   — домашка по фото (Gemini Vision → DeepSeek)
      POST /chess-explain — объяснение уже посчитанной оценки хода
                            (DeepSeek; САМУ оценку считает движок в
                            браузере, см. assets/chess-review.js)
-
+     POST /grade-essay   — проверка сочинения (DeepSeek; пять описательных
+                           оценок 1–5, не официальные баллы ФИПИ)
+ 
    Как развернуть:
      npx wrangler login
      npx wrangler secret put DEEPSEEK_API_KEY
      npx wrangler secret put GEMINI_API_KEY     # только для /check-photo
      npx wrangler deploy
    Полученный адрес впишите в assets/config.js в поле AI_BASE.
-
+ 
    Все лимиты и имена моделей — переменные окружения со значениями по
    умолчанию (см. DEFAULTS ниже). Числа в тарифах и названия моделей
    меняются часто, и менять их правкой кода с последующим деплоем —
    плохая идея: правится в панели Cloudflare без выкатки.
    ============================================================ */
-
+ 
 /* ---------- настройки ----------
    Любое из этих значений переопределяется переменной окружения с тем
    же именем: wrangler.toml → [vars], либо панель Cloudflare. */
@@ -39,6 +41,8 @@ const DEFAULTS = {
   RATE_PHOTO_SECONDS: 30,
   /* минимальный промежуток между объяснениями ходов, сек */
   RATE_CHESS_SECONDS: 3,
+  /* минимальный промежуток между проверками сочинений, сек */
+  RATE_ESSAY_SECONDS: 20,
   /* максимальный размер картинки после сжатия в браузере, КБ */
   MAX_IMAGE_KB: 1200,
   /* модели */
@@ -56,7 +60,7 @@ const DEFAULTS = {
     'http://127.0.0.1:8100'
   ].join(',')
 };
-
+ 
 const numCfg = (env, key) => {
   const raw = env && env[key];
   const n = Number(raw);
@@ -67,25 +71,25 @@ const strCfg = (env, key) => {
   return (typeof raw === 'string' && raw.trim()) ? raw.trim() : DEFAULTS[key];
 };
 const originList = env => strCfg(env, 'ALLOWED_ORIGINS').split(',').map(s => s.trim()).filter(Boolean);
-
-
+ 
+ 
 /* ---------- ограничение частоты ----------
    Хранится в памяти Worker: при перезапуске обнуляется, и это
    нормально. Цель не безопасность (её даёт белый список источников), а
    защита от случайного цикла, который за ночь съест весь баланс.
-
+ 
    Две разные меры: счётчик за минуту для обычных запросов и
    минимальный промежуток для дорогих (фото). Считать фото тем же
    счётчиком неправильно — двадцать распознаваний подряд стоят совсем
    других денег, чем двадцать текстовых разборов. */
 const hits = new Map();
 const lastAt = new Map();
-
+ 
 function sweep(now) {
   if (hits.size > 5000) for (const [k, v] of hits) if (now - v.start > 60_000) hits.delete(k);
   if (lastAt.size > 5000) for (const [k, t] of lastAt) if (now - t > 3_600_000) lastAt.delete(k);
 }
-
+ 
 function ratePerMinOk(ip, limit) {
   const now = Date.now();
   sweep(now);
@@ -94,7 +98,7 @@ function ratePerMinOk(ip, limit) {
   rec.n++;
   return rec.n <= limit;
 }
-
+ 
 /* Возвращает 0, если можно, иначе сколько секунд ещё ждать. */
 function intervalWait(key, seconds) {
   const now = Date.now();
@@ -105,8 +109,8 @@ function intervalWait(key, seconds) {
   lastAt.set(key, now);
   return 0;
 }
-
-
+ 
+ 
 /* ---------- служебное ---------- */
 function cors(origin, env) {
   const list = originList(env);
@@ -118,17 +122,17 @@ function cors(origin, env) {
     'Access-Control-Max-Age': '86400'
   };
 }
-
+ 
 const json = (data, status, origin, env) => new Response(JSON.stringify(data), {
   status,
   headers: { 'Content-Type': 'application/json; charset=utf-8', ...cors(origin, env) }
 });
-
+ 
 /* Обрезаем всё, что приходит от браузера: длина запроса напрямую
    переводится в деньги, и присылать сюда мегабайт текста незачем. */
 const cut = (v, n) => String(v == null ? '' : v).slice(0, n);
-
-
+ 
+ 
 /* ---------- кто объясняет ----------
    Клиент присылает ТОЛЬКО идентификатор, промпты живут здесь.
    Так и должно быть: если принимать текст системного промпта от
@@ -137,7 +141,7 @@ const cut = (v, n) => String(v == null ? '' : v).slice(0, n);
    ограничения модели. Неизвестный идентификатор не ошибка, а повод
    ответить общим промптом: так старый Worker продолжает работать с
    новым сайтом, просто без персонажа.
-
+ 
    ВАЖНО: тексты должны совпадать с data/ai-teachers.js. Это осознанное
    дублирование — файл нужен сайту для режима «свой ключ» и для работы
    офлайн, а Worker не может ему доверять. Правя промпт в одном месте,
@@ -168,7 +172,7 @@ const TEACHERS = {
     en: 'You are explaining to a child aged 5–10. Very short sentences, one idea each. Words a child hears at home: apples, steps, blocks. Help with counting on objects, not formulas. If the child was wrong, say many people think so too and show how to check; never start with "wrong". One or two emoji are fine. Keep it under 120 words.'
   }
 };
-
+ 
 /* Строгость учителя. Держится здесь и в assets/ai-teachers.js по той
    же причине, что и промпты. */
 const STRICT = {
@@ -183,13 +187,13 @@ const STRICT = {
   5: { ru: 'Экзаменационная строгость: любая неточность формулировки или пропущенный шаг стоят балла.',
        en: 'Exam strictness: any imprecise wording or skipped step costs a mark.' }
 };
-
+ 
 function persona(teacherId, lang) {
   const t = TEACHERS[cut(teacherId, 40)];
   return t ? t[lang] : null;
 }
-
-
+ 
+ 
 /* ---------- вызовы моделей ---------- */
 function deepseekHint(status) {
   return status === 401 ? 'Ключ DeepSeek неверен или отозван.'
@@ -197,7 +201,7 @@ function deepseekHint(status) {
     : status === 429 ? 'DeepSeek ограничил частоту запросов. Попробуйте через минуту.'
     : 'DeepSeek вернул ошибку ' + status + '.';
 }
-
+ 
 async function callDeepSeek(env, system, user, opts) {
   const o = opts || {};
   const r = await fetch('https://api.deepseek.com/chat/completions', {
@@ -213,7 +217,7 @@ async function callDeepSeek(env, system, user, opts) {
       max_tokens: o.maxTokens || numCfg(env, 'MAX_TOKENS')
     }, o.jsonMode ? { response_format: { type: 'json_object' } } : {}))
   });
-
+ 
   if (!r.ok) {
     const text = await r.text();
     return { error: deepseekHint(r.status), detail: text.slice(0, 300) };
@@ -223,7 +227,7 @@ async function callDeepSeek(env, system, user, opts) {
   if (!content) return { error: 'Пустой ответ от DeepSeek.' };
   return { content };
 }
-
+ 
 /* Gemini Vision: распознавание рукописного текста.
    Отдельная модель именно потому, что DeepSeek картинок не читает. */
 async function callGeminiVision(env, base64, mime, prompt) {
@@ -239,7 +243,7 @@ async function callGeminiVision(env, base64, mime, prompt) {
       })
     }
   );
-
+ 
   if (!r.ok) {
     const text = await r.text();
     const hint = r.status === 400 ? 'Gemini не принял изображение (формат или размер).'
@@ -254,7 +258,7 @@ async function callGeminiVision(env, base64, mime, prompt) {
   if (!text) return { error: 'Gemini не смог прочитать текст на фото.' };
   return { text };
 }
-
+ 
 /* Модель иногда оборачивает JSON в ```json … ``` вопреки просьбе.
    Снимаем обёртку, прежде чем разбирать. */
 function parseJsonLoose(raw) {
@@ -264,35 +268,35 @@ function parseJsonLoose(raw) {
   if (a > 0 || b < s.length - 1) { if (a >= 0 && b > a) s = s.slice(a, b + 1); }
   try { return JSON.parse(s); } catch (e) { return null; }
 }
-
-
+ 
+ 
 /* ============================================================
    Обработчики
    ============================================================ */
-
+ 
 /* ---------- /explain: разбор задания ---------- */
 async function handleExplain(body, env, origin) {
   const lang = body.lang === 'en' ? 'en' : 'ru';
   const task = cut(body.task, 1200);
   if (!task.trim()) return json({ error: 'empty task' }, 400, origin, env);
-
+ 
   const options = Array.isArray(body.options) ? body.options.slice(0, 8).map(o => cut(o, 200)) : [];
   const userAnswer = cut(body.userAnswer, 200);
   const correctAnswer = cut(body.correctAnswer, 200);
   const subject = cut(body.subject, 60);
   const topic = cut(body.topic, 80);
-
+ 
   const COMMON = lang === 'ru'
     ? '\nНе выдумывай фактов. Если условие неполное — так и скажи.\nУложись в 200 слов. Не используй markdown-заголовки и списки, пиши связным текстом.'
     : '\nDo not invent facts. If the problem is incomplete, say so.\nKeep it under 200 words. No markdown headings or bullet lists — write flowing prose.';
-
+ 
   const p = persona(body.teacher, lang);
   const system = p ? p + COMMON : (lang === 'ru'
     ? 'Ты помогаешь школьнику разобраться в задании. Объясняй по шагам, простым языком, без формул там, где можно без них.\n' +
       'Если ученик ошибся — сначала объясни, почему его вариант выглядел правдоподобно, и только потом покажи верный ход мысли.' + COMMON
     : 'You are helping a school student understand a problem. Explain step by step, in plain language.\n' +
       'If the student got it wrong, first explain why their answer looked plausible, then show the correct reasoning.' + COMMON);
-
+ 
   const user = lang === 'ru'
     ? `Предмет: ${subject || '—'}${topic ? ', тема: ' + topic : ''}\nЗадание: ${task}\n` +
       (options.length ? 'Варианты: ' + options.join(' | ') + '\n' : '') +
@@ -300,17 +304,17 @@ async function handleExplain(body, env, origin) {
     : `Subject: ${subject || '—'}${topic ? ', topic: ' + topic : ''}\nProblem: ${task}\n` +
       (options.length ? 'Options: ' + options.join(' | ') + '\n' : '') +
       `The student answered: ${userAnswer || '—'}\nCorrect answer: ${correctAnswer || '—'}\n\nExplain why the correct answer is what it is.`;
-
+ 
   const res = await callDeepSeek(env, system, user);
   if (res.error) return json(res, 502, origin, env);
   return json({ explanation: res.content }, 200, origin, env);
 }
-
-
+ 
+ 
 /* ---------- /check-photo: домашка по фото ----------
    Два шага: Gemini читает рукописный текст, DeepSeek оценивает
    прочитанное от лица выбранного учителя.
-
+ 
    Распознанный текст возвращается ученику ОБЯЗАТЕЛЬНО и отдельно от
    оценки. Это не деталь интерфейса: распознавание детского почерка
    ошибается, и когда оценка выглядит несправедливой, первое, что надо
@@ -320,40 +324,40 @@ async function handlePhoto(body, env, origin) {
   if (!env.GEMINI_API_KEY) {
     return json({ error: 'Ключ Gemini не задан в настройках Worker. Выполните: npx wrangler secret put GEMINI_API_KEY' }, 500, origin, env);
   }
-
+ 
   const lang = body.lang === 'en' ? 'en' : 'ru';
   const raw = String(body.imageBase64 || '');
   /* приходит либо чистый base64, либо data:image/jpeg;base64,… */
   const m = raw.match(/^data:(image\/[a-z+]+);base64,(.*)$/i);
   const mime = m ? m[1] : (cut(body.mime, 30) || 'image/jpeg');
   const b64 = m ? m[2] : raw;
-
+ 
   if (!b64) return json({ error: 'Нет изображения.' }, 400, origin, env);
-
+ 
   const maxBytes = numCfg(env, 'MAX_IMAGE_KB') * 1024;
   /* base64 длиннее оригинала примерно на треть */
   if (b64.length * 0.75 > maxBytes) {
     return json({ error: `Фото слишком большое. Максимум ${numCfg(env, 'MAX_IMAGE_KB')} КБ после сжатия.` }, 413, origin, env);
   }
-
+ 
   const subject = cut(body.subject, 60) || 'english';
   const taskText = cut(body.taskText, 800);
   const strictness = Math.min(5, Math.max(1, Number(body.strictness) || 3));
-
+ 
   /* --- шаг 1: распознавание --- */
   const ocrPrompt = lang === 'ru'
     ? 'Ты — OCR для рукописного текста в тетради школьника. Распознай весь текст на фото и верни его построчно, ровно как написано, не исправляя ошибок ученика. Формат ответа — обычный текст без пояснений. Нечитаемое место помечай [?].'
     : 'You are an OCR for handwriting in a school exercise book. Transcribe all text in the photo line by line, exactly as written, without correcting the student\'s mistakes. Reply with plain text only, no commentary. Mark unreadable spots with [?].';
-
+ 
   const ocr = await callGeminiVision(env, b64, mime, ocrPrompt);
   if (ocr.error) return json(ocr, 502, origin, env);
-
+ 
   const recognized = cut(ocr.text, 4000);
-
+ 
   /* --- шаг 2: оценка --- */
   const p = persona(body.teacher, lang);
   const strictNote = (STRICT[strictness] || STRICT[3])[lang];
-
+ 
   const system = (p ? p + '\n\n' : '') + (lang === 'ru'
     ? `Ты проверяешь домашнюю работу школьника по предмету «${subject}».\n${strictNote}\n` +
       'Текст работы получен распознаванием рукописи и может содержать ошибки распознавания. ' +
@@ -363,15 +367,15 @@ async function handlePhoto(body, env, origin) {
       'The text came from handwriting recognition and may contain recognition errors. ' +
       'If a fragment looks like a recognition glitch rather than the student\'s mistake, do not deduct for it and say so in overall_feedback.\n' +
       'Do not invent anything absent from the text. Return STRICT JSON, no markdown, no commentary around it.');
-
+ 
   const shape = '{"grade":1-5,"correct_parts":["..."],"errors":[{"fragment":"...","explanation":"...","fix":"..."}],"overall_feedback":"...","next_step":"..."}';
-
+ 
   const user = (lang === 'ru'
     ? (taskText ? `Задание, которое было дано:\n"""\n${taskText}\n"""\n\n` : '') +
       `Распознанный текст работы:\n"""\n${recognized}\n"""\n\nПоставь оценку 1–5 и разбери работу. Формат ответа: ${shape}`
     : (taskText ? `The task that was set:\n"""\n${taskText}\n"""\n\n` : '') +
       `Recognised text of the work:\n"""\n${recognized}\n"""\n\nGive a mark 1–5 and review the work. Reply shape: ${shape}`);
-
+ 
   const res = await callDeepSeek(env, system, user, {
     maxTokens: numCfg(env, 'MAX_TOKENS_PHOTO'),
     jsonMode: true,
@@ -382,12 +386,12 @@ async function handlePhoto(body, env, origin) {
        что прочиталось, даже если оценить не удалось */
     return json({ error: res.error, recognized_text: recognized }, 502, origin, env);
   }
-
+ 
   const parsed = parseJsonLoose(res.content);
   if (!parsed) {
     return json({ error: 'Модель вернула ответ, который не удалось разобрать как JSON.', recognized_text: recognized }, 502, origin, env);
   }
-
+ 
   const grade = Math.min(5, Math.max(1, Number(parsed.grade) || 3));
   return json({
     recognized_text: recognized,
@@ -398,38 +402,38 @@ async function handlePhoto(body, env, origin) {
     next_step: cut(parsed.next_step, 400)
   }, 200, origin, env);
 }
-
-
+ 
+ 
 /* ---------- /chess-explain: словами про уже посчитанный ход ----------
    Внимание на распределение ролей. Ярлык хода (blunder, mistake и так
    далее), потерю в оценке и лучший ход считает ШАХМАТНЫЙ ДВИЖОК в
    браузере — assets/chess-review.js. Сюда приходит готовый результат, и
    модель только переводит его в человеческую фразу.
-
+ 
    Так сделано намеренно. Языковая модель не умеет оценивать позицию:
    она выдаст уверенный ярлык, регулярно неверный, и предложит «лучшие
    ходы», часть которых в этой позиции невозможна. Ученик не сможет
    отличить такую подсказку от настоящей — он же учится. Движок при
    этом считает точно, мгновенно и бесплатно.
-
+ 
    Поэтому эндпоинт не принимает решения: если модель недоступна,
    раздел работает без него, просто без словесного пояснения. */
 async function handleChessExplain(body, env, origin) {
   const lang = body.lang === 'en' ? 'en' : 'ru';
-
+ 
   const quality = cut(body.quality, 20);
   const allowed = ['brilliant', 'good', 'inaccuracy', 'mistake', 'blunder'];
   if (!allowed.includes(quality)) return json({ error: 'unknown quality' }, 400, origin, env);
-
+ 
   const move = cut(body.move, 12);
   const better = cut(body.betterMove, 12);
   const fen = cut(body.fen, 100);
   const loss = Number(body.loss);
   const lossPawns = Number.isFinite(loss) ? (loss / 100).toFixed(1) : null;
   const material = cut(body.material, 200);
-
+ 
   const p = persona(body.teacher, lang);
-
+ 
   const system = (p ? p + '\n\n' : '') + (lang === 'ru'
     ? 'Ты шахматный тренер. Оценку хода и лучший ход уже посчитал движок — они даны тебе как факт, и спорить с ними нельзя: ' +
       'твоя работа только объяснить их человеческим языком. Не предлагай других ходов и не пересчитывай оценку. ' +
@@ -437,12 +441,12 @@ async function handleChessExplain(body, env, origin) {
     : 'You are a chess coach. The engine has already computed the move quality and the better move — they are given to you as fact and must not be disputed: ' +
       'your job is only to explain them in human language. Do not suggest other moves and do not recompute the evaluation. ' +
       'Do not assert anything about the position that is not in the data given. Two or three sentences, plain language, no lists.');
-
+ 
   const names = {
     ru: { brilliant: 'отличный ход', good: 'хороший ход', inaccuracy: 'неточность', mistake: 'ошибка', blunder: 'грубая ошибка' },
     en: { brilliant: 'brilliant move', good: 'good move', inaccuracy: 'inaccuracy', mistake: 'mistake', blunder: 'blunder' }
   }[lang];
-
+ 
   const user = lang === 'ru'
     ? `Позиция до хода (FEN): ${fen}\nХод ученика: ${move}\nОценка движка: ${names[quality]}` +
       (lossPawns ? `\nПотеря по оценке: ${lossPawns} пешки` : '') +
@@ -454,64 +458,136 @@ async function handleChessExplain(body, env, origin) {
       (better ? `\nEngine's better move: ${better}` : '') +
       (material ? `\nMaterial change: ${material}` : '') +
       '\n\nExplain to the student why their move is judged this way' + (better ? ' and what the idea behind the better move is.' : '.');
-
+ 
   const res = await callDeepSeek(env, system, user, { maxTokens: 220, temperature: 0.4 });
   if (res.error) return json(res, 502, origin, env);
   return json({ explanation: res.content }, 200, origin, env);
 }
-
-
+ 
+ 
+/* ---------- /grade-essay: проверка сочинения ----------
+   Ученик присылает готовый текст (сочинение ЕГЭ по русскому или эссе
+   по английскому) — без фото, без распознавания, чистый текст.
+ 
+   Намеренно НЕ выставляем баллы по настоящим критериям К1–К12 (русский)
+   или официальной рубрике FIPI: модель не заменяет живого эксперта,
+   а уверенно расставленные баллы по несуществующей у неё методике —
+   это как раз тот случай ложной точности, которого разбор задания
+   избегает. Вместо этого — пять описательных измерений (по 1–5) и
+   развёрнутый разбор текстом, явно подписанные как ориентир, а не
+   как официальная оценка. Клиент обязан показать это предупреждение
+   рядом с результатом — see essay.html. */
+async function handleEssay(body, env, origin) {
+  const lang = body.lang === 'en' ? 'en' : 'ru';
+  const subject = (body.subject === 'english') ? 'english' : 'russian';
+  const essay = cut(body.essay, 6000);
+  if (essay.trim().length < 50) return json({ error: 'essay too short' }, 400, origin, env);
+ 
+  const prompt = cut(body.prompt, 800); // тема/задание сочинения, необязательно
+ 
+  const p = persona(body.teacher, lang);
+  const subjName = subject === 'english' ? (lang === 'ru' ? 'английскому языку' : 'English') : (lang === 'ru' ? 'русскому языку' : 'Russian');
+ 
+  const system = (p ? p + '\n\n' : '') + (lang === 'ru'
+    ? `Ты проверяешь сочинение школьника по предмету «${subjName}» в формате, близком к ЕГЭ.\n` +
+      'ВАЖНО: ты не выставляешь официальные баллы по критериям К1–К12 ФИПИ — у тебя нет доступа к их точной методике, ' +
+      'и притворяться, что есть, значит вводить ученика в заблуждение по вопросу, от которого реально зависит его итоговый балл. ' +
+      'Вместо этого оцени пять сторон работы по шкале 1–5 (1 — серьёзная проблема, 5 — сильно) и дай развёрнутый словесный разбор. ' +
+      'Не выдумывай фактов о тексте, которых там нет. Верни СТРОГО JSON без markdown и без пояснений вокруг.'
+    : `You are marking a student's essay for "${subjName}", in a format close to the Russian state exam (ЕГЭ).\n` +
+      'IMPORTANT: you do not assign official scores against the FIPI К1–К12 criteria — you do not have access to their exact grading methodology, ' +
+      "and pretending otherwise would mislead the student about something that genuinely affects their final score. " +
+      'Instead, rate five aspects of the work on a 1–5 scale (1 = serious problem, 5 = strong) and give a detailed written review. ' +
+      'Do not invent anything about the text that is not there. Return STRICT JSON, no markdown, no commentary around it.');
+ 
+  const shape = '{"scores":{"relevance":1-5,"structure":1-5,"argumentation":1-5,"language":1-5,"overall_impression":1-5},' +
+    '"strengths":["..."],"issues":[{"quote":"...","problem":"...","fix":"..."}],"overall_feedback":"...","next_step":"..."}';
+ 
+  const user = (lang === 'ru'
+    ? (prompt ? `Тема/задание сочинения:\n"""\n${prompt}\n"""\n\n` : '') +
+      `Текст сочинения:\n"""\n${essay}\n"""\n\nОцени работу. Формат ответа: ${shape}`
+    : (prompt ? `The essay prompt:\n"""\n${prompt}\n"""\n\n` : '') +
+      `Essay text:\n"""\n${essay}\n"""\n\nReview the work. Reply shape: ${shape}`);
+ 
+  const res = await callDeepSeek(env, system, user, { maxTokens: numCfg(env, 'MAX_TOKENS_PHOTO'), jsonMode: true, temperature: 0.3 });
+  if (res.error) return json(res, 502, origin, env);
+ 
+  const parsed = parseJsonLoose(res.content);
+  if (!parsed) return json({ error: 'Модель вернула ответ, который не удалось разобрать как JSON.' }, 502, origin, env);
+ 
+  const clampScore = v => Math.min(5, Math.max(1, Number(v) || 3));
+  const s = parsed.scores || {};
+  return json({
+    scores: {
+      relevance: clampScore(s.relevance),
+      structure: clampScore(s.structure),
+      argumentation: clampScore(s.argumentation),
+      language: clampScore(s.language),
+      overall_impression: clampScore(s.overall_impression)
+    },
+    strengths: Array.isArray(parsed.strengths) ? parsed.strengths.slice(0, 8).map(x => cut(x, 300)) : [],
+    issues: Array.isArray(parsed.issues) ? parsed.issues.slice(0, 15).map(x => ({
+      quote: cut(x && x.quote, 200), problem: cut(x && x.problem, 300), fix: cut(x && x.fix, 300)
+    })) : [],
+    overall_feedback: cut(parsed.overall_feedback, 1500),
+    next_step: cut(parsed.next_step, 400)
+  }, 200, origin, env);
+}
+ 
+ 
 /* ============================================================
    Точка входа
    ============================================================ */
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
-
+ 
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: cors(origin, env) });
     }
-
+ 
     const url = new URL(request.url);
-
+ 
     if (url.pathname === '/' || url.pathname === '/health') {
       return json({
         ok: true,
         service: 'skyschool-ai',
         hasKey: !!env.DEEPSEEK_API_KEY,
         hasVision: !!env.GEMINI_API_KEY,
-        endpoints: ['/explain', '/check-photo', '/chess-explain'],
+        endpoints: ['/explain', '/check-photo', '/chess-explain', '/grade-essay'],
         limits: {
           ratePerMin: numCfg(env, 'RATE_PER_MIN'),
           photoSeconds: numCfg(env, 'RATE_PHOTO_SECONDS'),
           chessSeconds: numCfg(env, 'RATE_CHESS_SECONDS'),
+          essaySeconds: numCfg(env, 'RATE_ESSAY_SECONDS'),
           maxImageKb: numCfg(env, 'MAX_IMAGE_KB')
         }
       }, 200, origin, env);
     }
-
+ 
     const routes = {
       '/explain': handleExplain,
       '/check-photo': handlePhoto,
-      '/chess-explain': handleChessExplain
+      '/chess-explain': handleChessExplain,
+      '/grade-essay': handleEssay
     };
     const handler = routes[url.pathname];
     if (!handler) return json({ error: 'not found' }, 404, origin, env);
     if (request.method !== 'POST') return json({ error: 'use POST' }, 405, origin, env);
-
+ 
     if (origin && !originList(env).includes(origin)) {
       return json({ error: 'origin not allowed' }, 403, origin, env);
     }
-
+ 
     if (!env.DEEPSEEK_API_KEY) {
       return json({ error: 'Ключ не задан в настройках Worker. Выполните: npx wrangler secret put DEEPSEEK_API_KEY' }, 500, origin, env);
     }
-
+ 
     const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
     if (!ratePerMinOk(ip, numCfg(env, 'RATE_PER_MIN'))) {
       return json({ error: 'Слишком много запросов подряд. Подождите минуту.' }, 429, origin, env);
     }
-
+ 
     /* дорогие эндпоинты — отдельный, более редкий шаг */
     if (url.pathname === '/check-photo') {
       const wait = intervalWait(ip + ':photo', numCfg(env, 'RATE_PHOTO_SECONDS'));
@@ -521,11 +597,15 @@ export default {
       const wait = intervalWait(ip + ':chess', numCfg(env, 'RATE_CHESS_SECONDS'));
       if (wait) return json({ error: `Подождите ${wait} сек.` }, 429, origin, env);
     }
-
+    if (url.pathname === '/grade-essay') {
+      const wait = intervalWait(ip + ':essay', numCfg(env, 'RATE_ESSAY_SECONDS'));
+      if (wait) return json({ error: `Следующая проверка сочинения будет доступна через ${wait} сек.` }, 429, origin, env);
+    }
+ 
     let body;
     try { body = await request.json(); }
     catch (e) { return json({ error: 'bad json' }, 400, origin, env); }
-
+ 
     try {
       return await handler(body, env, origin);
     } catch (e) {
