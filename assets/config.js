@@ -26,7 +26,7 @@ window.SKY_CONFIG = {
      Неправильно: 'sk-...'  ← ключ в браузере виден всем, кто откроет
                               исходник страницы, и спишет ваш баланс.
      Как развернуть Worker — в README, раздел «Разбор от ИИ». */
-  AI_BASE: '',
+  AI_BASE: 'https://news92-orders.almazpro0927.workers.dev/',
 
   /* --- 3. Ссылка на сайт студии (для перехода из шапки) --- */
   STUDIO_URL: 'https://news92-tg.github.io/Design-Studio/',
