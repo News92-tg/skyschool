@@ -207,55 +207,115 @@ window.Sky = (function () {
 
   /* ---------- шапка и подвал ---------- */
   const NAV = [
-    { href:'index.html',    key:'navHome' },
-    { href:'trainer.html',  key:'navLearn' },
-    { href:'test.html',     key:'navTest' },
-    { href:'exam.html',     key:'navExam' },
-    { href:'kids.html',     key:'navKids' },
-    { href:'chess.html',    key:'navChess' },
-    { href:'teachers.html', key:'navTeachers' },
-    { href:'classroom.html',   key:'navClassroom' },
-    { href:'headteacher.html', key:'navDean' },
-    { href:'pe.html',          key:'navPe' },
-    { href:'psychologist.html', key:'navPsy' },
-    { href:'life.html',     key:'navLife' },
-    { href:'trackers.html',   key:'navTrack' },
-    { href:'body.html',       key:'navBody' },
-    { href:'plan.html',     key:'navPlan' },
-    { href:'photo.html',    key:'navPhoto' },
-    { href:'essay.html',    key:'navEssay' },
-    { href:'parent.html',   key:'navParent' },
-    { href:'tools.html',    key:'navTools' }
+    { href:'index.html',        key:'navHome',      group:null },
+    { href:'trainer.html',      key:'navLearn',     group:'study' },
+    { href:'test.html',         key:'navTest',      group:'study' },
+    { href:'exam.html',         key:'navExam',      group:'study' },
+    { href:'kids.html',         key:'navKids',      group:'kids' },
+    { href:'chess.html',        key:'navChess',     group:'kids' },
+    { href:'teachers.html',     key:'navTeachers',  group:'teachers' },
+    { href:'classroom.html',    key:'navClassroom', group:'class' },
+    { href:'headteacher.html',  key:'navDean',      group:'class' },
+    { href:'pe.html',           key:'navPe',        group:'class' },
+    { href:'psychologist.html', key:'navPsy',       group:'development' },
+    { href:'life.html',         key:'navLife',      group:'development' },
+    { href:'trackers.html',     key:'navTrack',     group:'development' },
+    { href:'body.html',         key:'navBody',      group:'development' },
+    { href:'plan.html',         key:'navPlan',      group:'plan' },
+    { href:'photo.html',        key:'navPhoto',     group:'study' },
+    { href:'essay.html',        key:'navEssay',     group:'study' },
+    { href:'parent.html',       key:'navParent',    group:'parents' },
+    { href:'tools.html',        key:'navTools',     group:'plan' }
   ];
 
-  /* «Задания» показываем только тем, кто вошёл: гостю этот раздел
-     нечего показать, а меню и без того длинное. */
+  const NAV_GROUPS = [
+    { id:'study',       label:{ ru:'Учёба',     en:'Study' } },
+    { id:'kids',        label:{ ru:'Детям',     en:'Kids' } },
+    { id:'class',       label:{ ru:'Класс',     en:'Class' } },
+    { id:'development', label:{ ru:'Развитие',  en:'Growth' } },
+    { id:'plan',        label:{ ru:'План',      en:'Plan' } },
+    { id:'parents',     label:{ ru:'Родителям', en:'Parents' } },
+    { id:'teachers',    label:{ ru:'Учителя',   en:'Teachers' } }
+  ];
+
+  /* «Задания» показываем только тем, кто вошёл, и относим к «Учёбе». */
   function navItems() {
     const signedIn = !!(window.Sky && Sky.db && Sky.db.me && Sky.db.me());
     if (!signedIn) return NAV;
-    /* вставляем «Задания» сразу после «Учителей» — ищем позицию по
-       ключу, а не по номеру: так пункты меню можно свободно
-       добавлять и переставлять, не боясь сломать вставку. */
     const idx = NAV.findIndex(n => n.key === 'navTeachers') + 1;
-    return NAV.slice(0, idx).concat([{ href:'homework.html', key:'navHomework' }], NAV.slice(idx));
+    return NAV.slice(0, idx).concat([
+      { href:'homework.html', key:'navHomework', group:'study' }
+    ], NAV.slice(idx));
+  }
+
+  let navOverflowLoading = false;
+  function ensureNavOverflow() {
+    if (window.NavOverflow && typeof window.NavOverflow.init === 'function') {
+      window.NavOverflow.init();
+      return;
+    }
+    if (navOverflowLoading || document.querySelector('script[data-sky-nav-overflow]')) return;
+
+    navOverflowLoading = true;
+    const s = document.createElement('script');
+    s.src = 'assets/nav-overflow.js';
+    s.defer = true;
+    s.dataset.skyNavOverflow = '1';
+    s.onload = function () {
+      navOverflowLoading = false;
+      if (window.NavOverflow && typeof window.NavOverflow.init === 'function') {
+        window.NavOverflow.init();
+      }
+    };
+    s.onerror = function () {
+      navOverflowLoading = false;
+    };
+    document.head.appendChild(s);
   }
 
   function renderHeader() {
     const host = document.getElementById('appHeader');
     if (!host) return;
     const here = (location.pathname.split('/').pop() || 'index.html');
+    const items = navItems();
+
+    function navLink(n) {
+      const current = n.href === here;
+      return '<a href="' + n.href + '"' +
+        (current ? ' aria-current="page"' : '') + '>' +
+        t(n.key) + '</a>';
+    }
+
+    let navMarkup = navLink(items.find(n => n.group === null) || NAV[0]);
+
+    NAV_GROUPS.forEach(group => {
+      const groupItems = items.filter(n => n.group === group.id);
+      if (!groupItems.length) return;
+      const active = groupItems.some(n => n.href === here);
+
+      navMarkup +=
+        '<div class="nav-group' + (active ? ' is-active' : '') + '" data-nav-group="' + group.id + '">' +
+          '<button type="button" class="nav-group-trigger" aria-haspopup="menu" aria-expanded="false">' +
+            '<span>' + L(group.label) + '</span><span class="nav-caret" aria-hidden="true">⌄</span>' +
+          '</button>' +
+          '<div class="nav-group-menu" role="menu">' +
+            groupItems.map(navLink).join('') +
+          '</div>' +
+        '</div>';
+    });
+
     host.className = 'appbar';
     host.innerHTML =
       '<div class="inner">' +
         '<a class="brand" href="index.html">' + logoSvg('logo') +
           '<span>Skyy<b>School</b></span></a>' +
-        '<nav class="appnav">' +
-          navItems().map(n => `<a href="${n.href}"${n.href === here ? ' aria-current="page"' : ''}>${t(n.key)}</a>`).join('') +
+        '<nav id="mainMenu" aria-label="' + (lang === 'ru' ? 'Основная навигация' : 'Main navigation') + '">' +
+          '<div class="appnav">' + navMarkup + '</div>' +
         '</nav>' +
         '<div class="tools">' +
           '<div class="seg" id="langSeg">' +
-            `<button type="button" data-lang="ru" aria-pressed="${lang === 'ru'}">RU</button>` +
-            `<button type="button" data-lang="en" aria-pressed="${lang === 'en'}">EN</button>` +
+            '<button type="button" data-lang="ru" aria-pressed="' + (lang === 'ru') + '">RU</button>' +
+            '<button type="button" data-lang="en" aria-pressed="' + (lang === 'en') + '">EN</button>' +
           '</div>' +
           '<button class="icon-btn" id="themeBtn" title="' +
             (lang === 'ru' ? 'Светлая или тёмная тема' : 'Light or dark theme') + '">◐</button>' +
@@ -268,8 +328,12 @@ window.Sky = (function () {
       if (b) setLang(b.dataset.lang);
     });
     host.querySelector('#themeBtn').addEventListener('click', toggleTheme);
+
+    /* nav-overflow подключается после того, как шапка уже отрисована. */
+    ensureNavOverflow();
     document.dispatchEvent(new CustomEvent('headerready'));
   }
+
 
   function renderFooter() {
     const host = document.getElementById('appFooter');
