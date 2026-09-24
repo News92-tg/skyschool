@@ -2,6 +2,9 @@
 document.write('<link rel="stylesheet" href="assets/chess-board-fix.css?v=2">');
 document.write('<link rel="stylesheet" href="assets/chess-lesson-ui.css?v=2">');
 document.write('<script src="assets/chess-teacher-ui-core.js"><\/script>');
+/* Портреты подменяют аватарки сразу после ядра — до того, как
+   что-либо успеет нарисоваться со старыми. */
+document.write('<script src="assets/chess-coach-portraits.js?v=1"><\/script>');
 document.write('<script src="assets/chess-game-modes.js"><\/script>');
 document.write('<script src="assets/chess-puzzle-coach.js"><\/script>');
 document.write('<script src="assets/chess-game-flow.js"><\/script>');
