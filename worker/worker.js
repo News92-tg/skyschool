@@ -1,34 +1,40 @@
 /* ============================================================
    SkyySchool — прокси к моделям на Cloudflare Workers
- 
+
    Зачем он нужен. Ключи нельзя класть в файлы сайта: GitHub Pages
    отдаёт их как есть, и ключ увидит любой, кто откроет исходник
    страницы. По GitHub круглосуточно ходят боты, которые ищут строки
    вида sk-… и тратят чужие деньги.
- 
+
    Здесь ключи живут в переменных окружения Worker: браузер их не
    получает, они уходят только с этого сервера в модель.
- 
-   Три эндпоинта:
-     POST /explain       — разбор задания (DeepSeek)
-     POST /check-photo   — домашка по фото (Gemini Vision → DeepSeek)
+
+   Четыре эндпоинта:
+     POST /explain       — разбор задания (Groq)
+     POST /check-photo   — домашка по фото (Gemini читает → Groq оценивает)
      POST /chess-explain — объяснение уже посчитанной оценки хода
-                           (DeepSeek; САМУ оценку считает движок в
+                           (Groq; САМУ оценку считает движок в
                            браузере, см. assets/chess-review.js)
- 
-   Как развернуть:
-     npx wrangler login
-     npx wrangler secret put DEEPSEEK_API_KEY
-     npx wrangler secret put GEMINI_API_KEY     # только для /check-photo
-     npx wrangler deploy
+     POST /grade-essay   — проверка сочинения по критериям (Groq)
+
+   Разделение простое: весь текст — Groq, всё, что с картинкой, —
+   Gemini. Никаких других поставщиков здесь нет.
+
+   Секреты (задаются в панели Cloudflare или через wrangler):
+     GROQ_API_KEY           — текстовые эндпоинты
+     GEMINI_API_KEY         — /check-photo
+     SUPABASE_URL           — лимиты и история разборов
+     SUPABASE_SERVICE_KEY   — то же; ключ обходит RLS, только сюда
+   Необязательные переменные: GROQ_MODEL, GEMINI_MODEL, RATE_*,
+   MAX_TOKENS*, ALLOWED_ORIGINS — меняются без выкатки.
    Полученный адрес впишите в assets/config.js в поле AI_BASE.
- 
+
    Все лимиты и имена моделей — переменные окружения со значениями по
    умолчанию (см. DEFAULTS ниже). Числа в тарифах и названия моделей
    меняются часто, и менять их правкой кода с последующим деплоем —
    плохая идея: правится в панели Cloudflare без выкатки.
    ============================================================ */
- 
+
 /* ---------- настройки ----------
    Любое из этих значений переопределяется переменной окружения с тем
    же именем: wrangler.toml → [vars], либо панель Cloudflare. */
@@ -41,12 +47,29 @@ const DEFAULTS = {
   RATE_CHESS_SECONDS: 3,
   /* максимальный размер картинки после сжатия в браузере, КБ */
   MAX_IMAGE_KB: 1200,
-  /* модели */
-  DEEPSEEK_MODEL: 'deepseek-chat',
+  /* ---------- модели ----------
+     Текст — Groq, фото — Gemini. Больше никого.
+
+     Про GROQ_MODEL. Документация Groq сама себе противоречит: страница
+     отказа от моделей НЕ числит llama-3.3-70b-versatile устаревшей и
+     даже называет её заменой для старых Llama, а страница моделей
+     ставит рядом метку Enterprise / Contact Sales. Что из этого верно
+     для конкретного ключа — покажет первый же запрос.
+
+     Поэтому здесь стоит запрошенная модель, но она вынесена в
+     переменную окружения: если Groq ответит «нет такой модели» или
+     «нет доступа», в Cloudflare достаточно поменять GROQ_MODEL на
+     openai/gpt-oss-120b и нажать Save — без правки кода и выкатки.
+     Текст ошибки об этом прямо говорит, см. groqHint(). */
+  GROQ_MODEL: 'llama-3.3-70b-versatile',
   GEMINI_MODEL: 'gemini-2.5-flash',
   /* потолок ответа модели в токенах */
   MAX_TOKENS: 500,
   MAX_TOKENS_PHOTO: 900,
+  /* сочинение длиннее разбора задачи, и разбор по критериям тоже */
+  MAX_TOKENS_ESSAY: 1200,
+  /* максимальная длина сочинения на входе, символов */
+  MAX_ESSAY_CHARS: 12000,
   /* домены, которым разрешено обращаться сюда; через запятую */
   ALLOWED_ORIGINS: [
     'https://news92-tg.github.io',
@@ -56,7 +79,7 @@ const DEFAULTS = {
     'http://127.0.0.1:8100'
   ].join(',')
 };
- 
+
 const numCfg = (env, key) => {
   const raw = env && env[key];
   const n = Number(raw);
@@ -67,25 +90,25 @@ const strCfg = (env, key) => {
   return (typeof raw === 'string' && raw.trim()) ? raw.trim() : DEFAULTS[key];
 };
 const originList = env => strCfg(env, 'ALLOWED_ORIGINS').split(',').map(s => s.trim()).filter(Boolean);
- 
- 
+
+
 /* ---------- ограничение частоты ----------
    Хранится в памяти Worker: при перезапуске обнуляется, и это
    нормально. Цель не безопасность (её даёт белый список источников), а
    защита от случайного цикла, который за ночь съест весь баланс.
- 
+
    Две разные меры: счётчик за минуту для обычных запросов и
    минимальный промежуток для дорогих (фото). Считать фото тем же
    счётчиком неправильно — двадцать распознаваний подряд стоят совсем
    других денег, чем двадцать текстовых разборов. */
 const hits = new Map();
 const lastAt = new Map();
- 
+
 function sweep(now) {
   if (hits.size > 5000) for (const [k, v] of hits) if (now - v.start > 60_000) hits.delete(k);
   if (lastAt.size > 5000) for (const [k, t] of lastAt) if (now - t > 3_600_000) lastAt.delete(k);
 }
- 
+
 function ratePerMinOk(ip, limit) {
   const now = Date.now();
   sweep(now);
@@ -94,7 +117,7 @@ function ratePerMinOk(ip, limit) {
   rec.n++;
   return rec.n <= limit;
 }
- 
+
 /* Возвращает 0, если можно, иначе сколько секунд ещё ждать. */
 function intervalWait(key, seconds) {
   const now = Date.now();
@@ -105,8 +128,8 @@ function intervalWait(key, seconds) {
   lastAt.set(key, now);
   return 0;
 }
- 
- 
+
+
 /* ---------- служебное ---------- */
 function cors(origin, env) {
   const list = originList(env);
@@ -118,26 +141,26 @@ function cors(origin, env) {
     'Access-Control-Max-Age': '86400'
   };
 }
- 
+
 const json = (data, status, origin, env) => new Response(JSON.stringify(data), {
   status,
   headers: { 'Content-Type': 'application/json; charset=utf-8', ...cors(origin, env) }
 });
- 
+
 /* Обрезаем всё, что приходит от браузера: длина запроса напрямую
    переводится в деньги, и присылать сюда мегабайт текста незачем. */
 const cut = (v, n) => String(v == null ? '' : v).slice(0, n);
- 
- 
+
+
 /* ---------- кто объясняет ----------
    Клиент присылает ТОЛЬКО идентификатор, промпты живут здесь.
    Так и должно быть: если принимать текст системного промпта от
    клиента, Worker становится бесплатным доступом к вашему ключу
-   DeepSeek для любых задач — от чужих курсовых до попыток обойти
+   Groq для любых задач — от чужих курсовых до попыток обойти
    ограничения модели. Неизвестный идентификатор не ошибка, а повод
    ответить общим промптом: так старый Worker продолжает работать с
    новым сайтом, просто без персонажа.
- 
+
    ВАЖНО: тексты должны совпадать с data/ai-teachers.js. Это осознанное
    дублирование — файл нужен сайту для режима «свой ключ» и для работы
    офлайн, а Worker не может ему доверять. Правя промпт в одном месте,
@@ -168,7 +191,7 @@ const TEACHERS = {
     en: 'You are explaining to a child aged 5–10. Very short sentences, one idea each. Words a child hears at home: apples, steps, blocks. Help with counting on objects, not formulas. If the child was wrong, say many people think so too and show how to check; never start with "wrong". One or two emoji are fine. Keep it under 120 words.'
   }
 };
- 
+
 /* Строгость учителя. Держится здесь и в assets/ai-teachers.js по той
    же причине, что и промпты. */
 const STRICT = {
@@ -183,49 +206,67 @@ const STRICT = {
   5: { ru: 'Экзаменационная строгость: любая неточность формулировки или пропущенный шаг стоят балла.',
        en: 'Exam strictness: any imprecise wording or skipped step costs a mark.' }
 };
- 
+
 function persona(teacherId, lang) {
   const t = TEACHERS[cut(teacherId, 40)];
   return t ? t[lang] : null;
 }
- 
- 
+
+
 /* ---------- вызовы моделей ---------- */
-function deepseekHint(status) {
-  return status === 401 ? 'Ключ DeepSeek неверен или отозван.'
-    : status === 402 ? 'На счету DeepSeek закончились средства.'
-    : status === 429 ? 'DeepSeek ограничил частоту запросов. Попробуйте через минуту.'
-    : 'DeepSeek вернул ошибку ' + status + '.';
+function groqHint(status) {
+  if (status === 401) return 'Groq не принял ключ. Проверьте GROQ_API_KEY в настройках Worker.';
+  if (status === 429) return 'Groq: слишком много запросов или кончился лимит.';
+  if (status === 404) return 'Groq не знает такой модели. Проверьте GROQ_MODEL — список доступных моделей меняется.';
+  if (status >= 500) return 'Groq временно недоступен.';
+  return 'Groq ответил ошибкой ' + status + '.';
 }
- 
-async function callDeepSeek(env, system, user, opts) {
+
+/* Groq говорит на том же языке, что и OpenAI, поэтому тело запроса
+   почти совпадает с любым OpenAI-совместимым API. */
+async function callGroq(env, system, user, opts) {
   const o = opts || {};
-  const r = await fetch('https://api.deepseek.com/chat/completions', {
+  const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + env.DEEPSEEK_API_KEY
+      'Authorization': 'Bearer ' + env.GROQ_API_KEY
     },
     body: JSON.stringify(Object.assign({
-      model: strCfg(env, 'DEEPSEEK_MODEL'),
+      model: strCfg(env, 'GROQ_MODEL'),
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
       temperature: o.temperature == null ? 0.3 : o.temperature,
       max_tokens: o.maxTokens || numCfg(env, 'MAX_TOKENS')
     }, o.jsonMode ? { response_format: { type: 'json_object' } } : {}))
   });
- 
+
   if (!r.ok) {
     const text = await r.text();
-    return { error: deepseekHint(r.status), detail: text.slice(0, 300) };
+    return { error: groqHint(r.status), detail: text.slice(0, 300), status: r.status };
   }
   const data = await r.json();
   const content = data?.choices?.[0]?.message?.content?.trim();
-  if (!content) return { error: 'Пустой ответ от DeepSeek.' };
-  return { content };
+  if (!content) return { error: 'Пустой ответ от Groq.' };
+  return { content, provider: 'groq' };
 }
- 
-/* Gemini Vision: распознавание рукописного текста.
-   Отдельная модель именно потому, что DeepSeek картинок не читает. */
+
+/* ---------- единственный текстовый поставщик ----------
+   Запасного нет намеренно: держать второй ключ живым ради редкого
+   отказа — это второй счёт, второй лимит и второе место, где всё
+   может протухнуть незаметно. Когда Groq недоступен, сайт не остаётся
+   пустым: на страницах работает assets/ai-fallback.js, который
+   собирает разбор из заготовленных фраз голосом выбранного учителя. */
+async function callModel(env, system, user, opts) {
+  if (!env.GROQ_API_KEY) {
+    return { error: 'Ключ Groq не задан. Выполните: npx wrangler secret put GROQ_API_KEY' };
+  }
+  try {
+    return await callGroq(env, system, user, opts);
+  } catch (e) {
+    return { error: 'Groq недоступен: ' + e.message };
+  }
+}
+
 async function callGeminiVision(env, base64, mime, prompt) {
   const model = strCfg(env, 'GEMINI_MODEL');
   const r = await fetch(
@@ -239,7 +280,7 @@ async function callGeminiVision(env, base64, mime, prompt) {
       })
     }
   );
- 
+
   if (!r.ok) {
     const text = await r.text();
     const hint = r.status === 400 ? 'Gemini не принял изображение (формат или размер).'
@@ -254,7 +295,7 @@ async function callGeminiVision(env, base64, mime, prompt) {
   if (!text) return { error: 'Gemini не смог прочитать текст на фото.' };
   return { text };
 }
- 
+
 /* Модель иногда оборачивает JSON в ```json … ``` вопреки просьбе.
    Снимаем обёртку, прежде чем разбирать. */
 function parseJsonLoose(raw) {
@@ -264,35 +305,35 @@ function parseJsonLoose(raw) {
   if (a > 0 || b < s.length - 1) { if (a >= 0 && b > a) s = s.slice(a, b + 1); }
   try { return JSON.parse(s); } catch (e) { return null; }
 }
- 
- 
+
+
 /* ============================================================
    Обработчики
    ============================================================ */
- 
+
 /* ---------- /explain: разбор задания ---------- */
 async function handleExplain(body, env, origin) {
   const lang = body.lang === 'en' ? 'en' : 'ru';
   const task = cut(body.task, 1200);
   if (!task.trim()) return json({ error: 'empty task' }, 400, origin, env);
- 
+
   const options = Array.isArray(body.options) ? body.options.slice(0, 8).map(o => cut(o, 200)) : [];
   const userAnswer = cut(body.userAnswer, 200);
   const correctAnswer = cut(body.correctAnswer, 200);
   const subject = cut(body.subject, 60);
   const topic = cut(body.topic, 80);
- 
+
   const COMMON = lang === 'ru'
     ? '\nНе выдумывай фактов. Если условие неполное — так и скажи.\nУложись в 200 слов. Не используй markdown-заголовки и списки, пиши связным текстом.'
     : '\nDo not invent facts. If the problem is incomplete, say so.\nKeep it under 200 words. No markdown headings or bullet lists — write flowing prose.';
- 
+
   const p = persona(body.teacher, lang);
   const system = p ? p + COMMON : (lang === 'ru'
     ? 'Ты помогаешь школьнику разобраться в задании. Объясняй по шагам, простым языком, без формул там, где можно без них.\n' +
       'Если ученик ошибся — сначала объясни, почему его вариант выглядел правдоподобно, и только потом покажи верный ход мысли.' + COMMON
     : 'You are helping a school student understand a problem. Explain step by step, in plain language.\n' +
       'If the student got it wrong, first explain why their answer looked plausible, then show the correct reasoning.' + COMMON);
- 
+
   const user = lang === 'ru'
     ? `Предмет: ${subject || '—'}${topic ? ', тема: ' + topic : ''}\nЗадание: ${task}\n` +
       (options.length ? 'Варианты: ' + options.join(' | ') + '\n' : '') +
@@ -300,16 +341,16 @@ async function handleExplain(body, env, origin) {
     : `Subject: ${subject || '—'}${topic ? ', topic: ' + topic : ''}\nProblem: ${task}\n` +
       (options.length ? 'Options: ' + options.join(' | ') + '\n' : '') +
       `The student answered: ${userAnswer || '—'}\nCorrect answer: ${correctAnswer || '—'}\n\nExplain why the correct answer is what it is.`;
- 
-  const res = await callDeepSeek(env, system, user);
+
+  const res = await callModel(env, system, user);
   if (res.error) return json(res, 502, origin, env);
   return json({ explanation: res.content }, 200, origin, env);
 }
- 
- 
+
+
 /* ============================================================
    Supabase: личность пользователя и его квота
- 
+
    ПОЧЕМУ userId НЕ БЕРЁТСЯ ИЗ ТЕЛА ЗАПРОСА
    ----------------------------------------
    В исходном задании Worker принимал "userId" полем JSON. Так делать
@@ -317,19 +358,19 @@ async function handleExplain(body, env, origin) {
    выдуманный идентификатор может кто угодно обычным curl. Последствия
    не теоретические — можно бесконечно обходить свой лимит (каждый раз
    новый случайный uuid) и можно сжечь чужую оплаченную квоту.
- 
+
    Поэтому личность берётся из access-токена Supabase, который браузер
    присылает в заголовке Authorization. Токен подписан Supabase, и
    проверяет его сам Supabase — мы только спрашиваем у него «кто это».
- 
+
    Анонимных не выгоняем: без токена работает прежнее ограничение по
    IP-адресу, как было до тарифов. Сайт обязан работать без аккаунта.
    ============================================================ */
- 
+
 const supaUrl = env => String(env.SUPABASE_URL || '').replace(/\/+$/, '');
 const supaKey = env => env.SUPABASE_SERVICE_KEY || '';
 const supaReady = env => !!(supaUrl(env) && supaKey(env));
- 
+
 /* Кто прислал запрос. null — аноним (это нормально). */
 async function whoAmI(request, env) {
   if (!supaReady(env)) return null;
@@ -348,7 +389,7 @@ async function whoAmI(request, env) {
     return null;
   }
 }
- 
+
 /* Вызов функции в базе сервисным ключом. */
 async function supaRpc(env, fn, args) {
   const r = await fetch(supaUrl(env) + '/rest/v1/rpc/' + fn, {
@@ -369,7 +410,7 @@ async function supaRpc(env, fn, args) {
     return { error: 'supabase: ответ не разобран', detail: text.slice(0, 200) };
   }
 }
- 
+
 async function supaInsert(env, table, row) {
   try {
     await fetch(supaUrl(env) + '/rest/v1/' + table, {
@@ -384,12 +425,12 @@ async function supaInsert(env, table, row) {
     });
   } catch (e) { /* история не критична: ученик уже получил разбор */ }
 }
- 
- 
+
+
 /* ---------- /check-photo: домашка по фото ----------
-   Два шага: Gemini читает рукописный текст, DeepSeek оценивает
+   Два шага: Gemini читает рукописный текст, Groq оценивает
    прочитанное от лица выбранного учителя.
- 
+
    Распознанный текст возвращается ученику ОБЯЗАТЕЛЬНО и отдельно от
    оценки. Это не деталь интерфейса: распознавание детского почерка
    ошибается, и когда оценка выглядит несправедливой, первое, что надо
@@ -399,33 +440,33 @@ async function handlePhoto(body, env, origin, request, ip) {
   if (!env.GEMINI_API_KEY) {
     return json({ error: 'Ключ Gemini не задан в настройках Worker. Выполните: npx wrangler secret put GEMINI_API_KEY' }, 500, origin, env);
   }
- 
+
   const lang = body.lang === 'en' ? 'en' : 'ru';
   const raw = String(body.imageBase64 || '');
   /* приходит либо чистый base64, либо data:image/jpeg;base64,… */
   const m = raw.match(/^data:(image\/[a-z+]+);base64,(.*)$/i);
   const mime = m ? m[1] : (cut(body.mime, 30) || 'image/jpeg');
   const b64 = m ? m[2] : raw;
- 
+
   if (!b64) return json({ error: 'Нет изображения.' }, 400, origin, env);
- 
+
   const maxBytes = numCfg(env, 'MAX_IMAGE_KB') * 1024;
   /* base64 длиннее оригинала примерно на треть */
   if (b64.length * 0.75 > maxBytes) {
     return json({ error: `Фото слишком большое. Максимум ${numCfg(env, 'MAX_IMAGE_KB')} КБ после сжатия.` }, 413, origin, env);
   }
- 
+
   const subject = cut(body.subject, 60) || 'english';
   const taskText = cut(body.taskText, 800);
   const strictness = Math.min(5, Math.max(1, Number(body.strictness) || 3));
- 
+
   /* --- шаг 0: личность и квота ---
      Личность берём из подписанного токена, а не из тела запроса
      (см. комментарий к whoAmI выше). Для анонимов квоты нет — у них
      работает прежнее ограничение по IP из точки входа. */
   const me = request ? await whoAmI(request, env) : null;
   let quota = null;
- 
+
   if (!me) {
     /* Аноним: прежнее ограничение по адресу. Оно осталось ровно таким,
        каким было до тарифов, — просто переехало сюда. */
@@ -437,7 +478,7 @@ async function handlePhoto(body, env, origin, request, ip) {
       }, 429, origin, env);
     }
   }
- 
+
   if (me && supaReady(env)) {
     const res = await supaRpc(env, 'photo_try_consume', { p_user: me.id });
     if (res.error) {
@@ -469,7 +510,7 @@ async function handlePhoto(body, env, origin, request, ip) {
       }
     }
   }
- 
+
   /* Вернуть списанный разбор, если дальше что-то сломалось не по вине
      ученика. Без этого сбой Gemini стоил бы ему разбора из квоты. */
   const refund = async () => {
@@ -477,21 +518,21 @@ async function handlePhoto(body, env, origin, request, ip) {
       await supaRpc(env, 'photo_refund', { p_user: me.id }).catch(() => {});
     }
   };
- 
+
   /* --- шаг 1: распознавание --- */
   const ocrPrompt = lang === 'ru'
     ? 'Ты — OCR для рукописного текста в тетради школьника. Распознай весь текст на фото и верни его построчно, ровно как написано, не исправляя ошибок ученика. Формат ответа — обычный текст без пояснений. Нечитаемое место помечай [?].'
     : 'You are an OCR for handwriting in a school exercise book. Transcribe all text in the photo line by line, exactly as written, without correcting the student\'s mistakes. Reply with plain text only, no commentary. Mark unreadable spots with [?].';
- 
+
   const ocr = await callGeminiVision(env, b64, mime, ocrPrompt);
   if (ocr.error) { await refund(); return json(ocr, 502, origin, env); }
- 
+
   const recognized = cut(ocr.text, 4000);
- 
+
   /* --- шаг 2: оценка --- */
   const p = persona(body.teacher, lang);
   const strictNote = (STRICT[strictness] || STRICT[3])[lang];
- 
+
   const system = (p ? p + '\n\n' : '') + (lang === 'ru'
     ? `Ты проверяешь домашнюю работу школьника по предмету «${subject}».\n${strictNote}\n` +
       'Текст работы получен распознаванием рукописи и может содержать ошибки распознавания. ' +
@@ -501,16 +542,16 @@ async function handlePhoto(body, env, origin, request, ip) {
       'The text came from handwriting recognition and may contain recognition errors. ' +
       'If a fragment looks like a recognition glitch rather than the student\'s mistake, do not deduct for it and say so in overall_feedback.\n' +
       'Do not invent anything absent from the text. Return STRICT JSON, no markdown, no commentary around it.');
- 
+
   const shape = '{"grade":1-5,"correct_parts":["..."],"errors":[{"fragment":"...","explanation":"...","fix":"..."}],"overall_feedback":"...","next_step":"..."}';
- 
+
   const user = (lang === 'ru'
     ? (taskText ? `Задание, которое было дано:\n"""\n${taskText}\n"""\n\n` : '') +
       `Распознанный текст работы:\n"""\n${recognized}\n"""\n\nПоставь оценку 1–5 и разбери работу. Формат ответа: ${shape}`
     : (taskText ? `The task that was set:\n"""\n${taskText}\n"""\n\n` : '') +
       `Recognised text of the work:\n"""\n${recognized}\n"""\n\nGive a mark 1–5 and review the work. Reply shape: ${shape}`);
- 
-  const res = await callDeepSeek(env, system, user, {
+
+  const res = await callModel(env, system, user, {
     maxTokens: numCfg(env, 'MAX_TOKENS_PHOTO'),
     jsonMode: true,
     temperature: 0.2
@@ -521,17 +562,17 @@ async function handlePhoto(body, env, origin, request, ip) {
     await refund();
     return json({ error: res.error, recognized_text: recognized }, 502, origin, env);
   }
- 
+
   const parsed = parseJsonLoose(res.content);
   if (!parsed) {
     await refund();
     return json({ error: 'Модель вернула ответ, который не удалось разобрать как JSON.', recognized_text: recognized }, 502, origin, env);
   }
- 
+
   const grade = Math.min(5, Math.max(1, Number(parsed.grade) || 3));
   const errors = Array.isArray(parsed.errors) ? parsed.errors.slice(0, 20) : [];
   const feedback = cut(parsed.overall_feedback, 1500);
- 
+
   /* История — в базу. Фото НЕ сохраняем: это тетрадь ребёнка, и
      держать её снимки на сервере без отдельного разговора незачем.
      image_url остаётся для случая, когда такой разговор состоится. */
@@ -546,7 +587,7 @@ async function handlePhoto(body, env, origin, request, ip) {
       status: 'ok'
     });
   }
- 
+
   return json({
     recognized_text: recognized,
     grade,
@@ -559,38 +600,38 @@ async function handlePhoto(body, env, origin, request, ip) {
     quota: quota ? { used: quota.used, limit: quota.day_limit, plan: quota.plan, resetAt: quota.reset_at } : null
   }, 200, origin, env);
 }
- 
- 
+
+
 /* ---------- /chess-explain: словами про уже посчитанный ход ----------
    Внимание на распределение ролей. Ярлык хода (blunder, mistake и так
    далее), потерю в оценке и лучший ход считает ШАХМАТНЫЙ ДВИЖОК в
    браузере — assets/chess-review.js. Сюда приходит готовый результат, и
    модель только переводит его в человеческую фразу.
- 
+
    Так сделано намеренно. Языковая модель не умеет оценивать позицию:
    она выдаст уверенный ярлык, регулярно неверный, и предложит «лучшие
    ходы», часть которых в этой позиции невозможна. Ученик не сможет
    отличить такую подсказку от настоящей — он же учится. Движок при
    этом считает точно, мгновенно и бесплатно.
- 
+
    Поэтому эндпоинт не принимает решения: если модель недоступна,
    раздел работает без него, просто без словесного пояснения. */
 async function handleChessExplain(body, env, origin) {
   const lang = body.lang === 'en' ? 'en' : 'ru';
- 
+
   const quality = cut(body.quality, 20);
   const allowed = ['brilliant', 'good', 'inaccuracy', 'mistake', 'blunder'];
   if (!allowed.includes(quality)) return json({ error: 'unknown quality' }, 400, origin, env);
- 
+
   const move = cut(body.move, 12);
   const better = cut(body.betterMove, 12);
   const fen = cut(body.fen, 100);
   const loss = Number(body.loss);
   const lossPawns = Number.isFinite(loss) ? (loss / 100).toFixed(1) : null;
   const material = cut(body.material, 200);
- 
+
   const p = persona(body.teacher, lang);
- 
+
   const system = (p ? p + '\n\n' : '') + (lang === 'ru'
     ? 'Ты шахматный тренер. Оценку хода и лучший ход уже посчитал движок — они даны тебе как факт, и спорить с ними нельзя: ' +
       'твоя работа только объяснить их человеческим языком. Не предлагай других ходов и не пересчитывай оценку. ' +
@@ -598,12 +639,12 @@ async function handleChessExplain(body, env, origin) {
     : 'You are a chess coach. The engine has already computed the move quality and the better move — they are given to you as fact and must not be disputed: ' +
       'your job is only to explain them in human language. Do not suggest other moves and do not recompute the evaluation. ' +
       'Do not assert anything about the position that is not in the data given. Two or three sentences, plain language, no lists.');
- 
+
   const names = {
     ru: { brilliant: 'отличный ход', good: 'хороший ход', inaccuracy: 'неточность', mistake: 'ошибка', blunder: 'грубая ошибка' },
     en: { brilliant: 'brilliant move', good: 'good move', inaccuracy: 'inaccuracy', mistake: 'mistake', blunder: 'blunder' }
   }[lang];
- 
+
   const user = lang === 'ru'
     ? `Позиция до хода (FEN): ${fen}\nХод ученика: ${move}\nОценка движка: ${names[quality]}` +
       (lossPawns ? `\nПотеря по оценке: ${lossPawns} пешки` : '') +
@@ -615,34 +656,142 @@ async function handleChessExplain(body, env, origin) {
       (better ? `\nEngine's better move: ${better}` : '') +
       (material ? `\nMaterial change: ${material}` : '') +
       '\n\nExplain to the student why their move is judged this way' + (better ? ' and what the idea behind the better move is.' : '.');
- 
-  const res = await callDeepSeek(env, system, user, { maxTokens: 220, temperature: 0.4 });
+
+  const res = await callModel(env, system, user, { maxTokens: 220, temperature: 0.4 });
   if (res.error) return json(res, 502, origin, env);
   return json({ explanation: res.content }, 200, origin, env);
 }
- 
- 
+
+
+/* ---------- /grade-essay: проверка сочинения ----------
+
+   Отличается от /explain не длиной, а тем, что здесь оценка. Поэтому
+   три решения.
+
+   Первое: разбор идёт ПО КРИТЕРИЯМ, а не одной оценкой. «4» без
+   объяснения не говорит ученику ничего и спорить с ней нельзя; по
+   критериям видно, где именно потеряно и что править.
+
+   Второе: цитата обязательна. Модель должна показать фрагмент, к
+   которому относится замечание, — иначе «есть речевые ошибки»
+   невозможно проверить, и ученику остаётся верить на слово.
+
+   Третье: сочинение не переписывается за ученика. Модели свойственно
+   выдать «вот как надо», и это ровно тот случай, когда помощь вредна:
+   готовый текст можно сдать, ничему не научившись. Поэтому в промпте
+   прямой запрет, а в ответе есть next_step — что сделать самому.
+   ============================================================ */
+async function handleEssay(body, env, origin) {
+  const lang = body.lang === 'en' ? 'en' : 'ru';
+  const text = cut(body.text, numCfg(env, 'MAX_ESSAY_CHARS'));
+  if (!text.trim()) return json({ error: 'empty essay' }, 400, origin, env);
+
+  const topic = cut(body.topic, 300);
+  const subject = cut(body.subject, 60) || (lang === 'ru' ? 'русский язык' : 'language');
+  const kind = cut(body.kind, 40);          /* сочинение, изложение, эссе, letter… */
+  const strictness = Math.min(5, Math.max(1, Number(body.strictness) || 3));
+
+  /* Критерии можно прислать свои (у разных экзаменов они разные).
+     Если не прислали — берём школьные по умолчанию. */
+  const DEFAULT_CRITERIA = lang === 'ru'
+    ? ['соответствие теме', 'логика и композиция', 'аргументация и примеры',
+       'речевое оформление', 'грамотность']
+    : ['relevance to the topic', 'structure and logic', 'argument and examples',
+       'style and word choice', 'accuracy'];
+  const criteria = (Array.isArray(body.criteria) && body.criteria.length
+    ? body.criteria.slice(0, 8).map(c => cut(c, 80))
+    : DEFAULT_CRITERIA);
+
+  const p = persona(body.teacher, lang);
+  const strictNote = (STRICT[strictness] || STRICT[3])[lang];
+
+  const system = (p ? p + '\n\n' : '') + (lang === 'ru'
+    ? `Ты проверяешь письменную работу школьника по предмету «${subject}»${kind ? ` (${kind})` : ''}.\n${strictNote}\n` +
+      'Оценивай по каждому критерию отдельно и подкрепляй КАЖДОЕ замечание цитатой из работы — дословным фрагментом, а не пересказом.\n' +
+      'НЕ переписывай работу за ученика и не давай готовых формулировок для вставки: покажи, что не так и почему, но исправляет пусть он сам.\n' +
+      'Не выдумывай того, чего в тексте нет. Верни СТРОГО JSON без markdown и пояснений вокруг.'
+    : `You are marking a student's written work in "${subject}"${kind ? ` (${kind})` : ''}.\n${strictNote}\n` +
+      'Assess each criterion separately and back EVERY remark with a verbatim quotation from the work, not a paraphrase.\n' +
+      'Do NOT rewrite the work for the student and do not supply ready-made sentences to paste in: show what is wrong and why, but let them fix it.\n' +
+      'Do not invent anything absent from the text. Return STRICT JSON, no markdown, no commentary around it.');
+
+  const shape = '{"grade":1-5,"criteria":[{"name":"...","score":1-5,"comment":"..."}],' +
+                '"strengths":["..."],"issues":[{"quote":"...","problem":"...","why":"..."}],' +
+                '"overall_feedback":"...","next_step":"..."}';
+
+  const user = (lang === 'ru'
+    ? (topic ? `Тема: ${topic}\n\n` : '') +
+      `Критерии оценивания: ${criteria.join('; ')}\n\n` +
+      `Текст работы:\n"""\n${text}\n"""\n\n` +
+      `Оцени работу по каждому критерию и в целом по пятибалльной шкале. Формат ответа: ${shape}`
+    : (topic ? `Topic: ${topic}\n\n` : '') +
+      `Marking criteria: ${criteria.join('; ')}\n\n` +
+      `The work:\n"""\n${text}\n"""\n\n` +
+      `Assess it against each criterion and overall on a 1-5 scale. Reply shape: ${shape}`);
+
+  const res = await callModel(env, system, user, {
+    maxTokens: numCfg(env, 'MAX_TOKENS_ESSAY'),
+    jsonMode: true,
+    temperature: 0.2
+  });
+  if (res.error) return json(res, 502, origin, env);
+
+  const parsed = parseJsonLoose(res.content);
+  if (!parsed) {
+    return json({ error: 'Модель вернула ответ, который не удалось разобрать как JSON.' }, 502, origin, env);
+  }
+
+  const clampScore = v => Math.min(5, Math.max(1, Number(v) || 3));
+
+  return json({
+    grade: clampScore(parsed.grade),
+    criteria: Array.isArray(parsed.criteria)
+      ? parsed.criteria.slice(0, 8).map(c => ({
+          name: cut(c && c.name, 80),
+          score: clampScore(c && c.score),
+          comment: cut(c && c.comment, 500)
+        }))
+      : [],
+    strengths: Array.isArray(parsed.strengths) ? parsed.strengths.slice(0, 8).map(x => cut(x, 300)) : [],
+    issues: Array.isArray(parsed.issues)
+      ? parsed.issues.slice(0, 20).map(i => ({
+          quote: cut(i && i.quote, 300),
+          problem: cut(i && i.problem, 300),
+          why: cut(i && i.why, 400)
+        }))
+      : [],
+    overall_feedback: cut(parsed.overall_feedback, 1500),
+    next_step: cut(parsed.next_step, 400),
+    chars: text.length
+  }, 200, origin, env);
+}
+
+
 /* ============================================================
    Точка входа
    ============================================================ */
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
- 
+
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: cors(origin, env) });
     }
- 
+
     const url = new URL(request.url);
- 
+
     if (url.pathname === '/' || url.pathname === '/health') {
       return json({
         ok: true,
         service: 'skyschool-ai',
-        hasKey: !!env.DEEPSEEK_API_KEY,
+        hasKey: !!env.GROQ_API_KEY,
         hasVision: !!env.GEMINI_API_KEY,
         hasQuotas: supaReady(env),
-        endpoints: ['/explain', '/check-photo', '/chess-explain'],
+        endpoints: ['/explain', '/check-photo', '/chess-explain', '/grade-essay'],
+        models: {
+          text: strCfg(env, 'GROQ_MODEL'),
+          vision: strCfg(env, 'GEMINI_MODEL')
+        },
         limits: {
           ratePerMin: numCfg(env, 'RATE_PER_MIN'),
           photoSeconds: numCfg(env, 'RATE_PHOTO_SECONDS'),
@@ -651,29 +800,30 @@ export default {
         }
       }, 200, origin, env);
     }
- 
+
     const routes = {
       '/explain': handleExplain,
       '/check-photo': handlePhoto,
-      '/chess-explain': handleChessExplain
+      '/chess-explain': handleChessExplain,
+      '/grade-essay': handleEssay
     };
     const handler = routes[url.pathname];
     if (!handler) return json({ error: 'not found' }, 404, origin, env);
     if (request.method !== 'POST') return json({ error: 'use POST' }, 405, origin, env);
- 
+
     if (origin && !originList(env).includes(origin)) {
       return json({ error: 'origin not allowed' }, 403, origin, env);
     }
- 
-    if (!env.DEEPSEEK_API_KEY) {
-      return json({ error: 'Ключ не задан в настройках Worker. Выполните: npx wrangler secret put DEEPSEEK_API_KEY' }, 500, origin, env);
+
+    if (!env.GROQ_API_KEY) {
+      return json({ error: 'Ключ Groq не задан в настройках Worker. Выполните: npx wrangler secret put GROQ_API_KEY' }, 500, origin, env);
     }
- 
+
     const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
     if (!ratePerMinOk(ip, numCfg(env, 'RATE_PER_MIN'))) {
       return json({ error: 'Слишком много запросов подряд. Подождите минуту.' }, 429, origin, env);
     }
- 
+
     /* Для /check-photo интервал НЕ проверяем здесь. Раньше он стоял в
        этом месте и бил по адресу, а не по человеку: в школе за одним
        NAT-адресом сидит весь класс, и один ученик блокировал бы
@@ -685,11 +835,11 @@ export default {
       const wait = intervalWait(ip + ':chess', numCfg(env, 'RATE_CHESS_SECONDS'));
       if (wait) return json({ error: `Подождите ${wait} сек.` }, 429, origin, env);
     }
- 
+
     let body;
     try { body = await request.json(); }
     catch (e) { return json({ error: 'bad json' }, 400, origin, env); }
- 
+
     try {
       return await handler(body, env, origin, request, ip);
     } catch (e) {
@@ -697,4 +847,3 @@ export default {
     }
   }
 };
- 
