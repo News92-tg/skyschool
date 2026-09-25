@@ -4,8 +4,12 @@ compatibility_date = "2025-01-01"
 
 # Ключи сюда НЕ пишутся. Они задаются отдельными командами и хранятся
 # на стороне Cloudflare:
-#   npx wrangler secret put DEEPSEEK_API_KEY
-#   npx wrangler secret put GEMINI_API_KEY     # нужен только для /check-photo
+#   npx wrangler secret put GROQ_API_KEY       # весь текст
+#   npx wrangler secret put GLM_API_KEY        # /check-photo, бесплатная модель
+#   npx wrangler secret put SUPABASE_URL       # лимиты на разбор фото
+#   npx wrangler secret put SUPABASE_SERVICE_KEY
+# Необязательно, если хотите Gemini вместо GLM:
+#   npx wrangler secret put GEMINI_API_KEY
 
 # Лимиты и модели. Всё перечисленное имеет значение по умолчанию в
 # worker.js — раскомментируйте только то, что хотите поменять.
@@ -25,7 +29,12 @@ compatibility_date = "2025-01-01"
 # MAX_IMAGE_KB = "1200"
 
 # имена моделей
-# DEEPSEEK_MODEL = "deepseek-chat"
+# GROQ_MODEL = "llama-3.3-70b-versatile"
+# Зрячая модель. На open.bigmodel.cn бесплатная — glm-4v-flash,
+# на api.z.ai — glm-4.6v-flash. Ключ работает только на своей площадке,
+# поэтому менять эти две строки нужно вместе.
+# GLM_MODEL = "glm-4v-flash"
+# GLM_API_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
 # GEMINI_MODEL = "gemini-2.5-flash"
 
 # потолок ответа модели в токенах
