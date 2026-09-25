@@ -18,15 +18,22 @@
      POST /grade-essay   — проверка сочинения по критериям (Groq)
 
    Разделение простое: весь текст — Groq, всё, что с картинкой, —
-   Gemini. Никаких других поставщиков здесь нет.
+   зрячая модель. Никаких других поставщиков здесь нет.
+
+   Зрячая модель выбирается по тому, какой ключ задан: GLM, если есть
+   GLM_API_KEY (бесплатный тариф), иначе Gemini. Задать оба можно —
+   тогда работает GLM; какой выбран, показывает /health в поле
+   visionProvider.
 
    Секреты (задаются в панели Cloudflare или через wrangler):
      GROQ_API_KEY           — текстовые эндпоинты
-     GEMINI_API_KEY         — /check-photo
+     GLM_API_KEY            — /check-photo, основной
+     GEMINI_API_KEY         — /check-photo, запасной; можно не задавать
      SUPABASE_URL           — лимиты и история разборов
      SUPABASE_SERVICE_KEY   — то же; ключ обходит RLS, только сюда
-   Необязательные переменные: GROQ_MODEL, GEMINI_MODEL, RATE_*,
-   MAX_TOKENS*, ALLOWED_ORIGINS — меняются без выкатки.
+   Необязательные переменные: GROQ_MODEL, GLM_MODEL, GLM_API_URL,
+   GEMINI_MODEL, RATE_*, MAX_TOKENS*, ALLOWED_ORIGINS — меняются без
+   выкатки.
    Полученный адрес впишите в assets/config.js в поле AI_BASE.
 
    Все лимиты и имена моделей — переменные окружения со значениями по
@@ -63,6 +70,18 @@ const DEFAULTS = {
      Текст ошибки об этом прямо говорит, см. groqHint(). */
   GROQ_MODEL: 'llama-3.3-70b-versatile',
   GEMINI_MODEL: 'gemini-2.5-flash',
+  /* ЗРЕНИЕ: GLM ПО УМОЛЧАНИЮ, GEMINI — ЕСЛИ ЕГО КЛЮЧ ЗАДАН
+
+     Имя модели и адрес вынесены в переменные не для красоты. У GLM две
+     площадки с разными именами моделей: на китайской open.bigmodel.cn
+     бесплатная зрячая модель называется glm-4v-flash, на
+     международной api.z.ai та же роль у glm-4.6v-flash. Ключ работает
+     только на своей площадке. Если запрос вернёт «нет такой модели»
+     или 401, в Cloudflare достаточно поменять GLM_MODEL и GLM_API_URL
+     и нажать Save — без правки кода и выкатки. Текст ошибки об этом
+     прямо говорит, см. glmHint(). */
+  GLM_MODEL: 'glm-4v-flash',
+  GLM_API_URL: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
   /* потолок ответа модели в токенах */
   MAX_TOKENS: 500,
   MAX_TOKENS_PHOTO: 900,
@@ -267,6 +286,86 @@ async function callModel(env, system, user, opts) {
   }
 }
 
+/* ---------- зрение ----------
+   Читает фото и возвращает распознанный текст. Провайдера выбираем по
+   тому, какой ключ задан: GLM бесплатный и потому основной, Gemini
+   остаётся запасным, если его ключ есть.
+
+   Почему выбор по ключу, а не отдельной переменной: одна переменная
+   меньше, и невозможно выставить провайдера, для которого не задан
+   ключ, — самая частая ошибка настройки. */
+
+function glmHint(status, model, url) {
+  if (status === 401 || status === 403)
+    return 'Ключ GLM не принят. Проверьте GLM_API_KEY и что он выдан для площадки ' + url + '.';
+  if (status === 404 || status === 400)
+    return 'GLM не принял запрос: возможно, модель «' + model + '» недоступна на этой площадке. ' +
+      'На open.bigmodel.cn бесплатная зрячая модель — glm-4v-flash, на api.z.ai — glm-4.6v-flash. ' +
+      'Поменяйте GLM_MODEL и GLM_API_URL в настройках Worker.';
+  if (status === 429)
+    return 'Исчерпан лимит запросов GLM. Попробуйте позже.';
+  return 'GLM вернул ошибку ' + status + '.';
+}
+
+async function callGlmVision(env, base64, mime, prompt) {
+  const model = strCfg(env, 'GLM_MODEL');
+  const url = strCfg(env, 'GLM_API_URL');
+
+  /* Картинку GLM принимает строкой data:<MIME>;base64,… — именно с
+     префиксом. Сюда base64 приходит уже без него (его сняли выше,
+     чтобы посчитать размер), поэтому собираем обратно. */
+  const dataUrl = 'data:' + mime + ';base64,' + base64;
+
+  let r;
+  try {
+    r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + env.GLM_API_KEY },
+      body: JSON.stringify({
+        model,
+        temperature: 0,          /* распознавание, а не сочинение */
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image_url', image_url: { url: dataUrl } },
+            { type: 'text', text: prompt }
+          ]
+        }]
+      })
+    });
+  } catch (e) {
+    return { error: 'GLM недоступен: ' + e.message };
+  }
+
+  if (!r.ok) {
+    const text = await r.text();
+    return { error: glmHint(r.status, model, url), detail: text.slice(0, 300) };
+  }
+
+  const data = await r.json();
+  const content = data?.choices?.[0]?.message?.content;
+  /* Ответ обычно строка, но у части моделей — массив кусков. */
+  const text = (Array.isArray(content)
+    ? content.map(c => (typeof c === 'string' ? c : c?.text || '')).join('')
+    : String(content || '')).trim();
+
+  if (!text) return { error: 'GLM не смог прочитать текст на фото.' };
+  return { text };
+}
+
+function visionProvider(env) {
+  if (env.GLM_API_KEY) return 'glm';
+  if (env.GEMINI_API_KEY) return 'gemini';
+  return null;
+}
+
+async function callVision(env, base64, mime, prompt) {
+  const who = visionProvider(env);
+  if (who === 'glm') return callGlmVision(env, base64, mime, prompt);
+  if (who === 'gemini') return callGeminiVision(env, base64, mime, prompt);
+  return { error: 'Не задан ключ для распознавания фото. Выполните: npx wrangler secret put GLM_API_KEY' };
+}
+
 async function callGeminiVision(env, base64, mime, prompt) {
   const model = strCfg(env, 'GEMINI_MODEL');
   const r = await fetch(
@@ -437,8 +536,8 @@ async function supaInsert(env, table, row) {
    увидеть, — что именно модель приняла за написанное. Без этого
    ученик спорит с оценкой вслепую. */
 async function handlePhoto(body, env, origin, request, ip) {
-  if (!env.GEMINI_API_KEY) {
-    return json({ error: 'Ключ Gemini не задан в настройках Worker. Выполните: npx wrangler secret put GEMINI_API_KEY' }, 500, origin, env);
+  if (!visionProvider(env)) {
+    return json({ error: 'Не задан ключ для распознавания фото. Выполните: npx wrangler secret put GLM_API_KEY (бесплатная модель) или GEMINI_API_KEY.' }, 500, origin, env);
   }
 
   const lang = body.lang === 'en' ? 'en' : 'ru';
@@ -524,7 +623,7 @@ async function handlePhoto(body, env, origin, request, ip) {
     ? 'Ты — OCR для рукописного текста в тетради школьника. Распознай весь текст на фото и верни его построчно, ровно как написано, не исправляя ошибок ученика. Формат ответа — обычный текст без пояснений. Нечитаемое место помечай [?].'
     : 'You are an OCR for handwriting in a school exercise book. Transcribe all text in the photo line by line, exactly as written, without correcting the student\'s mistakes. Reply with plain text only, no commentary. Mark unreadable spots with [?].';
 
-  const ocr = await callGeminiVision(env, b64, mime, ocrPrompt);
+  const ocr = await callVision(env, b64, mime, ocrPrompt);
   if (ocr.error) { await refund(); return json(ocr, 502, origin, env); }
 
   const recognized = cut(ocr.text, 4000);
@@ -785,12 +884,15 @@ export default {
         ok: true,
         service: 'skyschool-ai',
         hasKey: !!env.GROQ_API_KEY,
-        hasVision: !!env.GEMINI_API_KEY,
+        hasVision: !!visionProvider(env),
+        visionProvider: visionProvider(env),
         hasQuotas: supaReady(env),
         endpoints: ['/explain', '/check-photo', '/chess-explain', '/grade-essay'],
         models: {
           text: strCfg(env, 'GROQ_MODEL'),
-          vision: strCfg(env, 'GEMINI_MODEL')
+          vision: visionProvider(env) === 'gemini'
+            ? strCfg(env, 'GEMINI_MODEL')
+            : strCfg(env, 'GLM_MODEL')
         },
         limits: {
           ratePerMin: numCfg(env, 'RATE_PER_MIN'),
