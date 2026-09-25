@@ -40,6 +40,49 @@
       #mainMenu .nav-group{
         position:relative;
       }
+
+      /* Плавное ПОЯВЛЕНИЕ пункта. Исчезновение намеренно мгновенное:
+         затухание на 150 мс держало бы место в строке эти 150 мс, и
+         рывок, ради которого всё затевалось, стал бы только заметнее. */
+      #mainMenu .appnav > a,
+      #mainMenu .nav-group{
+        transition:opacity .15s ease;
+      }
+      #mainMenu .appnav > a.nav-enter,
+      #mainMenu .nav-group.nav-enter{
+        opacity:0;
+      }
+      @media (prefers-reduced-motion:reduce){
+        #mainMenu .appnav > a,
+        #mainMenu .nav-group{transition:none}
+      }
+
+      /* Текущая страница уехала под «Ещё» — подсвечиваем кнопку. */
+      #mainMenu .nav-overflow-trigger.active{
+        color:var(--ink);
+        background:var(--panel-2);
+      }
+      #mainMenu .nav-overflow.has-current .nav-overflow-trigger.active::after{
+        content:'';
+        position:absolute;
+        left:13px;right:13px;bottom:4px;
+        height:2px;border-radius:2px;
+        background:currentColor;
+      }
+      #mainMenu .nav-overflow-trigger{position:relative}
+
+      /* На узких экранах подпись «Ещё» не влезает: инструменты справа
+         занимают 250 из 390 пикселей, меню остаётся 54, а кнопка с
+         подписью требует 63 — и ряд торчал за край. Ниже 560px
+         показываем значок вместо подписи: получается тот самый
+         гамбургер, которого на этом сайте не было. */
+      #mainMenu .nav-burger{display:none;font-size:15px;line-height:1}
+      @media (max-width:560px){
+        #mainMenu .nav-overflow-trigger{padding:8px 9px}
+        #mainMenu .nav-more-label{display:none}
+        #mainMenu .nav-burger{display:inline-block}
+        #mainMenu .nav-overflow-trigger .nav-caret{display:none}
+      }
       #mainMenu .nav-group-trigger,
       #mainMenu .nav-overflow-trigger{
         display:inline-flex;
@@ -255,13 +298,118 @@
     more.hidden = true;
     const isEnglish = (((window.Sky && Sky.lang) || document.documentElement.lang || 'ru') + '').toLowerCase().startsWith('en');
     more.innerHTML =
-      '<button type="button" class="nav-overflow-trigger" aria-haspopup="menu" aria-expanded="false">' +
-        '<span>' + (isEnglish ? 'More' : 'Ещё') + '</span>' +
+      '<button type="button" class="nav-overflow-trigger" aria-haspopup="menu" aria-expanded="false" ' +
+        'aria-label="' + (isEnglish ? 'Menu' : 'Меню') + '">' +
+        /* Значок нужен только на узких экранах, где подпись прячется
+           (см. media-запрос в стилях). Здесь он всегда в разметке,
+           показывает его CSS. */
+        '<span class="nav-burger" aria-hidden="true">☰</span>' +
+        '<span class="nav-more-label">' + (isEnglish ? 'More' : 'Ещё') + '</span>' +
         '<span class="nav-caret" aria-hidden="true">⌄</span>' +
       '</button>' +
       '<div class="nav-overflow-menu" role="menu"></div>';
     root.appendChild(more);
     return more;
+  }
+
+  /* ============================================================
+     РАСЧЁТ: ЧТО ИМЕННО ВЫЗЫВАЛО СКАЧОК
+
+     Прежний recalc на каждый чих делал так:
+
+         items.forEach(item => { item.hidden = false; });   // показать ВСЁ
+         ... померить ...
+         hidden.forEach(item => { item.hidden = true; });   // спрятать заново
+
+     То есть при любом изменении ширины меню на один кадр раскрывалось
+     во всю длину и тут же схлопывалось. Это и видно как рывок.
+
+     Хуже: ResizeObserver висел на том самом элементе, содержимое
+     которого этот код меняет. Раскрыли пункты — ширина строки
+     изменилась — наблюдатель сработал снова — раскрыли опять. На
+     границе, где пункт то влезает, то нет, это зацикливалось и мигало.
+
+     И третья причина, самая тихая. Место под кнопку «Ещё» вычиталось
+     ВСЕГДА, даже когда прятать нечего и кнопки на экране нет. Поэтому
+     последний пункт уезжал в «Ещё» при живых семидесяти свободных
+     пикселях, а в момент перехода строка скачком меняла состав.
+
+     Что делаем вместо этого:
+
+     1. Ширины пунктов меряем ОДИН раз и запоминаем. Дальше считаем
+        арифметикой, ничего не показывая и не пряча ради замера.
+        Пересчёт замеров — только когда он правда нужен: сменился язык,
+        догрузились шрифты, шапка перерисовалась.
+
+     2. Два прохода. Сначала проверяем, влезают ли все пункты БЕЗ
+        кнопки. Влезают — показываем всё, кнопки нет. Не влезают — и
+        только тогда резервируем место под «Ещё». Разрыв исчезает.
+
+     3. Гистерезис. Чтобы вернуть пункт в строку, места должно стать
+        больше на HYSTERESIS пикселей, чем нужно впритык. Без этого на
+        границе пункт дрожит между строкой и «Ещё» при движении мыши
+        на один пиксель.
+
+     4. DOM трогаем, только если состав видимых пунктов ДЕЙСТВИТЕЛЬНО
+        изменился. Это и убирает обратную связь с наблюдателем, и
+        снимает мигание.
+
+     5. Наблюдаем не за строкой .appnav, содержимое которой меняем, а
+        за контейнером #mainMenu: его ширину задаёт шапка, а не наши
+        правки, поэтому сам себя пересчёт больше не запускает.
+     ============================================================ */
+
+  const HYSTERESIS = 10;   /* пикселей запаса на возврат пункта в строку */
+  let measured = false;    /* ширины посчитаны и годны */
+  let lastHiddenCount = -1;
+
+  /* Ширины снимаем, когда все пункты на месте. Делается это редко:
+     первый показ, смена языка, загрузка шрифтов. */
+  function measure(root, items, more) {
+    const prevHidden = items.filter(i => i.hidden);
+    prevHidden.forEach(i => { i.hidden = false; });
+
+    /* Замер не должен мелькать: на время замера гасим строку целиком,
+       а не по одному пункту. */
+    root.style.visibility = 'hidden';
+    items.forEach(item => {
+      item.__navW = Math.ceil(item.getBoundingClientRect().width);
+    });
+    const wasHidden = more.hidden;
+    more.hidden = false;
+    more.__navW = Math.ceil(more.getBoundingClientRect().width) || 76;
+    more.hidden = wasHidden;
+    root.style.visibility = '';
+
+    prevHidden.forEach(i => { i.hidden = true; });
+    measured = true;
+  }
+
+  function invalidate() { measured = false; }
+
+  /* Сколько пунктов помещается. limit — доступная ширина. */
+  function fitCount(items, available, gap, reserve) {
+    let used = reserve ? reserve + gap : 0;
+    let n = 0;
+    for (const item of items) {
+      const w = item.__navW || 0;
+      const add = n ? gap + w : w;
+      if (used + add > available) break;
+      used += add;
+      n++;
+    }
+    return n;
+  }
+
+  function applyActiveMark(more, hiddenItems) {
+    const trigger = more.querySelector(':scope > .nav-overflow-trigger');
+    if (!trigger) return;
+    /* Если страница, на которой мы сейчас, уехала под «Ещё», человек
+       теряет понимание, где находится. Подсвечиваем саму кнопку. */
+    const hasCurrent = hiddenItems.some(item =>
+      item.matches('[aria-current="page"]') || item.querySelector('[aria-current="page"]'));
+    trigger.classList.toggle('active', hasCurrent);
+    more.classList.toggle('has-current', hasCurrent);
   }
 
   function recalc() {
@@ -270,8 +418,11 @@
 
     ensureStyles();
 
+    const host = root.closest('#mainMenu') || root.parentElement || root;
+
     if (boundRoot !== root) {
       boundRoot = root;
+      invalidate();
 
       if (resizeObserver) resizeObserver.disconnect();
       if ('ResizeObserver' in window) {
@@ -279,66 +430,97 @@
           cancelAnimationFrame(rafId);
           rafId = requestAnimationFrame(recalc);
         });
-        resizeObserver.observe(root);
+        /* Наблюдаем за контейнером, а не за строкой, которую сами же
+           и переписываем — иначе пересчёт вызывает пересчёт. */
+        resizeObserver.observe(host);
       }
     }
 
     const more = ensureMore(root);
     const items = Array.from(root.children).filter(el => el !== more);
+    if (!items.length) return;
 
-    items.forEach(item => {
+    if (!measured || items.some(i => !i.__navW)) measure(root, items, more);
+
+    const available = root.clientWidth;      /* именно clientWidth: без полосы прокрутки */
+    if (!available) return;
+
+    const cs = getComputedStyle(root);
+    const gap = parseFloat(cs.columnGap || cs.gap || '2') || 2;
+
+    /* Проход 1: влезают ли все БЕЗ кнопки «Ещё». */
+    let total = 0;
+    items.forEach((item, i) => { total += (i ? gap : 0) + (item.__navW || 0); });
+
+    let visible;
+    if (total <= available) {
+      visible = items.length;
+    } else {
+      /* Проход 2: прятать придётся — теперь место под кнопку честно
+         занято, и считаем с ним. */
+      visible = fitCount(items, available, gap, more.__navW || 76);
+      /* Ноль видимых пунктов — законное состояние, а не сбой.
+         На узком экране даже один пункт рядом с кнопкой не влезает, и
+         страховка «покажем хотя бы один» приводила к тому, что ряд
+         торчал за край на сотню пикселей. Проверено на 390px: ровно
+         так и было. Здесь «Ещё» просто становится единственной
+         кнопкой меню — тем самым гамбургером. */
+    }
+
+    /* Гистерезис: возвращать пункт в строку можно только с запасом. */
+    const prevVisible = items.length - Math.max(0, lastHiddenCount);
+    if (lastHiddenCount >= 0 && visible > prevVisible) {
+      const tighter = (visible === items.length)
+        ? (total <= available - HYSTERESIS ? items.length
+           : fitCount(items, available - HYSTERESIS, gap, more.__navW || 76))
+        : fitCount(items, available - HYSTERESIS, gap, more.__navW || 76);
+      visible = Math.max(prevVisible, Math.min(visible, Math.max(0, tighter)));
+    }
+
+    const hidden = items.slice(visible);
+
+    /* Ничего не изменилось — DOM не трогаем вообще. Это и убирает
+       мигание, и разрывает обратную связь с наблюдателем. */
+    if (hidden.length === lastHiddenCount) return;
+    lastHiddenCount = hidden.length;
+
+    items.slice(0, visible).forEach(item => {
+      if (!item.hidden) return;
       item.hidden = false;
       item.removeAttribute('aria-hidden');
+      /* Появление — с плавностью: стартуем с прозрачного и включаем
+         переход на следующем кадре, иначе браузер применит оба
+         значения сразу и перехода не будет. */
+      item.classList.add('nav-enter');
+      requestAnimationFrame(() => requestAnimationFrame(() => item.classList.remove('nav-enter')));
     });
 
-    more.hidden = false;
-    more.style.visibility = 'hidden';
-    const moreWidth = Math.ceil(more.getBoundingClientRect().width || 76);
-    more.style.visibility = '';
-
-    const available = root.clientWidth;
-    const gap = parseFloat(getComputedStyle(root).columnGap || getComputedStyle(root).gap || '2') || 2;
-    if (!available) {
-      more.hidden = true;
-      return;
-    }
-
-    let used = 0;
-    const hidden = [];
-
-    for (const item of items) {
-      if (hidden.length) {
-        hidden.push(item);
-        continue;
-      }
-
-      const width = Math.ceil(item.getBoundingClientRect().width);
-      const itemGap = used ? gap : 0;
-      const reserveMore = moreWidth + gap;
-
-      if (used + itemGap + width + reserveMore <= available) {
-        used += itemGap + width;
-      } else {
-        hidden.push(item);
-      }
-    }
-
-    if (!hidden.length) {
-      more.hidden = true;
-      closeMenus(root);
-      return;
-    }
-
     hidden.forEach(item => {
+      if (item.hidden) return;
       item.hidden = true;
       item.setAttribute('aria-hidden', 'true');
-      item.classList.remove('is-open');
+      item.classList.remove('is-open', 'nav-enter');
       const trigger = item.querySelector(':scope > .nav-group-trigger');
       if (trigger) trigger.setAttribute('aria-expanded', 'false');
     });
 
+    if (!hidden.length) {
+      more.hidden = true;
+      applyActiveMark(more, []);
+      closeMenus(root);
+      return;
+    }
+
     buildMoreMenu(more, hidden);
+    applyActiveMark(more, hidden);
     more.hidden = false;
+  }
+
+  /* Замеры устаревают, когда меняется текст пунктов или шрифт. */
+  document.addEventListener('langchange', () => { invalidate(); lastHiddenCount = -1; setTimeout(recalc, 0); });
+  document.addEventListener('headerready', () => { invalidate(); lastHiddenCount = -1; setTimeout(recalc, 0); });
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => { invalidate(); lastHiddenCount = -1; recalc(); }).catch(() => {});
   }
 
   function bindRoot(root) {
