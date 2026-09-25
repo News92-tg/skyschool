@@ -252,7 +252,7 @@ async function callGroq(env, system, user, opts) {
       'Authorization': 'Bearer ' + env.GROQ_API_KEY
     },
     body: JSON.stringify(Object.assign({
-      model: strCfg(env, 'GROQ_MODEL'),
+      model: modelCfg(env, 'GROQ_MODEL'),
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
       temperature: o.temperature == null ? 0.3 : o.temperature,
       max_tokens: o.maxTokens || numCfg(env, 'MAX_TOKENS')
@@ -308,7 +308,7 @@ function glmHint(status, model, url) {
 }
 
 async function callGlmVision(env, base64, mime, prompt) {
-  const model = strCfg(env, 'GLM_MODEL');
+  const model = modelCfg(env, 'GLM_MODEL');
   const url = strCfg(env, 'GLM_API_URL');
 
   /* Картинку GLM принимает строкой data:<MIME>;base64,… — именно с
@@ -353,6 +353,49 @@ async function callGlmVision(env, base64, mime, prompt) {
   return { text };
 }
 
+/* ---------- защита от ключа, вставленного не в то поле ----------
+
+   Случай из жизни: ключ GLM вписали в переменную GLM_MODEL вместо
+   GLM_API_KEY. GLM_MODEL — обычная переменная, а не секрет, и /health
+   честно показывал её значение всем подряд. Ключ оказался открыт в
+   публичном ответе.
+
+   Виноват тут не только тот, кто перепутал поля: /health не должен был
+   выводить наружу значение, которое выглядит как ключ. Поэтому теперь
+   две вещи. Первая — looksLikeSecret() ловит типичные формы ключей, и
+   такое значение не показывается и не используется как имя модели:
+   вместо него берётся значение по умолчанию. Вторая — /health прямо
+   говорит, что переменная заполнена неверно, чтобы это чинили, а не
+   гадали, почему не работает.
+
+   Идеально это не ловит и не может: ключ — просто строка. Но
+   перекрывает те формы, которые встречаются у Groq, Gemini, OpenAI и
+   Zhipu, и главное — закрывает вывод наружу. */
+function looksLikeSecret(v) {
+  const s = String(v || '');
+  if (!s) return false;
+  /* Адрес площадки длиннее сорока символов и под правило длины попадал —
+     на этом моя же проверка и споткнулась на первом прогоне. */
+  if (/^https?:\/\//i.test(s)) return false;
+  if (s.length > 40) return true;                 /* имена моделей короче */
+  if (/^(gsk_|sk-|AIza|xai-|Bearer\s)/i.test(s)) return true;
+  if (/^[0-9a-f]{16,}\./i.test(s)) return true;    /* Zhipu: id.secret */
+  return false;
+}
+
+/* Имя модели для ответа наружу: подозрительное — прячем. */
+function safeModelName(v) {
+  if (!v) return null;
+  return looksLikeSecret(v) ? '(скрыто: значение похоже на ключ, а не на имя модели)' : v;
+}
+
+/* Имя модели для запроса: подозрительное — берём значение по умолчанию,
+   иначе запрос заведомо уйдёт в никуда с ключом в поле model. */
+function modelCfg(env, name) {
+  const v = strCfg(env, name);
+  return looksLikeSecret(v) ? DEFAULTS[name] : v;
+}
+
 function visionProvider(env) {
   if (env.GLM_API_KEY) return 'glm';
   if (env.GEMINI_API_KEY) return 'gemini';
@@ -367,7 +410,7 @@ async function callVision(env, base64, mime, prompt) {
 }
 
 async function callGeminiVision(env, base64, mime, prompt) {
-  const model = strCfg(env, 'GEMINI_MODEL');
+  const model = modelCfg(env, 'GEMINI_MODEL');
   const r = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
     {
@@ -889,11 +932,16 @@ export default {
         hasQuotas: supaReady(env),
         endpoints: ['/explain', '/check-photo', '/chess-explain', '/grade-essay'],
         models: {
-          text: strCfg(env, 'GROQ_MODEL'),
-          vision: visionProvider(env) === 'gemini'
+          text: safeModelName(strCfg(env, 'GROQ_MODEL')),
+          vision: safeModelName(visionProvider(env) === 'gemini'
             ? strCfg(env, 'GEMINI_MODEL')
-            : strCfg(env, 'GLM_MODEL')
+            : strCfg(env, 'GLM_MODEL'))
         },
+        /* Пустой список — всё в порядке. Иначе здесь названы переменные,
+           в которые попало похожее на ключ значение: их надо исправить,
+           а сам ключ считать засвеченным и выпустить заново. */
+        misconfigured: ['GROQ_MODEL', 'GLM_MODEL', 'GEMINI_MODEL', 'GLM_API_URL']
+          .filter(n => looksLikeSecret(strCfg(env, n))),
         limits: {
           ratePerMin: numCfg(env, 'RATE_PER_MIN'),
           photoSeconds: numCfg(env, 'RATE_PHOTO_SECONDS'),
