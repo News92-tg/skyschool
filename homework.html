@@ -37,6 +37,7 @@
     <div class="section-head">
       <h2 data-i18n="given"></h2>
       <button class="btn teach small" id="btnNew" data-i18n="newHw"></button>
+      <button class="btn ghost small" id="btnPhotoTask" data-i18n="newPhotoTask"></button>
     </div>
     <div class="list" id="hwTeacher"></div>
   </div>
@@ -77,6 +78,20 @@ Sky.init({
 
   given:{ru:'Выданные задания',en:'Assignments you set'},
   mine:{ru:'Мои задания',en:'My assignments'},
+  newPhotoTask:{ru:'Задание по фото',en:'Photo task'},
+  ptHead:{ru:'Задание с проверкой по фото',en:'Photo-checked task'},
+  ptLead:{ru:'Ученик откроет ссылку, увидит задание и пришлёт фото решения. Вход ему нужен только на отправку.',
+          en:'The student opens the link, sees the task and sends a photo. Sign-in is needed only to submit.'},
+  ptSubject:{ru:'Предмет',en:'Subject'},
+  ptText:{ru:'Текст задания',en:'Task text'},
+  ptTextPh:{ru:'Например: тело падает с высоты 20 м, найдите время падения.',
+            en:'e.g. a body falls from 20 m, find the fall time.'},
+  ptCreate:{ru:'Создать ссылку',en:'Create a link'},
+  ptEmpty:{ru:'Напишите текст задания — ученик увидит именно его.',en:'Write the task text.'},
+  ptReady:{ru:'Ссылка готова. Отдайте её ученикам.',en:'The link is ready. Share it with your students.'},
+  ptCopy:{ru:'Скопировать',en:'Copy'},
+  ptCopied:{ru:'Скопировано',en:'Copied'},
+  ptFail:{ru:'Не удалось сохранить задание. Проверьте подключение к базе.',en:'Could not save the task.'},
   newHw:{ru:'Новое задание',en:'New assignment'},
 
   needAuth:{ru:'Войдите, чтобы увидеть задания',en:'Sign in to see assignments'},
@@ -262,6 +277,76 @@ function renderStudent() {
 }
 
 /* ---------- создание задания ---------- */
+/* ---------- задание с проверкой по фото ----------
+
+   Учитель пишет текст, получает ссылку. Ссылка ведёт на страницу
+   разбора фото с идентификатором задания в адресе.
+
+   Идентификатор — uuid из базы, а не закодированный текст задания.
+   Соблазн зашить текст прямо в ссылку (base64) велик: не нужна
+   таблица. Но тогда ссылку можно подделать — подставить свой текст и
+   выдать за учительский, — и она станет гигантской. */
+function openPhotoTask() {
+  Sky.modal(`
+    <div style="min-width:min(560px,calc(100vw - 40px))">
+      <h2 style="margin:0 0 4px">${Sky.t('ptHead')}</h2>
+      <p style="margin:0 0 14px;color:var(--muted);font-size:12.5px;line-height:1.45">${Sky.t('ptLead')}</p>
+      <div class="field">
+        <label>${Sky.t('ptSubject')}</label>
+        <select id="ptSubj">
+          <option value="physics">${Sky.lang === 'en' ? 'Physics' : 'Физика'}</option>
+          <option value="algebra">${Sky.lang === 'en' ? 'Algebra' : 'Алгебра'}</option>
+          <option value="other">${Sky.lang === 'en' ? 'Other' : 'Другое'}</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>${Sky.t('ptText')}</label>
+        <textarea id="ptBody" rows="4" placeholder="${Sky.t('ptTextPh')}"></textarea>
+      </div>
+      <div class="actions"><button class="btn teach" id="ptGo">${Sky.t('ptCreate')}</button></div>
+      <div id="ptOut" class="hidden" style="margin-top:14px"></div>
+    </div>`,
+    (box, close) => {
+      box.querySelector('#ptGo').addEventListener('click', async () => {
+        const text = box.querySelector('#ptBody').value.trim();
+        if (!text) { Sky.toast(Sky.t('ptEmpty'), 4000); return; }
+        const btn = box.querySelector('#ptGo');
+        btn.disabled = true;
+        try {
+          const row = await Sky.db.insert('teacher_tasks', {
+            teacher_id: (Sky.db.me() || {}).id,
+            subject: box.querySelector('#ptSubj').value,
+            task_text: text.slice(0, 4000)
+          });
+          /* Ссылку строим от текущего адреса: сайт живёт и на
+             github.io, и на своём домене, и жёстко вписанный хост
+             сломался бы на одном из них. */
+          const base = location.href.replace(/[^/]*$/, '');
+          const link = base + 'photo.html?task=' + encodeURIComponent(row.id);
+          const out = box.querySelector('#ptOut');
+          out.classList.remove('hidden');
+          out.innerHTML =
+            `<div style="font-weight:800;font-size:12.5px;margin-bottom:6px">${Sky.t('ptReady')}</div>
+             <div style="display:flex;gap:8px;align-items:center">
+               <input type="text" id="ptLink" readonly value="${link.replace(/"/g, '&quot;')}"
+                      style="flex:1;min-width:0;font-size:12px">
+               <button class="btn small" id="ptCopy">${Sky.t('ptCopy')}</button>
+             </div>`;
+          out.querySelector('#ptCopy').addEventListener('click', async () => {
+            const input = out.querySelector('#ptLink');
+            try { await navigator.clipboard.writeText(input.value); }
+            catch (e) { input.select(); document.execCommand('copy'); }
+            Sky.toast(Sky.t('ptCopied'), 2000);
+          });
+        } catch (e) {
+          Sky.toast(Sky.t('ptFail'), 5000);
+        } finally { btn.disabled = false; }
+      });
+    });
+}
+
+$('#btnPhotoTask').addEventListener('click', openPhotoTask);
+
 $('#btnNew').addEventListener('click', () => {
   const me = Sky.db.me();
   const myStudents = links.filter(l => l.teacher_id === me.id);

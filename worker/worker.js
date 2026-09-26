@@ -91,7 +91,11 @@ const DEFAULTS = {
      значением по умолчанию: тогда ничего настраивать не нужно, а
      переменная остаётся на случай, когда имя опять поменяют. */
   GLM_MODEL: 'glm-4.6v-flash',
-  GLM_API_URL: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+  /* Международная площадка Z.AI — так указано в задании. В прошлой
+     правке здесь по недосмотру осталась китайская open.bigmodel.cn.
+     Ключ работает только на своей площадке: если он выдан на
+     bigmodel.cn, поменяйте GLM_API_URL в настройках Worker. */
+  GLM_API_URL: 'https://api.z.ai/api/paas/v4/chat/completions',
   /* потолок ответа модели в токенах */
   MAX_TOKENS: 500,
   MAX_TOKENS_PHOTO: 900,
@@ -308,9 +312,15 @@ async function callModel(env, system, user, opts) {
 function glmHint(status, model, url) {
   if (status === 401 || status === 403)
     return 'Ключ GLM не принят. Проверьте GLM_API_KEY и что он выдан для площадки ' + url + '.';
+  /* glm-4v-flash по документации принимает ровно одно фото и не
+     принимает base64. Сказать об этом прямо — иначе ошибка выглядит
+     как «модель недоступна», и искать будут не там. */
+  if (status === 400 && /^glm-4v-flash$/i.test(model))
+    return 'Модель glm-4v-flash принимает только одно фото за запрос и не принимает base64. ' +
+      'Для проверки нескольких фото нужна glm-4.6v-flash — уберите переменную GLM_MODEL в настройках Worker.';
   if (status === 404 || status === 400)
     return 'GLM не принял запрос: возможно, модель «' + model + '» недоступна на этой площадке. ' +
-      'На open.bigmodel.cn бесплатная зрячая модель — glm-4v-flash, на api.z.ai — glm-4.6v-flash. ' +
+      'Бесплатная зрячая модель называется glm-4.6v-flash (и на open.bigmodel.cn, и на api.z.ai). ' +
       'Поменяйте GLM_MODEL и GLM_API_URL в настройках Worker.';
   if (status === 429)
     return 'Исчерпан лимит запросов GLM. Попробуйте позже.';
@@ -563,6 +573,34 @@ async function supaRpc(env, fn, args) {
   }
 }
 
+/* Вызов функции в базе ОТ ИМЕНИ УЧЕНИКА, его же токеном.
+
+   Зачем отдельно от supaRpc: homework_try_consume берёт личность из
+   auth.uid(). Под сервисным ключом auth.uid() пуст, и функция сочла
+   бы вызывающего анонимом. Поэтому сюда идёт токен ученика.
+
+   Подменить себя этим нельзя: токен проверяет Supabase, а лимит
+   зашит внутри функции и параметром не передаётся. */
+async function supaRpcAsUser(env, token, fn, args) {
+  const r = await fetch(supaUrl(env) + '/rest/v1/rpc/' + fn, {
+    method: 'POST',
+    headers: {
+      apikey: supaKey(env),
+      Authorization: 'Bearer ' + token,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(args || {})
+  });
+  const text = await r.text();
+  if (!r.ok) return { error: 'supabase ' + r.status, detail: text.slice(0, 300) };
+  try {
+    const data = JSON.parse(text);
+    return { data: Array.isArray(data) ? data[0] : data };
+  } catch (e) {
+    return { error: 'supabase: ответ не разобран', detail: text.slice(0, 200) };
+  }
+}
+
 async function supaInsert(env, table, row) {
   try {
     await fetch(supaUrl(env) + '/rest/v1/' + table, {
@@ -588,6 +626,298 @@ async function supaInsert(env, table, row) {
    ошибается, и когда оценка выглядит несправедливой, первое, что надо
    увидеть, — что именно модель приняла за написанное. Без этого
    ученик спорит с оценкой вслепую. */
+/* ---------- /check-homework: разбор домашки по фото ----------
+
+   СЕАНС
+
+   Одно нажатие «проверить» — один сеанс. В сеансе от 1 до 5 фото
+   бесплатно и до 20 у VIP. Бесплатно — один сеанс в день на предмет,
+   день считается по местному времени ученика. Всё это решает база
+   (homework_try_consume), здесь — только подготовка и передача.
+
+   ПОЧЕМУ ФОТО ПРИХОДЯТ ПУТЯМИ, А НЕ КАРТИНКАМИ
+
+   Замер: на бесплатном тарифе Workers лимит 10 мс процессора, а
+   разбор и пересборка JSON с фотографиями стоят 16 мс для пяти фото
+   обычного размера и 85–350 мс для двадцати. Worker обрывался бы.
+   Поэтому страница кладёт фото в хранилище Supabase (бакет homework,
+   папка ученика), а сюда присылает пути. Здесь пути превращаются в
+   подписанные ссылки, и модель скачивает картинки сама. Процессора
+   на это уходит доли миллисекунды.
+
+   Побочный плюс: международная документация Z.AI показывает
+   картинки только ссылками, про base64 там не сказано ничего.
+   Ссылки — путь, который описан.
+
+   ОДИН ЗАПРОС К МОДЕЛИ
+
+   Все фото уходят одним chat/completions: текст задания и дальше
+   картинки, каждая с подписью «Фото N». Подписи нужны, чтобы модель
+   не путала, какая задача где, когда отвечает по номерам.
+
+   Проверку делает только GLM. Gemini не умеет брать картинки по
+   произвольной ссылке, а скачивать и перекодировать их здесь — ровно
+   та работа процессора, от которой мы уходим. */
+
+const HOMEWORK_BUCKET = 'homework';
+const HOMEWORK_MAX_PHOTOS = 20;          /* жёсткий потолок до похода в базу */
+
+const HOMEWORK_SUBJECTS = {
+  physics: {
+    ru: 'физике', en: 'physics',
+    extraRu: 'Для физики отдельно проверь единицы измерения и размерность: сходится ли размерность в каждой формуле, ' +
+             'переведены ли величины в СИ, не потеряны ли множители. Если формула применена не к тому случаю — скажи, к какому она применима.',
+    extraEn: 'For physics, check units and dimensional analysis, SI conversion, and whether each formula fits the case.'
+  },
+  algebra: {
+    ru: 'алгебре', en: 'algebra',
+    extraRu: 'Для алгебры проверяй ХОД решения, а не только итоговый ответ. Укажи конкретную строку, где переход неверен, ' +
+             'и почему. Если ответ случайно совпал, а решение неправильное — так и скажи.',
+    extraEn: 'For algebra, check the steps, not only the final answer. Point at the exact line where a step is wrong.'
+  },
+  other: { ru: 'этому предмету', en: 'this subject', extraRu: '', extraEn: '' }
+};
+
+function homeworkSubject(raw) {
+  const k = String(raw || '').toLowerCase().trim();
+  return HOMEWORK_SUBJECTS[k] ? k : 'other';
+}
+
+/* Промпт — по заданию, с одной правкой по смыслу. В задании было
+   «На фото N задач», где N — число фото. Но на одном фото бывает три
+   задачи, а одна задача бывает на двух фото, и модель получала бы
+   заведомо неверное число. Поэтому говорим о N ФОТО, а нумеровать
+   просим задачи. */
+function homeworkPrompt(subjectKey, lang, taskText, n) {
+  const s = HOMEWORK_SUBJECTS[subjectKey];
+  if (lang === 'en') {
+    return `There are ${n} photo(s) with solutions to ${s.en} problems. Check each problem separately.\n` +
+      'Structure the answer by number: Problem 1: …, Problem 2: …\n' +
+      'For each problem: solve it yourself, compare with the student\'s solution, and state 1) what is correct, ' +
+      '2) where the mistake is, 3) the correct answer with an explanation.\n' +
+      'If one photo holds several problems or one problem continues on the next photo, number problems, not photos.\n' +
+      'Be brief and friendly.' + (s.extraEn ? '\n' + s.extraEn : '') +
+      (taskText ? '\n\nThe task as the teacher set it: ' + taskText : '') +
+      '\n\nIf a photo is unreadable, say which one and do not guess its content.';
+  }
+  return `Прислано фото: ${n}. На них решения задач по ${s.ru}. Проверь каждую задачу отдельно.\n` +
+    'Ответ структурируй по номерам: Задача 1: …, Задача 2: …\n' +
+    'Для каждой задачи: реши её сам, сравни с решением ученика и укажи 1) что верно, 2) где ошибка, ' +
+    '3) правильный ответ с пояснением.\n' +
+    'Если на одном фото несколько задач или одна задача продолжается на следующем фото — нумеруй задачи, а не фото.\n' +
+    'Пиши кратко, дружелюбно, на русском.' + (s.extraRu ? '\n' + s.extraRu : '') +
+    (taskText ? '\n\nЗадание, которое дал учитель: ' + taskText : '') +
+    /* Без этого модель охотно «дорисовывает» неразборчивое. */
+    '\n\nЕсли какое-то фото нечитаемое — скажи, какое именно, и не придумывай, что на нём.';
+}
+
+/* Потолок ответа растёт с числом фото: на двадцать задач по-другому
+   не хватит, и разбор обрывался бы на середине. Верх — 8000 токенов:
+   документация даёт glm-4.6v-flash до 32K, но ждать такой ответ
+   ученику пришлось бы минутами. */
+function homeworkMaxTokens(n) {
+  return Math.min(8000, 700 + 550 * n);
+}
+
+async function callGlmVisionUrls(env, urls, prompt, maxTokens) {
+  const model = modelCfg(env, 'GLM_MODEL');
+  const url = strCfg(env, 'GLM_API_URL');
+
+  const content = [{ type: 'text', text: prompt }];
+  urls.forEach((u, i) => {
+    content.push({ type: 'text', text: 'Фото ' + (i + 1) });
+    content.push({ type: 'image_url', image_url: { url: u } });
+  });
+
+  let r;
+  try {
+    r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + env.GLM_API_KEY },
+      body: JSON.stringify({ model, temperature: 0.2, max_tokens: maxTokens,
+        messages: [{ role: 'user', content }] })
+    });
+  } catch (e) {
+    return { error: 'GLM недоступен: ' + e.message };
+  }
+  if (!r.ok) {
+    const text = await r.text();
+    return { error: glmHint(r.status, model, url), detail: text.slice(0, 300) };
+  }
+  const data = await r.json();
+  const c = data?.choices?.[0]?.message?.content;
+  const text = (Array.isArray(c)
+    ? c.map(x => (typeof x === 'string' ? x : x?.text || '')).join('')
+    : String(c || '')).trim();
+  if (!text) return { error: 'GLM не прислал разбор.' };
+  /* Упёрлись в потолок токенов — разбор оборван. Лучше сказать об
+     этом, чем выдать ученику половину как целое. */
+  const cut = data?.choices?.[0]?.finish_reason === 'length';
+  return { text, truncated: cut };
+}
+
+/* ---------- хранилище ---------- */
+
+async function storageSign(env, paths, seconds) {
+  const r = await fetch(`${supaUrl(env)}/storage/v1/object/sign/${HOMEWORK_BUCKET}`, {
+    method: 'POST',
+    headers: { apikey: supaKey(env), Authorization: 'Bearer ' + supaKey(env), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expiresIn: seconds, paths })
+  });
+  if (!r.ok) return { error: 'хранилище ' + r.status, detail: (await r.text()).slice(0, 200) };
+  const list = await r.json();
+  const byPath = {};
+  (Array.isArray(list) ? list : []).forEach(x => { if (x && x.path) byPath[x.path] = x; });
+  const urls = [];
+  for (const p of paths) {
+    const x = byPath[p];
+    /* signedURL приходит относительным: /object/sign/… — так же его
+       достраивает официальный клиент Supabase. */
+    if (!x || x.error || !x.signedURL) return { error: 'фото не найдено в хранилище: ' + p };
+    urls.push(encodeURI(`${supaUrl(env)}/storage/v1${x.signedURL}`));
+  }
+  return { urls };
+}
+
+async function storageRemove(env, paths) {
+  if (!paths.length) return;
+  try {
+    await fetch(`${supaUrl(env)}/storage/v1/object/${HOMEWORK_BUCKET}`, {
+      method: 'DELETE',
+      headers: { apikey: supaKey(env), Authorization: 'Bearer ' + supaKey(env), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prefixes: paths })
+    });
+  } catch (e) { /* не удалось убрать — не повод ронять разбор */ }
+}
+
+/* Фоновая работа: пусть идёт после ответа ученику, если платформа
+   это умеет; иначе — дождёмся. */
+function later(ctx, promise) {
+  if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(promise);
+  else return promise;
+}
+
+async function handleHomework(body, env, origin, request, ip, ctx) {
+  const lang = body.lang === 'en' ? 'en' : 'ru';
+  const t = (ru, en) => (lang === 'en' ? en : ru);
+
+  if (!env.GLM_API_KEY) {
+    return json({ error: t('Для проверки нескольких фото нужен ключ GLM. Выполните: npx wrangler secret put GLM_API_KEY',
+      'A GLM key is required. Run: npx wrangler secret put GLM_API_KEY') }, 500, origin, env);
+  }
+  if (!supaReady(env)) {
+    return json({ error: t('Хранилище фото не настроено: нужны SUPABASE_URL и SUPABASE_SERVICE_KEY.',
+      'Photo storage is not configured.') }, 500, origin, env);
+  }
+
+  const subject = homeworkSubject(body.subject);
+  /* Пояс проверяет база по списку поясов; здесь только отсекаем мусор,
+     чтобы не гонять его туда. Неизвестный пояс база превратит в UTC. */
+  const tz = /^[A-Za-z0-9_+\-\/]{1,64}$/.test(String(body.tz || '')) ? String(body.tz) : 'UTC';
+
+  /* --- кто --- */
+  const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
+  const me = await whoAmI(request, env);
+  if (!me) {
+    return json({ error: t('Войдите, чтобы отправить домашку на проверку: бесплатный лимит считается на ученика.',
+      'Sign in to have your homework checked.'), reason: 'anonymous' }, 401, origin, env);
+  }
+
+  /* --- какие фото ---
+     Каждый путь обязан лежать в папке этого ученика. Проверка
+     обязательная: ссылки подписываются сервисным ключом, который
+     видит всё хранилище, и без неё ученик мог бы отправить на разбор
+     чужие фото, просто указав их путь. */
+  const raw = Array.isArray(body.paths) ? body.paths : [];
+  const prefix = me.id + '/';
+  const paths = raw.filter(p => typeof p === 'string');
+  const pathOk = p => p.startsWith(prefix) && p.length < 300 && !p.includes('..') &&
+    /^[A-Za-z0-9._\-\/]+$/.test(p);
+
+  if (!paths.length) {
+    return json({ error: t('Нет фото для проверки.', 'No photos to check.'), reason: 'no_photos' }, 400, origin, env);
+  }
+  if (paths.length > HOMEWORK_MAX_PHOTOS || paths.length !== raw.length || !paths.every(pathOk)) {
+    return json({ error: t('Неверный список фото.', 'Invalid photo list.'), reason: 'bad_paths' }, 400, origin, env);
+  }
+
+  /* --- сеанс --- */
+  const res = await supaRpcAsUser(env, token, 'homework_try_consume',
+    { p_subject: subject, p_photos: paths.length, p_tz: tz });
+  if (res.error) {
+    return json({ error: t('Не удалось проверить лимит: ', 'Could not check the limit: ') + res.error,
+      detail: res.detail }, 502, origin, env);
+  }
+  const q = res.data || {};
+  if (!q.allowed) {
+    /* Фото уже лежат в хранилище, а разбора не будет — убираем. */
+    const cleanup = storageRemove(env, paths);
+    const reply = {
+      reason: q.reason, subject, vip: !!q.vip,
+      photo_limit: q.photo_limit, day_limit: q.day_limit, used: q.used
+    };
+    if (q.reason === 'limit') {
+      reply.error = t('Бесплатно — 1 проверка в день по каждому предмету. Оформи подписку для безлимита.',
+        'Free plan: one check per subject per day. Subscribe for unlimited.');
+      reply.paywall = true;
+      await later(ctx, cleanup);
+      return json(reply, 402, origin, env);
+    }
+    if (q.reason === 'too_many_photos') {
+      reply.error = q.vip
+        ? t(`В одном сеансе — не больше ${q.photo_limit} фото.`, `At most ${q.photo_limit} photos per check.`)
+        : t(`Бесплатно — до ${q.photo_limit} фото за раз. В VIP — до 20.`, `Free: up to ${q.photo_limit} photos. VIP: up to 20.`);
+      reply.paywall = !q.vip;
+      await later(ctx, cleanup);
+      return json(reply, q.vip ? 400 : 402, origin, env);
+    }
+    reply.error = t('Проверка не разрешена.', 'Check not allowed.');
+    await later(ctx, cleanup);
+    return json(reply, 403, origin, env);
+  }
+
+  /* Вернуть сеанс, если разбор не состоялся не по вине ученика.
+     День берём тот, что вернула база при списании, — см. комментарий
+     к homework_refund: за время разбора могла наступить полночь. */
+  const refund = () => supaRpc(env, 'homework_refund',
+    { p_user: me.id, p_subject: subject, p_day: q.local_day, p_photos: paths.length }).catch(() => {});
+
+  const signed = await storageSign(env, paths, 600);
+  if (signed.error) {
+    await refund();
+    await later(ctx, storageRemove(env, paths));
+    return json({ error: t('Не удалось подготовить фото: ', 'Could not prepare photos: ') + signed.error },
+      502, origin, env);
+  }
+
+  const taskText = cut(body.taskText, 800);
+  const out = await callGlmVisionUrls(env, signed.urls,
+    homeworkPrompt(subject, lang, taskText, paths.length), homeworkMaxTokens(paths.length));
+
+  /* Фото больше не нужны ни при успехе, ни при сбое. */
+  const cleanup = storageRemove(env, paths);
+
+  if (out.error) {
+    await refund();
+    await later(ctx, cleanup);
+    return json({ error: out.error, detail: out.detail }, 502, origin, env);
+  }
+
+  /* История. Колонки — как в schema-photo-limits.sql: ai_feedback и
+     status. В прошлой версии здесь стояли task_text и result_text,
+     которых в таблице нет; запись молча падала, и история не
+     сохранялась вовсе. */
+  const history = supaInsert(env, 'photo_checks', {
+    user_id: me.id, subject, ai_feedback: out.text.slice(0, 8000), status: out.truncated ? 'truncated' : 'ok'
+  });
+  await later(ctx, Promise.all([cleanup, history]));
+
+  return json({
+    ok: true, subject, photos: paths.length, text: out.text, truncated: !!out.truncated,
+    quota: { used: q.used, day_limit: q.day_limit, photo_limit: q.photo_limit, vip: !!q.vip, local_day: q.local_day }
+  }, 200, origin, env);
+}
+
 async function handlePhoto(body, env, origin, request, ip) {
   if (!visionProvider(env)) {
     return json({ error: 'Не задан ключ для распознавания фото. Выполните: npx wrangler secret put GLM_API_KEY (бесплатная модель) или GEMINI_API_KEY.' }, 500, origin, env);
@@ -923,7 +1253,7 @@ async function handleEssay(body, env, origin) {
    Точка входа
    ============================================================ */
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const origin = request.headers.get('Origin') || '';
 
     if (request.method === 'OPTIONS') {
@@ -940,7 +1270,7 @@ export default {
         hasVision: !!visionProvider(env),
         visionProvider: visionProvider(env),
         hasQuotas: supaReady(env),
-        endpoints: ['/explain', '/check-photo', '/chess-explain', '/grade-essay'],
+        endpoints: ['/explain', '/check-photo', '/check-homework', '/chess-explain', '/grade-essay'],
         models: {
           text: safeModelName(strCfg(env, 'GROQ_MODEL')),
           vision: safeModelName(visionProvider(env) === 'gemini'
@@ -964,6 +1294,7 @@ export default {
     const routes = {
       '/explain': handleExplain,
       '/check-photo': handlePhoto,
+      '/check-homework': handleHomework,
       '/chess-explain': handleChessExplain,
       '/grade-essay': handleEssay
     };
@@ -1001,7 +1332,7 @@ export default {
     catch (e) { return json({ error: 'bad json' }, 400, origin, env); }
 
     try {
-      return await handler(body, env, origin, request, ip);
+      return await handler(body, env, origin, request, ip, ctx);
     } catch (e) {
       return json({ error: 'Не удалось связаться с моделью: ' + e.message }, 502, origin, env);
     }

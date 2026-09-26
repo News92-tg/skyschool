@@ -69,6 +69,56 @@
 .working{display:flex;align-items:center;gap:11px;font-size:13.5px;color:var(--muted);font-weight:700}
 .working .dot{width:9px;height:9px;border-radius:50%;background:var(--warn);animation:phPulse 1s infinite;flex:none}
 @keyframes phPulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .subj-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .subj-btn{padding:9px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel-2);
+    font-family:inherit;font-size:13px;font-weight:800;color:var(--muted);cursor:pointer;transition:.15s}
+  .subj-btn:hover{border-color:var(--line-2)}
+  .subj-btn.active{border-color:var(--m-photo,var(--accent));background:var(--m-photo-soft,var(--panel));color:var(--ink)}
+  .task-from-teacher{margin:12px 0;border-left:3px solid var(--accent)}
+  .tft-head{font-size:10.5px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .tft-text{margin-top:6px;font-size:14px;line-height:1.5;white-space:pre-wrap}
+  .hw-text{font-size:14.5px;line-height:1.65}
+  .hw-left{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);
+    font-size:12px;font-weight:800;color:var(--muted)}
+  .thumbs-head{display:flex;align-items:center;justify-content:space-between;margin-top:12px;
+    font-size:12.5px;font-weight:800;color:var(--muted)}
+  .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px;margin-top:8px}
+  .thumb{position:relative;aspect-ratio:3/4;border-radius:10px;overflow:hidden;background:var(--panel-2);
+    border:1px solid var(--line)}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .thumb b{position:absolute;left:5px;top:5px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;
+    background:rgba(0,0,0,.6);color:#fff;font-size:11px;display:grid;place-items:center}
+  .thumb button{position:absolute;right:4px;top:4px;width:24px;height:24px;border:0;border-radius:50%;
+    background:rgba(0,0,0,.6);color:#fff;font-size:14px;line-height:1;cursor:pointer}
+  .cap-note{margin-top:8px;font-size:12px;color:var(--muted)}
+  .used-note{margin:10px 0 0;padding:10px 12px;border-radius:12px;background:var(--panel-2);
+    font-size:12.5px;line-height:1.5;color:var(--ink-2)}
+  .progress{margin-top:12px}
+  .progress-text{font-size:13px;font-weight:800;margin-bottom:6px}
+  .progress-bar{height:8px;border-radius:99px;background:var(--panel-2);overflow:hidden}
+  .progress-bar i{display:block;height:100%;width:0;background:var(--accent);border-radius:99px;transition:width .25s}
+  .progress-bar.indef i{width:35%;animation:pgrun 1.2s ease-in-out infinite}
+  @keyframes pgrun{from{transform:translateX(-100%)}to{transform:translateX(290%)}}
+  @media (prefers-reduced-motion:reduce){.progress-bar.indef i{animation:none;width:100%;opacity:.5}}
+  /* Ширину не навязываем через min-width по окну браузера: у модалки
+     свои отступы, и на телефоне содержимое вылезало за край — были
+     обрезаны карточки и кнопка «Оформить VIP». А на компьютере сама
+     модалка уже 480px, и любой min-width шире неё вылезает там. Поэтому
+     содержимое просто занимает ширину окна, какой бы она ни была. */
+  .pw{width:100%;min-width:0;max-width:560px;box-sizing:border-box}
+  .pw-actions .btn{flex:1 1 auto}
+  .pw h2{margin:0 0 4px}
+  .pw-lead{margin:0 0 14px;color:var(--muted);font-size:13px;line-height:1.5}
+  .pw-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .pw-card{border:1px solid var(--line);border-radius:14px;padding:14px}
+  .pw-card.vip{border-color:var(--accent);background:var(--panel-2)}
+  .pw-card h3{margin:0 0 8px;font-size:15px}
+  .pw-card ul{margin:0;padding-left:18px;font-size:12.5px;line-height:1.6}
+  .pw-price{margin-top:10px;font-weight:900;font-size:18px}
+  .pw-actions{margin-top:14px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+  @media (max-width:560px){.pw-grid{grid-template-columns:1fr}}
+  .limit-note{margin-top:10px;padding:11px 13px;border-radius:12px;background:var(--warn-soft);
+    color:var(--warn);font-size:13px;font-weight:700;line-height:1.5}
 </style>
 </head>
 <body>
@@ -96,24 +146,71 @@
       <div class="shot-frame" id="frame">
         <div class="hint" id="frameHint"></div>
         <video id="video" playsinline autoplay muted hidden></video>
-        <img id="preview" alt="" hidden>
       </div>
 
       <div class="shot-actions">
         <button class="btn" id="camBtn"></button>
         <button class="btn ghost" id="fileBtn"></button>
         <button class="btn hidden" id="shotBtn"></button>
-        <button class="btn ghost hidden" id="againBtn"></button>
+        <button class="btn ghost hidden" id="camOffBtn"></button>
       </div>
-      <input type="file" id="fileIn" accept="image/*" capture="environment" hidden>
+
+      <!-- Выбранные фото. Сжимаются и загружаются только при отправке,
+           по одному: двадцать декодированных снимков с телефона разом —
+           это больше гигабайта памяти, и вкладка падает. -->
+      <div class="thumbs-head hidden" id="thumbsHead">
+        <span id="thumbsCount"></span>
+        <button type="button" class="btn ghost small" id="clearBtn"></button>
+      </div>
+      <div class="thumbs" id="thumbs"></div>
+      <div class="cap-note hidden" id="capNote"></div>
+      <!-- ПОЧЕМУ УБРАН capture="environment"
+
+           Именно из-за него «Выбор файла не работает». На телефоне
+           capture велит браузеру открыть камеру вместо галереи, и до
+           файлов добраться нечем — кнопка «Выбрать файл» открывала
+           камеру. На компьютере атрибут игнорируется, поэтому там
+           баг не воспроизводился.
+
+           Снимок с камеры делается отдельной кнопкой и отдельным
+           кодом, так что capture здесь не нужен вовсе.
+
+           accept сужен до конкретных типов: image/* пропускает heic
+           и tiff, которые canvas в браузере не прочитает, и ученик
+           получал пустой экран вместо понятного отказа. -->
+      <input type="file" id="fileIn" accept="image/jpeg,image/png,image/webp" multiple hidden>
+
+      <div class="field">
+        <label data-i18n="subjLabel"></label>
+        <div class="subj-row" id="subjRow">
+          <button type="button" class="subj-btn" data-subject="physics"></button>
+          <button type="button" class="subj-btn" data-subject="algebra"></button>
+          <button type="button" class="subj-btn" data-subject="other"></button>
+        </div>
+      </div>
+
+      <!-- Задание, пришедшее по ссылке от учителя. -->
+      <div class="panel task-from-teacher hidden" id="teacherTask">
+        <div class="tft-head" data-i18n="tftHead"></div>
+        <div class="tft-text" id="tftText"></div>
+      </div>
 
       <div class="field">
         <label data-i18n="taskLabel"></label>
         <textarea id="taskText" rows="2" placeholder=""></textarea>
       </div>
 
+      <div class="used-note hidden" id="usedNote"></div>
       <button class="btn full big" id="checkBtn" disabled data-i18n="checkBtn"></button>
-      <div class="working hidden" id="working"><span class="dot"></span><span id="workingText"></span></div>
+
+      <!-- Прогресс. Счётчик «k из N» — только там, где он правдив:
+           на подготовке и загрузке фото идут по одному. Проверка — один
+           запрос к модели на все фото сразу, и «проверяю фото 2 из 5»
+           был бы выдуманным числом; там полоса бежит без счёта. -->
+      <div class="progress hidden" id="progress">
+        <div class="progress-text" id="progressText"></div>
+        <div class="progress-bar"><i id="progressFill"></i></div>
+      </div>
     </div>
   </div>
 
@@ -151,20 +248,64 @@ Sky.init({
   needWorker:{ru:'Разбор фото требует Worker с ключом Gemini: распознавание рукописи делает отдельная модель, и её ключ нельзя держать в браузере. Впишите адрес Worker в assets/config.js → AI_BASE и выполните npx wrangler secret put GEMINI_API_KEY. Как развернуть — в README.',
               en:'Photo review needs the Worker with a Gemini key: handwriting recognition is a separate model and its key cannot live in the browser. Put the Worker address into assets/config.js → AI_BASE and run npx wrangler secret put GEMINI_API_KEY. See the README.'},
 
-  frameHint:{ru:'Пока ничего не выбрано. Снимите страницу камерой или выберите готовое фото.',
-             en:'Nothing chosen yet. Take a photo of the page or pick an existing one.'},
+  frameHint:{ru:'Пока ничего не выбрано. Снимите страницы камерой или выберите фото — можно несколько.',en:'Nothing yet. Take photos of the pages or pick files — several are fine.'},
   camBtn:{ru:'Включить камеру',en:'Open camera'},
+  camOffBtn:{ru:'Выключить камеру',en:'Turn camera off'},
+  subjLabel:{ru:'Предмет',en:'Subject'},
+  subjPhysics:{ru:'Физика',en:'Physics'},
+  subjAlgebra:{ru:'Алгебра',en:'Algebra'},
+  subjOther:{ru:'Другое',en:'Other'},
+  tftHead:{ru:'Задание от учителя',en:'Task from your teacher'},
+  badType:{ru:'Такой файл не подойдёт. Нужен jpg, png или webp.',en:'Unsupported file. Use jpg, png or webp.'},
+  tooHeavy:{ru:'Файл тяжелее 20 МБ. Выберите фото поменьше.',en:'File is over 20 MB. Use a smaller photo.'},
+  clearBtn:{ru:'Убрать все',en:'Remove all'},
+  rmPhoto:{ru:'Убрать фото',en:'Remove photo'},
+  thumbsCount:{ru:'Фото: %1 из %2',en:'Photos: %1 of %2'},
+  capFree:{ru:'Бесплатно — до 5 фото за раз. В VIP — до 20.',en:'Free: up to 5 photos at once. VIP: up to 20.'},
+  capVip:{ru:'За одну проверку — не больше 20 фото.',en:'At most 20 photos per check.'},
+  pgUpload:{ru:'Загружаю фото %1 из %2',en:'Uploading photo %1 of %2'},
+  pgCheck:{ru:'Проверяю фото: %1 шт. Это может занять до минуты',en:'Checking %1 photo(s). This may take up to a minute'},
+  upFail:{ru:'Не удалось загрузить фото. Проверьте интернет и попробуйте ещё раз.',en:'Could not upload photos. Check your connection.'},
+  tooBigAfter:{ru:'Фото %1 не получилось сжать до 1,5 МБ. Попробуйте другое.',en:'Photo %1 could not be compressed to 1.5 MB.'},
+  usedToday:{ru:'Сегодня бесплатная проверка по предмету «%1» уже была. Следующая — в 00:00 по вашему времени.',
+             en:'Today\'s free check for %1 is used. The next one is at 00:00 your time.'},
+  nextFree:{ru:'Следующая бесплатная проверка по предмету «%1» — в 00:00 по вашему времени.',
+            en:'Next free check for %1: at 00:00 your time.'},
+  truncated:{ru:'Разбор получился слишком длинным и оборвался. Отправьте меньше фото за раз.',
+             en:'The review got too long and was cut off. Send fewer photos at once.'},
+  pwHeadLimit:{ru:'Бесплатная проверка на сегодня использована',en:'Today\'s free check is used'},
+  pwHeadPhotos:{ru:'Слишком много фото для бесплатной проверки',en:'Too many photos for a free check'},
+  pwLeadPhotos:{ru:'Бесплатно — до 5 фото за раз. Уберите лишние или оформите VIP: там до 20 фото и проверок без ограничений.',
+                en:'Free: up to 5 photos. Remove some or get VIP: up to 20 photos and unlimited checks.'},
+  pwNext:{ru:'Следующая бесплатная по предмету «%1» — в 00:00 по вашему времени.',en:'Next free check for %1: at 00:00 your time.'},
+  pwFree:{ru:'Бесплатно',en:'Free'},
+  pwFree1:{ru:'1 проверка в день по каждому предмету',en:'1 check per subject per day'},
+  pwFree2:{ru:'до 5 фото за раз',en:'up to 5 photos at once'},
+  pwVip1:{ru:'проверок без ограничений',en:'unlimited checks'},
+  pwVip2:{ru:'до 20 фото за раз',en:'up to 20 photos at once'},
+  pwOk:{ru:'Понятно',en:'Got it'},
+  pwGo:{ru:'Оформить VIP',en:'Get VIP'},
+  pwSoon:{ru:'Оплата пока не подключена — скоро появится.',en:'Payments are not connected yet.'},
+  camDenied:{ru:'Вы не разрешили доступ к камере. Разрешите его в настройках сайта или выберите файл.',
+             en:'Camera access was denied. Allow it in site settings or pick a file.'},
+  camNone:{ru:'Камера не найдена. Выберите файл с решением.',en:'No camera found. Pick a file instead.'},
+  camBusy:{ru:'Камеру занял другой сайт или программа. Закройте их и попробуйте снова.',
+           en:'The camera is used by another app. Close it and try again.'},
+  needLogin:{ru:'Войдите, чтобы отправить домашку на проверку: бесплатный лимит считается на ученика.',
+             en:'Sign in to have your homework checked.'},
+  limitHit:{ru:'Бесплатно — 1 проверка в день по каждому предмету. Оформи подписку для безлимита.',
+            en:'Free plan: one check per subject per day. Subscribe for unlimited.'},
+  taskGone:{ru:'Задание по этой ссылке не найдено. Возможно, учитель его удалил.',
+            en:'This task was not found. The teacher may have removed it.'},
+  leftToday:{ru:'Осталось сегодня по этому предмету: %1',en:'Left today for this subject: %1'},
   fileBtn:{ru:'Выбрать файл',en:'Pick a file'},
   shotBtn:{ru:'Снять',en:'Capture'},
-  againBtn:{ru:'Переснять',en:'Retake'},
   camFail:{ru:'Камера недоступна: браузер не дал доступ или её нет. Выберите файл.',
            en:'Camera unavailable: the browser denied access or there is none. Pick a file instead.'},
 
   taskLabel:{ru:'Что было задано (необязательно, но с этим проверка точнее)',
              en:'What was set (optional, but it makes marking more accurate)'},
   checkBtn:{ru:'Проверить работу',en:'Check the work'},
-  working1:{ru:'Читаю почерк…',en:'Reading the handwriting…'},
-  working2:{ru:'Проверяю работу…',en:'Marking the work…'},
 
   resultH:{ru:'Разбор',en:'Review'},
   recogH:{ru:'Что прочитала модель',en:'What the model read'},
@@ -195,8 +336,25 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;
 const AI_BASE = (Sky.cfg.AI_BASE || '').trim();
 const hasWorker = /^https?:\/\//i.test(AI_BASE);
 
-let shotDataUrl = null;   // сжатое фото как data:URL
+let photos = [];          // выбранные фото: { blob, url } — сжимаются только при отправке
+let busy = false;         // идёт загрузка или проверка
+let usage = null;         // что разрешено сегодня: { vip, photo_limit, used_subjects }
 let stream = null;        // поток камеры, чтобы потом закрыть
+
+/* Часовой пояс ученика — чтобы бесплатная проверка возвращалась в
+   ЕГО полночь. Время при этом берётся с сервера: перевести часы на
+   телефоне и получить новый день нельзя. */
+const TZ = (() => {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; }
+  catch (e) { return 'UTC'; }
+})();
+const FREE_PHOTOS = 5;
+const capNow = () => (usage && usage.photo_limit) || FREE_PHOTOS;
+const isVip = () => !!(usage && usage.vip);
+
+/* Оплата ещё не подключена. Когда появится — впишите сюда цену и
+   ссылку на оплату, окно с тарифами подхватит их само. */
+const VIP_OFFER = { price: null, url: null };
 let lastSaved = null;     // строка photo_checks для кнопки «распознано неверно»
 
 /* ---------- учитель ---------- */
@@ -214,120 +372,355 @@ async function openCamera() {
       video: { facingMode: { ideal: 'environment' } }, audio: false
     });
   } catch (e) {
-    Sky.toast(Sky.t('camFail'), 4500);
+    /* Раньше на любой сбой выводилось одно общее сообщение, и человек
+       не понимал, что делать. Причины разные, и действия тоже разные:
+       отказ в доступе снимается в настройках сайта, занятую камеру
+       надо освободить, а отсутствующую не починить вовсе. */
+    const byName = {
+      NotAllowedError:   'camDenied',
+      PermissionDeniedError: 'camDenied',
+      NotFoundError:     'camNone',
+      DevicesNotFoundError: 'camNone',
+      NotReadableError:  'camBusy',
+      TrackStartError:   'camBusy'
+    };
+    Sky.toast(Sky.t(byName[e && e.name] || 'camFail'), 5000);
     return;
   }
+  $('#frame').style.display = '';
   const v = $('#video');
   v.srcObject = stream;
   v.hidden = false;
-  $('#preview').hidden = true;
   $('#frameHint').hidden = true;
   $('#shotBtn').classList.remove('hidden');
+  $('#camOffBtn').classList.remove('hidden');
   $('#camBtn').classList.add('hidden');
 }
 
+/* ВЫКЛЮЧЕНИЕ КАМЕРЫ
+
+   Код здесь был правильный и раньше: track.stop() на каждой дорожке
+   есть. Не было КНОПКИ — closeCamera вызывался только при уходе со
+   страницы и по «Переснять», которая появляется уже после снимка.
+   То есть включив камеру, выключить её было нечем, и зелёный огонёк
+   горел до закрытия вкладки.
+
+   Добавлено и обнуление srcObject: без него видеоэлемент держит
+   ссылку на остановленный поток, и в части браузеров индикатор
+   камеры гаснет не сразу. */
 function closeCamera() {
   if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-  $('#video').hidden = true;
+  const v = $('#video');
+  v.srcObject = null;
+  v.hidden = true;
   $('#shotBtn').classList.add('hidden');
+  $('#camOffBtn').classList.add('hidden');
+  $('#camBtn').classList.remove('hidden');
+  $('#frameHint').hidden = false;
+  renderThumbs(false);
 }
 
 /* ---------- сжатие ----------
-   Сжимаем в браузере, а не на сервере: снимок с телефона — это 3–6 МБ,
-   и гонять их целиком незачем. Для чтения текста хватает 1024 px по
-   длинной стороне, дальше качество подбираем под потолок размера. */
-const MAX_SIDE = 1024;
-const MAX_KB = 1200;
 
-function compress(srcImg) {
-  const scale = Math.min(1, MAX_SIDE / Math.max(srcImg.naturalWidth, srcImg.naturalHeight));
-  const c = document.createElement('canvas');
-  c.width = Math.round(srcImg.naturalWidth * scale);
-  c.height = Math.round(srcImg.naturalHeight * scale);
-  c.getContext('2d').drawImage(srcImg, 0, 0, c.width, c.height);
+   Параметры из задания: длинная сторона до 1600 px, JPEG 0.8, не
+   больше 1,5 МБ. Если на 0.8 файл тяжелее — снижаем качество, если и
+   на 0.5 не влезает — уменьшаем стороны. canvas.toBlob, а не
+   toDataURL: base64 на треть длиннее и держит копию в памяти.
 
-  for (const q of [0.82, 0.7, 0.58, 0.45, 0.35]) {
-    const url = c.toDataURL('image/jpeg', q);
-    /* длина base64 примерно на треть больше исходных байт */
-    if ((url.length - url.indexOf(',') - 1) * 0.75 <= MAX_KB * 1024) return url;
+   Поворот: снимки с телефона часто лежат «боком» и поворачиваются
+   меткой EXIF. createImageBitmap по умолчанию эту метку в части
+   браузеров игнорирует, поэтому просим учитывать её явно. */
+const MAX_SIDE = 1600;
+const MAX_BYTES = 1.5 * 1024 * 1024;
+
+async function loadBitmap(blob) {
+  if (window.createImageBitmap) {
+    try { return await createImageBitmap(blob, { imageOrientation: 'from-image' }); } catch (e) {}
   }
-  return null;
-}
-
-function showShot(dataUrl) {
-  shotDataUrl = dataUrl;
-  const p = $('#preview');
-  p.src = dataUrl;
-  p.hidden = false;
-  $('#frameHint').hidden = true;
-  $('#againBtn').classList.remove('hidden');
-  $('#checkBtn').disabled = !hasWorker;
-}
-
-function captureFromVideo() {
-  const v = $('#video');
-  const c = document.createElement('canvas');
-  const scale = Math.min(1, MAX_SIDE / Math.max(v.videoWidth, v.videoHeight));
-  c.width = Math.round(v.videoWidth * scale);
-  c.height = Math.round(v.videoHeight * scale);
-  c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
-  closeCamera();
-  showShot(c.toDataURL('image/jpeg', 0.82));
-}
-
-/* ---------- проверка ---------- */
-async function check() {
-  if (!shotDataUrl) return;
-  const t = SkyTeachers.selected();
-
-  $('#checkBtn').disabled = true;
-  $('#working').classList.remove('hidden');
-  $('#workingText').textContent = Sky.t('working1');
-  /* Второй шаг идёт на сервере сразу за первым, отдельного сигнала
-     оттуда нет — поэтому просто меняем надпись по времени, чтобы
-     ожидание не выглядело зависанием. */
-  const swap = setTimeout(() => { $('#workingText').textContent = Sky.t('working2'); }, 3500);
-
-  let data;
+  const url = URL.createObjectURL(blob);
   try {
-    const r = await fetch(AI_BASE.replace(/\/+$/, '') + '/check-photo', {
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = url;
+    await img.decode();
+    return img;
+  } finally { URL.revokeObjectURL(url); }
+}
+
+async function compress(blob) {
+  const src = await loadBitmap(blob);
+  const w = src.width || src.naturalWidth, h = src.height || src.naturalHeight;
+  let scale = Math.min(1, MAX_SIDE / Math.max(w, h));
+  try {
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(w * scale));
+      c.height = Math.max(1, Math.round(h * scale));
+      const g = c.getContext('2d');
+      /* У png бывает прозрачный фон; в JPEG он стал бы чёрным, и
+         чёрная ручка на нём пропала бы. */
+      g.fillStyle = '#fff';
+      g.fillRect(0, 0, c.width, c.height);
+      g.drawImage(src, 0, 0, c.width, c.height);
+      for (const q of [0.8, 0.7, 0.6, 0.5]) {
+        const out = await new Promise(r => c.toBlob(r, 'image/jpeg', q));
+        if (out && out.size <= MAX_BYTES) { c.width = c.height = 0; return out; }
+      }
+      c.width = c.height = 0;          /* отдать память до следующей попытки */
+      scale *= 0.8;
+    }
+  } finally {
+    if (src.close) src.close();
+  }
+  throw new Error('too_big');
+}
+
+/* ---------- список фото ---------- */
+function addPhotos(blobs) {
+  let dropped = 0;
+  for (const blob of blobs) {
+    if (photos.length >= capNow()) { dropped++; continue; }
+    photos.push({ blob, url: URL.createObjectURL(blob) });
+  }
+  renderThumbs(dropped > 0);
+}
+
+function removePhoto(i) {
+  const [p] = photos.splice(i, 1);
+  if (p) URL.revokeObjectURL(p.url);
+  renderThumbs(false);
+}
+
+function clearPhotos() {
+  photos.forEach(p => URL.revokeObjectURL(p.url));
+  photos = [];
+  renderThumbs(false);
+}
+
+function renderThumbs(overflow) {
+  const cap = capNow();
+  $('#thumbs').innerHTML = photos.map((p, i) =>
+    `<div class="thumb"><img src="${p.url}" alt=""><b>${i + 1}</b>` +
+    `<button type="button" data-rm="${i}" aria-label="${esc(Sky.t('rmPhoto'))}">×</button></div>`).join('');
+  $('#thumbsHead').classList.toggle('hidden', !photos.length);
+  $('#thumbsCount').textContent = Sky.t('thumbsCount').replace('%1', photos.length).replace('%2', cap);
+  $('#frameHint').hidden = !!stream || photos.length > 0;
+  /* Пустая рамка нужна, пока ничего не выбрано (в ней подсказка) и
+     пока идёт съёмка (в ней видео). Когда фото уже выбраны, а камера
+     выключена, она только отодвигает список вниз. Прячем через style:
+     у .shot-frame свой display, и атрибут hidden он перебивает. */
+  $('#frame').style.display = (!stream && photos.length > 0) ? 'none' : '';
+
+  /* Подсказку про потолок показываем, когда в него упёрлись: не раньше,
+     чтобы не пугать, и не молча — иначе лишние фото просто исчезнут. */
+  const full = photos.length >= cap;
+  const note = $('#capNote');
+  note.classList.toggle('hidden', !(full || overflow));
+  note.textContent = isVip() ? Sky.t('capVip') : Sky.t('capFree');
+  $('#shotBtn').disabled = full;
+  $('#fileBtn').disabled = full || busy;
+  updateCheckBtn();
+}
+
+function updateCheckBtn() {
+  $('#checkBtn').disabled = busy || !photos.length || !hasWorker;
+}
+
+/* ---------- прогресс ---------- */
+function progress(text, share) {
+  const box = $('#progress');
+  box.classList.remove('hidden');
+  $('#progressText').textContent = text;
+  const bar = box.querySelector('.progress-bar');
+  /* share === null — «ждём, сколько — неизвестно»: полоса бежит. */
+  bar.classList.toggle('indef', share === null);
+  $('#progressFill').style.width = share === null ? '' : Math.round(share * 100) + '%';
+}
+function progressDone() { $('#progress').classList.add('hidden'); }
+
+function setBusy(on) {
+  busy = on;
+  $('#camBtn').disabled = on;
+  $('#subjRow').querySelectorAll('button').forEach(b => { b.disabled = on; });
+  $('#thumbs').querySelectorAll('button').forEach(b => { b.disabled = on; });
+  $('#clearBtn').disabled = on;
+  renderThumbs(false);
+}
+
+/* ---------- что разрешено сегодня ---------- */
+async function loadUsage() {
+  usage = null;
+  try {
+    await Sky.db.ready;
+    if (Sky.db.me()) {
+      const rows = await Sky.db.rpc('homework_my_usage', { p_tz: TZ });
+      const u = Array.isArray(rows) ? rows[0] : rows;
+      if (u) usage = { vip: !!u.vip, photo_limit: u.photo_limit || FREE_PHOTOS,
+                       used_subjects: u.used_subjects || [] };
+    }
+  } catch (e) {
+    /* Не узнали — не беда: окончательно решает сервер при отправке. */
+    usage = null;
+  }
+  renderUsage();
+}
+
+function subjName(k) {
+  return Sky.t(k === 'physics' ? 'subjPhysics' : k === 'algebra' ? 'subjAlgebra' : 'subjOther');
+}
+
+function usedToday() {
+  return !!(usage && !usage.vip && usage.used_subjects.includes(subject));
+}
+
+function renderUsage() {
+  const note = $('#usedNote');
+  note.classList.toggle('hidden', !usedToday());
+  if (usedToday()) note.textContent = Sky.t('usedToday').replace('%1', subjName(subject));
+  renderThumbs(false);
+}
+
+/* ---------- окно с тарифами ----------
+
+   Открывается ДО работы, если уже известно, что бесплатная проверка
+   по этому предмету сегодня была, — чтобы ученик не выбирал пять фото
+   и не ждал их загрузки впустую. И после ответа сервера 402 — на
+   случай, если заранее узнать не удалось. */
+function openPaywall(kind) {
+  const photosCase = kind === 'photos';
+  const price = VIP_OFFER.price ? `<div class="pw-price">${esc(VIP_OFFER.price)}</div>` : '';
+  Sky.modal(`
+    <div class="pw">
+      <h2>${Sky.t(photosCase ? 'pwHeadPhotos' : 'pwHeadLimit')}</h2>
+      <p class="pw-lead">${esc(photosCase ? Sky.t('pwLeadPhotos')
+        : Sky.t('limitHit') + ' ' + Sky.t('pwNext').replace('%1', subjName(subject)))}</p>
+      <div class="pw-grid">
+        <div class="pw-card">
+          <h3>${Sky.t('pwFree')}</h3>
+          <ul><li>${Sky.t('pwFree1')}</li><li>${Sky.t('pwFree2')}</li></ul>
+        </div>
+        <div class="pw-card vip">
+          <h3>VIP</h3>
+          <ul><li>${Sky.t('pwVip1')}</li><li>${Sky.t('pwVip2')}</li></ul>
+          ${price}
+        </div>
+      </div>
+      <div class="pw-actions">
+        <button type="button" class="btn ghost" id="pwClose">${Sky.t('pwOk')}</button>
+        <button type="button" class="btn" id="pwGo">${Sky.t('pwGo')}</button>
+      </div>
+    </div>`,
+    (box, close) => {
+      box.querySelector('#pwClose').addEventListener('click', close);
+      box.querySelector('#pwGo').addEventListener('click', () => {
+        if (VIP_OFFER.url) { location.href = VIP_OFFER.url; return; }
+        /* Не притворяемся, что оплата есть. */
+        Sky.toast(Sky.t('pwSoon'), 5000);
+      });
+    });
+}
+
+/* ---------- проверка ----------
+
+   Порядок:
+   1. Если уже известно, что сегодня по предмету проверка была, —
+      сразу окно с тарифами, без работы впустую.
+   2. Фото сжимаются и загружаются в хранилище ПО ОДНОМУ, await в
+      цикле. Не Promise.all: двадцать снимков, разжатых разом, — это
+      больше гигабайта памяти, и вкладка на телефоне падает.
+   3. Worker получает пути и делает один запрос к модели на все фото.
+   4. Если загрузка оборвалась посередине — уже загруженное стираем.
+
+   Сеанс списывается на шаге 3, на сервере. Сбой на шаге 2 сеанс не
+   тратит. */
+async function check() {
+  if (!photos.length || busy) return;
+
+  const jwt = await Sky.db.token();
+  const me = Sky.db.me();
+  if (!jwt || !me) { Sky.toast(Sky.t('needLogin'), 6000); return; }
+
+  if (usedToday()) { openPaywall('limit'); return; }
+  if (photos.length > capNow()) { openPaywall('photos'); return; }
+
+  setBusy(true);
+  $('#resultSection').classList.add('hidden');
+
+  const n = photos.length;
+  const session = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const uploaded = [];
+
+  try {
+    for (let i = 0; i < n; i++) {
+      progress(Sky.t('pgUpload').replace('%1', i + 1).replace('%2', n), i / n);
+      let small;
+      try { small = await compress(photos[i].blob); }
+      catch (e) { throw new Error(Sky.t('tooBigAfter').replace('%1', i + 1)); }
+      const path = `${me.id}/${session}/${i + 1}.jpg`;
+      await Sky.db.upload('homework', path, small, 'image/jpeg');
+      uploaded.push(path);
+    }
+  } catch (e) {
+    await Sky.db.removeFiles('homework', uploaded);
+    progressDone(); setBusy(false);
+    Sky.toast(e && e.message && !/^(offline|Failed|Network)/i.test(e.message) ? e.message : Sky.t('upFail'), 6000);
+    return;
+  }
+
+  progress(Sky.t('pgCheck').replace('%1', n), null);
+
+  let r, data;
+  try {
+    r = await fetch(AI_BASE.replace(/\/+$/, '') + '/check-homework', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt },
       body: JSON.stringify({
-        lang: Sky.lang,
-        imageBase64: shotDataUrl,
-        teacher: t ? t.id : null,
-        strictness: t ? t.strictness : 3,
-        subject: 'english',
+        lang: Sky.lang, subject, tz: TZ, paths: uploaded,
         taskText: $('#taskText').value.trim().slice(0, 800)
       })
     });
     data = await r.json().catch(() => null);
-    if (!r.ok) {
-      clearTimeout(swap);
-      $('#working').classList.add('hidden');
-      $('#checkBtn').disabled = false;
-      Sky.toast((data && data.error) || ('Ошибка ' + r.status), 5000);
-      /* распознанное показываем даже при неудачной оценке: оно уже
-         стоило запроса, и ученику полезно его увидеть */
-      if (data && data.recognized_text) renderResult({ recognized_text: data.recognized_text }, true);
-      return;
-    }
   } catch (e) {
-    clearTimeout(swap);
-    $('#working').classList.add('hidden');
-    $('#checkBtn').disabled = false;
-    Sky.toast(Sky.t('aiNoNet') || 'Нет связи с сервером разбора.', 4500);
+    /* До Worker не достучались — фото он не удалит, убираем сами.
+       Если достучались и ответ потерялся, повторное удаление ничего
+       не сломает. */
+    await Sky.db.removeFiles('homework', uploaded);
+    progressDone(); setBusy(false);
+    Sky.toast(Sky.t('aiNoNet') || 'Нет связи с сервером разбора.', 5000);
     return;
   }
 
-  clearTimeout(swap);
-  $('#working').classList.add('hidden');
-  $('#checkBtn').disabled = false;
+  progressDone(); setBusy(false);
 
-  renderResult(data, false);
-  await save(data);
+  if (!r.ok) {
+    if (r.status === 402 && data && data.paywall) {
+      if (data.reason === 'limit') {
+        usage = usage || { vip: false, photo_limit: FREE_PHOTOS, used_subjects: [] };
+        if (!usage.used_subjects.includes(subject)) usage.used_subjects.push(subject);
+        renderUsage();
+      }
+      openPaywall(data.reason === 'too_many_photos' ? 'photos' : 'limit');
+      return;
+    }
+    Sky.toast((data && data.error) || ('Ошибка ' + r.status), 6000);
+    return;
+  }
+
+  renderHomeworkResult(data);
+  clearPhotos();
+  if (usage && !usage.vip && !usage.used_subjects.includes(subject)) usage.used_subjects.push(subject);
+  renderUsage();
   await renderHistory();
+}
+
+function renderHomeworkResult(data) {
+  $('#resultSection').classList.remove('hidden');
+  $('#result').innerHTML =
+    `<div class="hw-text">${esc(data.text || '').replace(/\n/g, '<br>')}</div>` +
+    (data.truncated ? `<div class="limit-note">${esc(Sky.t('truncated'))}</div>` : '') +
+    (data.quota && !data.quota.vip
+      ? `<div class="hw-left">${esc(Sky.t('nextFree').replace('%1', subjName(data.subject || subject)))}</div>` : '');
+  $('#resultSection').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 /* ---------- сохранение ---------- */
@@ -449,35 +842,107 @@ async function renderHistory() {
 
 /* ---------- события ---------- */
 $('#camBtn').addEventListener('click', openCamera);
-$('#shotBtn').addEventListener('click', captureFromVideo);
+$('#camOffBtn').addEventListener('click', closeCamera);
+/* Снимок с камеры добавляется в список, камера остаётся включённой:
+   задач обычно несколько, и выключать-включать её на каждую незачем.
+   Сжимается снимок, как и файлы, только при отправке. */
+$('#shotBtn').addEventListener('click', () => {
+  const v = $('#video');
+  if (!v.videoWidth || photos.length >= capNow()) return;
+  const c = document.createElement('canvas');
+  c.width = v.videoWidth; c.height = v.videoHeight;
+  c.getContext('2d').drawImage(v, 0, 0);
+  c.toBlob(b => { c.width = c.height = 0; if (b) addPhotos([b]); }, 'image/jpeg', 0.92);
+});
 $('#fileBtn').addEventListener('click', () => $('#fileIn').click());
-$('#againBtn').addEventListener('click', () => {
-  shotDataUrl = null;
-  $('#preview').hidden = true;
-  $('#frameHint').hidden = false;
-  $('#againBtn').classList.add('hidden');
-  $('#camBtn').classList.remove('hidden');
-  $('#checkBtn').disabled = true;
-  $('#resultSection').classList.add('hidden');
+$('#clearBtn').addEventListener('click', clearPhotos);
+$('#thumbs').addEventListener('click', e => {
+  const b = e.target.closest('[data-rm]');
+  if (b && !busy) removePhoto(Number(b.dataset.rm));
 });
 
+/* Проверяем тип и размер ДО чтения файлов.
+
+   accept на input — подсказка диалогу, а не защита: файл можно
+   перетащить или выбрать «все файлы». heic с айфона без этой проверки
+   доходил до canvas, тот отдавал пустой кадр, и ученик видел белый
+   прямоугольник вместо ошибки.
+
+   ПОТОЛОК НА ВХОДЕ ПОДНЯТ С 5 ДО 20 МБ. 5 МБ задавались, когда фото
+   уходило почти как есть. Теперь оно в любом случае сжимается до
+   1,5 МБ, а обычный снимок телефона — 3–12 МБ: старый потолок отсекал
+   бы как раз тех, кто снимает на хорошую камеру. 20 МБ оставлены,
+   чтобы не пытаться разжимать в памяти заведомо огромное. */
+const OK_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_INPUT_MB = 20;
+
 $('#fileIn').addEventListener('change', e => {
-  const f = e.target.files && e.target.files[0];
-  if (!f) return;
-  closeCamera();
-  const img = new Image();
-  img.onload = () => {
-    const small = compress(img);
-    if (!small) { Sky.toast(Sky.t('tooBig'), 5000); return; }
-    showShot(small);
-    URL.revokeObjectURL(img.src);
-  };
-  img.src = URL.createObjectURL(f);
+  const files = Array.from(e.target.files || []);
+  /* Сбрасываем значение сразу: иначе повторный выбор того же файла
+     не вызовет change, и кнопка будет выглядеть сломанной. */
+  e.target.value = '';
+  if (!files.length) return;
+
+  const good = [];
+  let badType = 0, tooHeavy = 0;
+  for (const f of files) {
+    if (!OK_TYPES.includes(f.type)) { badType++; continue; }
+    if (f.size > MAX_INPUT_MB * 1024 * 1024) { tooHeavy++; continue; }
+    good.push(f);
+  }
+  if (badType) Sky.toast(Sky.t('badType'), 5000);
+  else if (tooHeavy) Sky.toast(Sky.t('tooHeavy'), 5000);
+  if (good.length) addPhotos(good);
 });
+
+/* ---------- предмет ---------- */
+let subject = Sky.get('hwSubject', 'physics');
+
+function renderSubjects() {
+  document.querySelectorAll('.subj-btn').forEach(b => {
+    const id = b.dataset.subject;
+    b.textContent = Sky.t(id === 'physics' ? 'subjPhysics' : id === 'algebra' ? 'subjAlgebra' : 'subjOther');
+    b.classList.toggle('active', id === subject);
+  });
+}
+
+$('#subjRow').addEventListener('click', e => {
+  const b = e.target.closest('.subj-btn');
+  if (!b) return;
+  subject = b.dataset.subject;
+  Sky.set('hwSubject', subject);   /* помним выбор: обычно ученик носит одну и ту же домашку */
+  renderSubjects();
+  renderUsage();
+});
+
+/* ---------- задание по ссылке от учителя ----------
+
+   Ссылка вида photo.html?task=<uuid>. Открыть её можно без входа:
+   задание показывается сразу. Вход понадобится только на отправку —
+   там персональный лимит, и без имени его не посчитать. */
+async function loadTeacherTask() {
+  const id = new URLSearchParams(location.search).get('task');
+  if (!id) return;
+  try {
+    await Sky.db.ready;
+    const rows = await Sky.db.rpc('homework_task_get', { p_id: id });
+    const t = Array.isArray(rows) ? rows[0] : rows;
+    if (!t) { Sky.toast(Sky.t('taskGone'), 6000); return; }
+    $('#tftText').textContent = t.task_text;
+    $('#teacherTask').classList.remove('hidden');
+    $('#taskText').value = t.task_text.slice(0, 800);
+    if (t.subject && ['physics', 'algebra', 'other'].includes(t.subject)) {
+      subject = t.subject; renderSubjects(); renderUsage();
+    }
+  } catch (e) {
+    Sky.toast(Sky.t('taskGone'), 6000);
+  }
+}
 
 $('#checkBtn').addEventListener('click', check);
 document.addEventListener('teacherchange', renderTeacher);
-document.addEventListener('langchange', () => { renderTeacher(); renderHistory(); });
+document.addEventListener('langchange', () => { renderTeacher(); renderSubjects(); renderUsage(); renderHistory(); });
+document.addEventListener('authchange', loadUsage);
 window.addEventListener('pagehide', closeCamera);
 
 /* ---------- запуск ---------- */
@@ -486,7 +951,7 @@ window.addEventListener('pagehide', closeCamera);
   $('#camBtn').textContent = Sky.t('camBtn');
   $('#fileBtn').textContent = Sky.t('fileBtn');
   $('#shotBtn').textContent = Sky.t('shotBtn');
-  $('#againBtn').textContent = Sky.t('againBtn');
+  $('#clearBtn').textContent = Sky.t('clearBtn');
   $('#frameHint').textContent = Sky.t('frameHint');
 
   if (!hasWorker) {
@@ -495,7 +960,11 @@ window.addEventListener('pagehide', closeCamera);
     n.classList.remove('hidden');
     $('#checkBtn').disabled = true;
   }
+  renderSubjects();
+  renderThumbs(false);
   renderHistory();
+  loadTeacherTask();
+  loadUsage();
 })();
 </script>
 </body>

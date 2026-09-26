@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<title>SkyySchool</title>
+<!-- ПЕРЕХОД, А НЕ ВТОРАЯ КОПИЯ СТРАНИЦЫ
+
+     В задании ссылка описана как /homework/check?task=<id>. Сайт —
+     статический на GitHub Pages, маршрутизации на сервере нет, и
+     такой адрес сам по себе ничего не откроет. Вариантов было два:
+     объяснить, что адрес будет другим, или сделать этот адрес
+     рабочим. Сделал рабочим — так ссылки из задания не придётся
+     переписывать.
+
+     Здесь только перенаправление: разбор живёт в одном месте, в
+     photo.html. Вторая копия страницы разошлась бы с первой на
+     первой же правке. -->
+<script>
+  var id = new URLSearchParams(location.search).get('task') || '';
+  location.replace('../../photo.html' + (id ? '?task=' + encodeURIComponent(id) : ''));
+</script>
+<meta http-equiv="refresh" content="0; url=../../photo.html">
+</head>
+<body></body>
+</html>
