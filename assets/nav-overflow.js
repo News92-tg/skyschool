@@ -117,16 +117,23 @@
         color:var(--accent);
         background:var(--m-learn-soft);
       }
+      /* Шеврон рисуем рамкой, а не символом «⌄»: у символа своя
+         базовая линия в каждом шрифте, и он висел ниже текста. */
       #mainMenu .nav-caret{
         display:inline-block;
-        font-size:11px;
-        line-height:1;
-        transform:translateY(-1px);
+        width:6px;height:6px;
+        margin:0 1px 0 2px;
+        font-size:0;
+        border-right:1.8px solid currentColor;
+        border-bottom:1.8px solid currentColor;
+        border-radius:0 0 1.5px 0;
+        opacity:.75;
+        transform:translateY(-2px) rotate(45deg);
         transition:transform .16s;
       }
       #mainMenu .nav-group.is-open .nav-caret,
       #mainMenu .nav-overflow.is-open .nav-caret{
-        transform:rotate(180deg) translateY(1px);
+        transform:translateY(1px) rotate(225deg);
       }
       #mainMenu .nav-group-menu,
       #mainMenu .nav-overflow-menu{
