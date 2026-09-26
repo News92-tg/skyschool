@@ -237,11 +237,17 @@ function generate(st, opts) {
   if (only < 0 || only === kingSq) {
     const kSide = (us === WHITE) ? CW_K : CB_K;
     const qSide = (us === WHITE) ? CW_Q : CB_Q;
-    if ((st.castling & kSide) && !b[kingSq + 1] && !b[kingSq + 2] &&
+    /* права из FEN могут врать: король должен стоять на e1/e8,
+       а в углу — своя ладья, иначе рокироваться не с чем */
+    const home = (us === WHITE) ? 4 : 0x74;
+    const rook = ROOK | us;
+    const canK = kingSq === home && b[kingSq + 3] === rook;
+    const canQ = kingSq === home && b[kingSq - 4] === rook;
+    if (canK && (st.castling & kSide) && !b[kingSq + 1] && !b[kingSq + 2] &&
         !attacked(st, kingSq, them) && !attacked(st, kingSq + 1, them) && !attacked(st, kingSq + 2, them)) {
       out.push(mk(st, kingSq, kingSq + 2, 'k', 0));
     }
-    if ((st.castling & qSide) && !b[kingSq - 1] && !b[kingSq - 2] && !b[kingSq - 3] &&
+    if (canQ && (st.castling & qSide) && !b[kingSq - 1] && !b[kingSq - 2] && !b[kingSq - 3] &&
         !attacked(st, kingSq, them) && !attacked(st, kingSq - 1, them) && !attacked(st, kingSq - 2, them)) {
       out.push(mk(st, kingSq, kingSq - 2, 'q', 0));
     }

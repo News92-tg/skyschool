@@ -57,7 +57,8 @@ const START = E.START_FEN;
   assert(legal(fen, 'e1c1'));
   assert(illegal('4k3/8/8/8/8/8/8/R3K3 w KQ - 0 1', 'e1g1'));
   assert(illegal('4k3/8/8/8/8/8/8/4K2R w KQ - 0 1', 'e1c1'));
-  assert(illegal('4k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1', 'e1g1'));
+  assert(illegal('4kr2/8/8/8/8/8/8/R3K2R w KQ - 0 1', 'e1g1'));   // f1 под боем ладьи f8
+  assert(legal('4k2r/8/8/8/8/8/8/R3K2R w KQk - 0 1', 'e1g1'));    // ладья h8 упирается в h1 и транзит не бьёт
 }
 
 // 5. King safety / pinned piece.
@@ -73,11 +74,12 @@ assert(illegal('4r1k1/8/8/8/8/8/4R3/4K3 w - - 0 1', 'e2f2'));
 
 // 7. Dead-position material accuracy.
 {
-  const same = E.create('7k/1B6/8/8/8/8/1B6/4K3 w - - 0 1');
+  const same = E.create('7k/1B6/8/8/8/8/2B5/4K3 w - - 0 1');       // b7 и c2 — оба светлопольные
   assert.strictEqual(E.status(same), 'material');
-  const opposite = E.create('7k/1B6/8/8/8/8/2B5/4K3 w - - 0 1');
+  const opposite = E.create('7k/1B6/8/8/8/8/1B6/4K3 w - - 0 1');   // b7 светлое, b2 тёмное
   assert.notStrictEqual(E.status(opposite), 'material');
-  assert.notStrictEqual(E.status(E.create('7k/8/8/8/8/8/1N6/4K3 w - - 0 1')), 'material');
+  assert.strictEqual(E.status(E.create('7k/8/8/8/8/8/1N6/4K3 w - - 0 1')), 'material');     // конём мат не поставить
+  assert.notStrictEqual(E.status(E.create('7k/8/8/8/8/8/1R6/4K3 w - - 0 1')), 'material');  // ладьёй — можно
 }
 
 // 8. Threefold repetition must survive make/unmake/search probes correctly.
@@ -110,8 +112,12 @@ assert(illegal('4r1k1/8/8/8/8/8/4R3/4K3 w - - 0 1', 'e2f2'));
 
 // 10. Every stored puzzle solution resolves legally.
 {
+  /* data/chess-puzzles.js — загрузчик через document.write, поэтому
+     читаем те же файлы с задачами напрямую и в том же порядке */
   const sandbox = { window: {}, console };
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'data/chess-puzzles.js'), 'utf8'), sandbox);
+  for (const file of ['data/chess-puzzles-base.js', 'data/chess-puzzles-batch01.js', 'data/chess-puzzles-batch02.js']) {
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), sandbox, { filename: file });
+  }
   const puzzles = sandbox.window.CHESS_PUZZLES;
   assert(Array.isArray(puzzles) && puzzles.length);
   for (const puzzle of puzzles) {

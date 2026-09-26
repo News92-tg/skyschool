@@ -1,4 +1,4 @@
-/* SkyySchool — 220 additional tactical puzzles. Total catalog: 320+ tasks. */
+/* SkyySchool — 197 additional tactical puzzles, generated from base positions by symmetry. */
 (function(){
   window.CHESS_PUZZLES = window.CHESS_PUZZLES || [];
   const F='abcdefgh';
@@ -55,6 +55,12 @@
     if(counts[b[0]]>=targets[b[0]])continue;
     for(let i=0;i<8 && counts[b[0]]<targets[b[0]];i++) for(const sw of [false,true]){
       if(counts[b[0]]>=targets[b[0]]) break;
+      /* пешка ходит только вперёд: поворот на 90° отправил бы её вбок,
+         и решение стало бы невозможным ходом. Для позиций с пешками
+         годятся только отражение по вертикали (и его пара со сменой цвета).
+         seq всё равно растёт, чтобы номера остальных задач не сдвинулись. */
+      const hasPawn=Object.keys(b[2]).some(s=>b[2][s].toUpperCase()==='P');
+      if(hasPawn && !(sw ? (i===2||i===6) : (i===0||i===4))){seq++;continue;}
       const board=transformBoard(b[2],i,sw);
       const turn=sw?'b':'w';
       const from=transformSquare(b[3],i), to=transformSquare(b[4].split('=')[0],i)+(b[4].includes('=')?'='+b[4].split('=')[1]:'');
