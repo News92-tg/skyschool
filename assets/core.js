@@ -43,6 +43,7 @@ window.Sky = (function () {
     navHome:{ru:'Обзор',en:'Overview'},
     navLearn:{ru:'Тренажёр',en:'Trainer'},
     navTest:{ru:'Тест',en:'Test'},
+    navRuEn:{ru:'Русский для англоговорящих',en:'Russian for English speakers'},
     navExam:{ru:'Пробник',en:'Mock exam'},
     navEssay:{ru:'Сочинение',en:'Essay'},
     navParent:{ru:'Родителям',en:'For parents'},
@@ -224,6 +225,7 @@ window.Sky = (function () {
     { href:'plan.html',         key:'navPlan',      group:'plan' },
     { href:'photo.html',        key:'navPhoto',     group:'study' },
     { href:'essay.html',        key:'navEssay',     group:'study' },
+    { href:'russian-for-en.html', key:'navRuEn',    group:'study' },
     { href:'parent.html',       key:'navParent',    group:'parents' },
     { href:'tools.html',        key:'navTools',     group:'plan' }
   ];
@@ -331,7 +333,26 @@ window.Sky = (function () {
 
     /* nav-overflow подключается после того, как шапка уже отрисована. */
     ensureNavOverflow();
+    addSkipLink();
     document.dispatchEvent(new CustomEvent('headerready'));
+  }
+
+  /* ---------- перемычка к содержимому ----------
+     В меню почти двадцать пунктов. Без этой ссылки человек, который
+     ходит по сайту с клавиатуры, проходит их все на КАЖДОЙ странице,
+     прежде чем добраться до первой кнопки. Видна только при фокусе. */
+  function addSkipLink() {
+    const main = document.querySelector('main');
+    if (!main) return;
+    if (!main.id) main.id = 'main';
+    let a = document.querySelector('.skip-link');
+    if (!a) {
+      a = document.createElement('a');
+      a.className = 'skip-link';
+      document.body.insertBefore(a, document.body.firstChild);
+    }
+    a.href = '#' + main.id;
+    a.textContent = lang === 'ru' ? 'К содержимому' : 'Skip to content';
   }
 
 

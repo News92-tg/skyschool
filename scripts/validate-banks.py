@@ -69,6 +69,19 @@ def _skip_string(s, i):
     return n  # незакрытая строка — файл битый, но не зацикливаемся
 
 
+def _skip_comment(s, i):
+    """Если в s[i] начинается JS-комментарий, возвращает индекс сразу
+    после него, иначе None. Без этого фигурные скобки из пояснений
+    вида «audio — { text, lang }» разбирались как ещё одно задание."""
+    if s.startswith('/*', i):
+        end = s.find('*/', i + 2)
+        return len(s) if end < 0 else end + 2
+    if s.startswith('//', i):
+        end = s.find('\n', i + 2)
+        return len(s) if end < 0 else end + 1
+    return None
+
+
 def _find_matching_brace(s, open_idx, open_ch, close_ch):
     """s[open_idx] — открывающая скобка. Возвращает индекс СРАЗУ ПОСЛЕ
     парной закрывающей, пропуская содержимое строк (кавычки), чтобы
@@ -80,6 +93,10 @@ def _find_matching_brace(s, open_idx, open_ch, close_ch):
         c = s[i]
         if c in ("'", '"'):
             i = _skip_string(s, i)
+            continue
+        after = _skip_comment(s, i)
+        if after is not None:
+            i = after
             continue
         if c == open_ch:
             depth += 1
@@ -100,6 +117,10 @@ def _extract_top_level_objects(s):
         c = s[i]
         if c in ("'", '"'):
             i = _skip_string(s, i)
+            continue
+        after = _skip_comment(s, i)
+        if after is not None:
+            i = after
             continue
         if c == '{':
             end = _find_matching_brace(s, i, '{', '}')

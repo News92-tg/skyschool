@@ -1291,4 +1291,12 @@ h3{font-size:16px;font-weight:800}
 @media (max-width:560px){
   .streak-badge{padding:5px 9px 5px 8px;font-size:12px;margin-right:5px}
 }
- 
+
+/* ---------- «К содержимому» для тех, кто ходит с клавиатуры ---------- */
+.skip-link{
+  position:absolute;left:12px;top:-60px;z-index:100;
+  padding:10px 16px;border-radius:0 0 12px 12px;
+  background:var(--accent);color:var(--accent-ink);
+  font-weight:800;font-size:13px;transition:top .15s;
+}
+.skip-link:focus{top:0}

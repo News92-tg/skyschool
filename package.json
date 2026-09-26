@@ -1,0 +1,13 @@
+{
+  "name": "skyschool",
+  "private": true,
+  "description": "Статический сайт: сборки нет, зависимости нужны только тестам.",
+  "scripts": {
+    "test": "npm run test:fast && npm run test:browser",
+    "test:fast": "node scripts/test-chess-engine.js && node scripts/test-chess-platform.js && node scripts/test-language-banks.js && node scripts/test-offline.js",
+    "test:browser": "node scripts/test-pages.js && node scripts/test-insights.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.55.0"
+  }
+}

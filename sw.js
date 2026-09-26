@@ -7,7 +7,7 @@
 */
 'use strict';
  
-const CACHE_VERSION = 'sky-v3';
+const CACHE_VERSION = 'sky-v4';
 const STATIC_CACHE = CACHE_VERSION + '-static';
  
 const PRECACHE_URLS = [
@@ -22,7 +22,13 @@ const PRECACHE_URLS = [
   'assets/icon-192.png','assets/icon-512.png','assets/apple-touch-icon.png',
   'data/bank-math.js','data/bank-informatics.js','data/bank-russian.js','data/bank-physics.js','data/bank-biology.js','data/bank-chemistry.js',
   'data/bank-geography.js','data/bank-social.js','data/bank-history.js','data/bank-english.js','data/bank-polish.js','data/bank-spanish.js','data/bank-german.js',
-  'data/bank-kids.js','data/chess-lessons.js','data/chess-puzzles.js'
+  'data/bank-kids.js','data/chess-lessons.js','data/chess-puzzles.js',
+  /* всё, что подключают страницы ниже; полноту списка проверяет
+     scripts/test-offline.js — новая страница без записи здесь его уронит */
+  'test.html','trackers.html','body.html','psychologist.html','classroom.html','headteacher.html','pe.html','russian-for-en.html',
+  'assets/nav-overflow.js','assets/ai-fallback.js','assets/roles.js','assets/trackers.js','assets/insights.js',
+  'assets/body.js','assets/psychologist.js','assets/chess-progress.js','assets/speech.js',
+  'assets/russian-en.js','assets/russian-en.css','data/bank-russian-en.js','data/iq-test.js','data/oge-bank.js'
 ];
  
 self.addEventListener('install',event=>{
