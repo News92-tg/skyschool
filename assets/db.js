@@ -28,7 +28,7 @@ Sky.db = (function () {
  
   const TABLES = ['profiles','links','homework','submissions','messages','chess_tasks','chess_games',
                   'teachers_ai','teacher_reviews','photo_checks','chess_sessions','task_attempts','chess_custom_tasks',
-                  'family_links','essay_checks'];
+                  'family_links','essay_checks','teacher_tasks','homework_checks'];
  
   function loadScript(src) {
     return new Promise((resolve, reject) => {
@@ -200,6 +200,49 @@ Sky.db = (function () {
   }
  
   const me = () => profile;
+  /* Токен текущей сессии. Нужен, чтобы Worker мог доказать Supabase,
+     кто именно прислал запрос: лимиты на разбор домашки персональные,
+     а идентификатор из тела запроса доверять нельзя — его подделает
+     кто угодно. Возвращает null, если вход не выполнен или работаем
+     в локальном режиме без облака. */
+  /* Вызов функции в базе. Нужен там, где таблицу читать нельзя, а
+     одну строку по точному идентификатору — можно: например задание
+     учителя по ссылке. Прав на саму таблицу у клиента нет, доступ
+     открыт только через такие функции. */
+  async function rpc(fn, args) {
+    if (!sb) return null;
+    const { data, error } = await sb.rpc(fn, args || {});
+    if (error) throw error;
+    return data;
+  }
+
+  /* Файлы в хранилище Supabase. Нужны для разбора домашки: фото
+     кладутся в бакет по одному, а Worker получает только пути.
+     Отправлять картинки прямо в Worker нельзя — на бесплатном тарифе
+     Cloudflare ему не хватает процессора разобрать такой запрос. */
+  async function upload(bucket, path, blob, contentType) {
+    if (!sb) throw new Error('offline');
+    const { error } = await sb.storage.from(bucket).upload(path, blob, {
+      contentType: contentType || blob.type || 'application/octet-stream',
+      upsert: false
+    });
+    if (error) throw error;
+    return path;
+  }
+
+  async function removeFiles(bucket, paths) {
+    if (!sb || !paths || !paths.length) return;
+    try { await sb.storage.from(bucket).remove(paths); } catch (e) { /* уборка не критична */ }
+  }
+
+  async function token() {
+    if (!sb) return null;
+    try {
+      const { data } = await sb.auth.getSession();
+      return (data && data.session && data.session.access_token) || null;
+    } catch (e) { return null; }
+  }
+
   const isTeacher = () => !!profile && profile.role === 'teacher';
   const isStudent = () => !!profile && profile.role === 'student';
  
@@ -241,7 +284,7 @@ Sky.db = (function () {
     isCloud: () => mode === 'cloud',
     list, insert, update, remove, subscribe,
     signUp, signIn, signInGoogle, signOut, becomeLocal,
-    me, isTeacher, isStudent,
+    me, isTeacher, isStudent, token, rpc, upload, removeFiles,
     allProfiles: () => list('profiles'),
     uid
   };
