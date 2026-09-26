@@ -268,8 +268,8 @@ Sky.init({
   meditLead:{ru:'Короткие записи с паузами. Голос читает браузер — наушники не нужны, но с ними спокойнее.',
              en:'Short scripts with pauses. Your browser reads them aloud — headphones are not required but make it calmer.'},
   minsN:{ru:'%1 мин',en:'%1 min'},
-  speechOn:{ru:'Голос доступен. Если он молчит — проверь, не выключен ли звук.',
-            en:'Voice is available. If it stays silent, check that your sound is on.'},
+  speechOn:{ru:'Включён спокойный естественный голос. Если он молчит — проверь звук браузера.',
+            en:'A calm natural voice is enabled. If it stays silent, check your browser sound.'},
   speechOff:{ru:'Этот браузер не умеет читать вслух — медитации будут показаны текстом, по фразе за раз. Так тоже работает.',
              en:'This browser cannot read aloud — meditations will be shown as text, one line at a time. That works too.'},
   meditDone:{ru:'Конец. Не спеши вставать.',en:'The end. Do not rush to get up.'},
@@ -789,19 +789,82 @@ function runMeditation(m) {
     }
   );
 
-  /* Обязательно глушим синтез при закрытии: иначе браузер
-     продолжит читать вслух уже закрытую медитацию — в наушниках это
-     выглядит как «сайт говорит сам с собой». */
+  /* Для медитации выбираем наиболее естественный доступный голос:
+     предпочитаем online/natural/neural/Google варианты, а технические
+     системные голоса ставим ниже. Это делает озвучку мягче и естественнее
+     на устройствах, где доступны качественные голоса. */
+  function pickCalmVoice() {
+    if (!canSpeak) return null;
+    const voices = window.speechSynthesis.getVoices() || [];
+    if (!voices.length) return null;
+
+    const want = Sky.lang === 'en' ? 'en' : 'ru';
+    const filtered = voices.filter(v => (v.lang || '').toLowerCase().startsWith(want));
+    if (!filtered.length) return null;
+
+    const preferred = Sky.lang === 'en'
+      ? ['natural', 'online', 'neural', 'google', 'samantha', 'aria', 'jenny', 'ava', 'sara']
+      : ['natural', 'online', 'neural', 'google', 'svetlana', 'daria', 'irina', 'milena', 'polina', 'elena'];
+
+    const avoid = ['espeak', 'festival', 'robot', 'compact', 'synthetic'];
+
+    let best = filtered[0];
+    let bestScore = -Infinity;
+
+    filtered.forEach(v => {
+      const name = (v.name || '').toLowerCase();
+      const lang = (v.lang || '').toLowerCase();
+      let score = 0;
+
+      if (lang === (Sky.lang === 'en' ? 'en-us' : 'ru-ru')) score += 20;
+      if (v.localService === false) score += 8;
+      preferred.forEach((word, i) => {
+        if (name.includes(word)) score += 18 - Math.min(i, 8);
+      });
+      avoid.forEach(word => {
+        if (name.includes(word)) score -= 40;
+      });
+
+      if (score > bestScore) {
+        bestScore = score;
+        best = v;
+      }
+    });
+
+    return best;
+  }
+
   function stop() {
     stopped = true;
     clearTimeout(timer);
     try { if (canSpeak) window.speechSynthesis.cancel(); } catch (e) {}
   }
 
+  function speak(text) {
+    if (!canSpeak || !text) return;
+    try {
+      const synth = window.speechSynthesis;
+      synth.cancel();
+
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = Sky.lang === 'en' ? 'en-US' : 'ru-RU';
+      u.rate = 0.78;
+      u.pitch = 1.06;
+      u.volume = 0.82;
+
+      const voice = pickCalmVoice();
+      if (voice) u.voice = voice;
+
+      synth.speak(u);
+    } catch (e) {
+      /* Текст на экране всё равно остаётся доступен. */
+    }
+  }
+
   function step() {
     if (stopped) return;
     const lineEl = document.getElementById('mLine');
-    if (!lineEl) { stop(); return; }   /* окно закрыли */
+    if (!lineEl) { stop(); return; }
 
     if (idx >= m.script.length) {
       lineEl.textContent = Sky.t('meditDone');
@@ -817,22 +880,7 @@ function runMeditation(m) {
     const prog = document.getElementById('mProg');
     if (prog) prog.querySelectorAll('i').forEach((el, i) => el.classList.toggle('on', i <= idx));
 
-    if (canSpeak) {
-      try {
-        const u = new SpeechSynthesisUtterance(text);
-        u.lang = Sky.lang === 'en' ? 'en-US' : 'ru-RU';
-        u.rate = 0.85;   /* медленнее обычного — это медитация, а не новости */
-        u.pitch = 1;
-        /* Голос выбираем по языку, если он есть. Если подходящего
-           голоса нет, браузер прочитает голосом по умолчанию — это
-           хуже, но лучше тишины. */
-        const voices = window.speechSynthesis.getVoices() || [];
-        const want = Sky.lang === 'en' ? 'en' : 'ru';
-        const v = voices.find(x => (x.lang || '').toLowerCase().startsWith(want));
-        if (v) u.voice = v;
-        window.speechSynthesis.speak(u);
-      } catch (e) { /* не мешаем упражнению: текст на экране уже есть */ }
-    }
+    speak(text);
 
     idx++;
     timer = setTimeout(step, pause);
