@@ -1,0 +1,919 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Russian for English speakers — SkyySchool</title>
+<meta name="theme-color" content="#f6faff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon-512.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/sky.css">
+<link rel="stylesheet" href="assets/russian-en.css">
+</head>
+<body>
+<header id="appHeader"></header>
+
+<main class="wrap">
+  <h1 data-i18n="h1"></h1>
+  <p class="lead" data-i18n="lead"></p>
+
+  <!-- Русскоязычному посетителю объясняем, почему страница английская.
+       Это зеркало заметки ruOnlyNote в тренажёре: там русские задания
+       под английским интерфейсом, здесь наоборот. -->
+  <p class="note ren-lang-note hidden" id="langNote"></p>
+
+  <!-- Предупреждение о голосе: без русского голоса озвучка врёт. -->
+  <p class="note hidden" id="voiceNote" style="border-left-color:var(--warn)"></p>
+
+  <div class="seg section" id="renSeg" role="tablist">
+    <button data-tab="alpha"    aria-pressed="true"  data-i18n="tabAlpha"></button>
+    <button data-tab="lessons"  aria-pressed="false" data-i18n="tabLessons"></button>
+    <button data-tab="dialogue" aria-pressed="false" data-i18n="tabDialogue"></button>
+    <button data-tab="practice" aria-pressed="false" data-i18n="tabPractice"></button>
+  </div>
+
+  <!-- ==================== АЛФАВИТ ==================== -->
+  <section id="tabAlpha">
+    <div class="panel section">
+      <h2 data-i18n="alphaTitle"></h2>
+      <p class="note" data-i18n="alphaLead"></p>
+      <div class="ren-alpha" id="alphaGrid"></div>
+    </div>
+
+    <div class="panel section">
+      <h2 data-i18n="tlTitle"></h2>
+      <p class="note" data-i18n="tlLead"></p>
+      <div class="ren-tool">
+        <div class="field">
+          <label data-i18n="tlInput"></label>
+          <input id="tlIn" type="text" autocomplete="off" spellcheck="false" data-i18n-ph="tlPh">
+        </div>
+        <button class="btn ghost" id="tlSpeak" data-i18n="listen"></button>
+      </div>
+      <div class="ren-out" id="tlOut" data-empty="…"></div>
+    </div>
+  </section>
+
+  <!-- ==================== УРОКИ ==================== -->
+  <section id="tabLessons" class="hidden">
+    <div class="panel section">
+      <div class="row">
+        <div class="field">
+          <label data-i18n="lessonPick"></label>
+          <select id="lessonSel"></select>
+        </div>
+      </div>
+      <p class="note" id="lessonIntro"></p>
+      <div id="lessonPhrases"></div>
+    </div>
+  </section>
+
+  <!-- ==================== ДИАЛОГ ==================== -->
+  <section id="tabDialogue" class="hidden">
+    <div class="panel section">
+      <h2 id="dlgTitle"></h2>
+      <p class="note" id="dlgIntro"></p>
+      <div class="spread section">
+        <button class="btn ghost small" id="dlgPlay" data-i18n="playAll"></button>
+        <button class="btn ghost small" id="dlgStop" data-i18n="stopAudio"></button>
+      </div>
+      <div id="dlgLines"></div>
+    </div>
+  </section>
+
+  <!-- ==================== ПРАКТИКА ==================== -->
+  <section id="tabPractice" class="hidden">
+
+    <div class="panel section" id="prSetup">
+      <h2 data-i18n="prTitle"></h2>
+      <div class="row">
+        <div class="field">
+          <label data-i18n="prLesson"></label>
+          <select id="prLesson"></select>
+        </div>
+      </div>
+      <label class="ren-label section" data-i18n="prKinds"></label>
+      <div class="ren-kinds" id="prKinds"></div>
+      <p class="note" id="prKindNote"></p>
+      <button class="btn full big" id="prStart" style="margin-top:16px" data-i18n="prStart"></button>
+    </div>
+
+    <div class="panel hidden" id="prQuiz">
+      <div class="meta">
+        <span class="tag ren-type" id="prKind"></span>
+        <span class="tag gray" id="prCount"></span>
+      </div>
+      <div class="ren-dots" id="prDots"></div>
+
+      <div class="ren-prompt" id="prPrompt"></div>
+      <div class="ren-sub" id="prSub"></div>
+
+      <div class="options hidden" id="prOptions"></div>
+
+      <div class="hidden" id="prWriteBox">
+        <input class="ren-write" id="prWrite" type="text" autocomplete="off"
+               autocapitalize="off" spellcheck="false" lang="ru">
+        <div class="ren-kb" id="prKb"></div>
+      </div>
+
+      <div class="hidden" id="prSayBox" style="text-align:center;margin-top:8px">
+        <button class="btn" id="prMic" data-i18n="micStart"></button>
+      </div>
+
+      <div class="ren-match hidden" id="prMatch">
+        <div class="ren-col" id="prMatchRu"></div>
+        <div class="ren-col" id="prMatchEn"></div>
+      </div>
+
+      <div class="ren-heard hidden" id="prHeard"></div>
+      <div class="verdict hidden" id="prVerdict"></div>
+      <div class="solution hidden" id="prSolution"></div>
+
+      <div class="actions">
+        <button class="btn ghost hidden" id="prHint" data-i18n="showHint"></button>
+        <button class="btn hidden" id="prCheck" data-i18n="check"></button>
+        <button class="btn hidden" id="prNext" data-i18n="next"></button>
+        <button class="btn ghost" id="prStop" data-i18n="finish"></button>
+      </div>
+    </div>
+
+    <div class="stats section">
+      <div class="stat accent"><b id="stDone">0</b><span data-i18n="stDoneL"></span></div>
+      <div class="stat ok"><b id="stRight">0</b><span data-i18n="stRightL"></span></div>
+      <div class="stat"><b id="stAcc">0%</b><span data-i18n="stAccL"></span></div>
+    </div>
+  </section>
+
+</main>
+
+<footer id="appFooter"></footer>
+
+<script src="assets/config.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/db.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/speech.js"></script>
+<script src="data/bank-russian-en.js"></script>
+<script src="assets/russian-en.js"></script>
+<script>
+'use strict';
+
+/* Словарь страницы. Подписи интерфейса двуязычные — русский учитель
+   тоже должен понимать, что открыл. А учебные тексты (значения слов,
+   пояснения, подсказки) только английские: это материал курса, и
+   «переводить» его на русский значит убрать сам предмет изучения. */
+Sky.init({
+  h1:{ru:'Русский для англоговорящих',en:'Russian for English speakers'},
+  lead:{ru:'Курс от «Привет» до «Как дела? Что делаешь?»: алфавит, транслитерация, чтение, письмо и произношение.',
+        en:'From “Привет” to “Как дела? Что делаешь?” — the alphabet, transliteration, reading, writing and speaking.'},
+
+  langNote:{ru:'Эта страница — курс для англоговорящих, поэтому учебные тексты на ней английские: значения слов, пояснения и подсказки объясняют русский язык человеку, который его не знает. Перевести их на русский значило бы убрать сам предмет. Подписи интерфейса переключаются как везде.',
+            en:''},
+
+  tabAlpha:{ru:'Алфавит',en:'Alphabet'},
+  tabLessons:{ru:'Уроки',en:'Lessons'},
+  tabDialogue:{ru:'Диалог',en:'Dialogue'},
+  tabPractice:{ru:'Практика',en:'Practice'},
+
+  /* ---------- алфавит ---------- */
+  alphaTitle:{ru:'Алфавит',en:'The alphabet'},
+  alphaLead:{ru:'Оранжевым отмечены буквы-ловушки: они выглядят как латинские, но читаются иначе.',
+             en:'The orange letters are the traps: they look Latin but sound different. Until those six click, “Ресторан” reads as “Pectopah”.'},
+  tlTitle:{ru:'Транслитерация',en:'Transliteration'},
+  tlLead:{ru:'Впишите любое русское слово — покажем латиницей и озвучим.',
+          en:'Type any Russian word and get it in Latin letters. Press Listen to hear it.'},
+  tlInput:{ru:'Русское слово или фраза',en:'Russian word or phrase'},
+  tlPh:{ru:'например, здравствуйте',en:'e.g. здравствуйте'},
+
+  /* ---------- уроки ---------- */
+  lessonPick:{ru:'Урок',en:'Lesson'},
+  listen:{ru:'Прослушать',en:'Listen'},
+  playAll:{ru:'Проиграть диалог',en:'Play the dialogue'},
+  stopAudio:{ru:'Остановить',en:'Stop'},
+
+  /* ---------- практика ---------- */
+  prTitle:{ru:'Практика',en:'Practice'},
+  prLesson:{ru:'Материал',en:'Material'},
+  prAllLessons:{ru:'Все уроки',en:'All lessons'},
+  prKinds:{ru:'Типы заданий',en:'Exercise types'},
+  prStart:{ru:'Начать',en:'Start'},
+  check:{ru:'Проверить',en:'Check'},
+  next:{ru:'Дальше',en:'Next'},
+  finish:{ru:'Закончить',en:'Finish'},
+  showHint:{ru:'Подсказка',en:'Hint'},
+
+  kRead:{ru:'Чтение',en:'Reading'},
+  kListen:{ru:'Аудирование',en:'Listening'},
+  kGap:{ru:'Пропуск',en:'Fill the gap'},
+  kMatch:{ru:'Сопоставление',en:'Matching'},
+  kWrite:{ru:'Письмо',en:'Writing'},
+  kSay:{ru:'Произношение',en:'Speaking'},
+
+  pRead:{ru:'',en:'What does this mean?'},
+  pListen:{ru:'',en:'Press play, then pick what you heard'},
+  pGap:{ru:'',en:'Choose the missing word'},
+  pMatch:{ru:'',en:'Match each Russian phrase with its meaning'},
+  pWrite:{ru:'',en:'Write this in Russian'},
+  pSay:{ru:'',en:'Say this out loud'},
+
+  playAgain:{ru:'Ещё раз',en:'Play again'},
+  micStart:{ru:'Говорить',en:'Speak'},
+  micGo:{ru:'Слушаю…',en:'Listening…'},
+  micAgain:{ru:'Ещё раз',en:'Try again'},
+  heard:{ru:'',en:'I heard: %1'},
+  micDenied:{ru:'',en:'The microphone is blocked. Allow it in the address bar and try again.'},
+  micNone:{ru:'',en:'I didn’t catch anything. Speak a little closer to the microphone.'},
+  micBusy:{ru:'',en:'The microphone is still busy — wait a second and try again.'},
+
+  right:{ru:'Верно',en:'Correct'},
+  wrong:{ru:'Неверно',en:'Not quite'},
+  correctIs:{ru:'Правильный ответ: ',en:'The answer is: '},
+  close:{ru:'',en:'Close — that was %1% of the way there.'},
+  matchLeft:{ru:'',en:'%1 pair(s) left'},
+  doneT:{ru:'Готово',en:'Done'},
+  doneD:{ru:'Подход закончен.',en:'That’s the whole set. Start another one, or switch lesson.'},
+
+  stDoneL:{ru:'в этом подходе',en:'answered here'},
+  stRightL:{ru:'верно',en:'correct'},
+  stAccL:{ru:'точность',en:'accuracy'},
+
+  noVoice:{ru:'',en:'Your browser has no Russian voice installed, so the audio would read Cyrillic with an English voice — nonsense. Listening and speaking exercises are switched off. Chrome and Edge ship a Russian voice; on Windows you can add one in Settings → Time & language → Speech.'},
+  noMic:{ru:'',en:'This browser has no speech recognition (Chrome and Edge do), so the speaking exercise is switched off. Everything else works.'},
+  kindOff:{ru:'',en:'Some exercise types need audio and are unavailable in this browser.'},
+  empty:{ru:'',en:'Nothing to practise with these settings — pick more exercise types.'}
+});
+
+/* ---------- короткие ссылки ---------- */
+const $ = s => document.querySelector(s);
+const L = RU_EN.lessons;
+const ALL_PHRASES = L.reduce((acc, l) => acc.concat(l.phrases || []), []);
+
+/* Учебные строки английские при любом языке интерфейса: у них в
+   словаре ru пустой, и Sky.t() вернул бы пустоту русскому читателю.
+   Поэтому берём английский вариант напрямую из словаря. */
+function en(key) {
+  const ru = Sky.lang;
+  Sky.lang = 'en';
+  const v = Sky.t(key, '');
+  Sky.lang = ru;
+  return v && v !== key ? v : '';
+}
+
+/* ---------- возможности браузера ----------
+   Считаем их ОДИН раз и честно: если русского голоса нет, задания на
+   слух не просто «будут хуже» — они станут невыполнимыми, потому что
+   ученик услышит кириллицу, прочитанную английским голосом. */
+let CAN_HEAR = RUEN.canSpeak() && RUEN.hasVoice('ru-RU');
+let CAN_MIC = RUEN.canListen();
+
+function refreshCapabilities(rerender) {
+  const was = CAN_HEAR;
+  CAN_HEAR = RUEN.canSpeak() && RUEN.hasVoice('ru-RU');
+  const parts = [];
+  if (!CAN_HEAR) parts.push(en('noVoice'));
+  if (!CAN_MIC)  parts.push(en('noMic'));
+  const note = $('#voiceNote');
+  note.textContent = parts.join(' ');
+  note.classList.toggle('hidden', !parts.length);
+  renderKinds();
+  /* Список голосов приходит асинхронно: кнопки «🔊», нарисованные до
+     его появления, остались бы навсегда выключенными. Перерисовываем
+     их, но только если ответ реально изменился. */
+  if (rerender && was !== CAN_HEAR) { renderLesson(); renderDialogue(); }
+}
+RUEN.onReady(() => refreshCapabilities(true));
+
+/* ---------- озвучка с честным отказом ---------- */
+function say(text, lang) {
+  const r = RUEN.speak(text, lang || 'ru-RU');
+  if (!r.ok) {
+    refreshCapabilities();
+    Sky.toast(r.reason === 'no-voice' ? en('noVoice') : 'Audio is unavailable in this browser.');
+  }
+  return r.ok;
+}
+
+/* ---------- заметка для русскоязычных ---------- */
+function syncLangNote() {
+  const n = $('#langNote');
+  const show = Sky.lang === 'ru';
+  n.classList.toggle('hidden', !show);
+  if (show) n.textContent = Sky.t('langNote');
+}
+document.addEventListener('langchange', () => { syncLangNote(); renderAll(); });
+
+/* ==================== ВКЛАДКИ ==================== */
+const TABS = ['alpha','lessons','dialogue','practice'];
+$('#renSeg').addEventListener('click', e => {
+  const b = e.target.closest('button[data-tab]');
+  if (!b) return;
+  const tab = b.dataset.tab;
+  $('#renSeg').querySelectorAll('button').forEach(x =>
+    x.setAttribute('aria-pressed', String(x.dataset.tab === tab)));
+  TABS.forEach(t => $('#tab' + t[0].toUpperCase() + t.slice(1))
+    .classList.toggle('hidden', t !== tab));
+  RUEN.stopSpeaking();
+});
+
+/* ==================== АЛФАВИТ ==================== */
+function renderAlphabet() {
+  const box = $('#alphaGrid');
+  box.innerHTML = '';
+  RU_EN.ALPHABET.forEach(a => {
+    const d = document.createElement('div');
+    d.className = 'ren-letter' + (a.trap ? ' trap' : '');
+    const b = document.createElement('b'); b.textContent = a.ru;
+    const i = document.createElement('i'); i.textContent = a.tl;
+    const s = document.createElement('span'); s.textContent = a.hint;
+    d.append(b, i, s);
+    box.appendChild(d);
+  });
+}
+
+/* ---------- транслитератор ---------- */
+$('#tlIn').addEventListener('input', e => {
+  $('#tlOut').textContent = RU_EN.translit(e.target.value);
+});
+$('#tlSpeak').addEventListener('click', () => {
+  const v = $('#tlIn').value.trim();
+  if (v) say(v);
+});
+
+/* ==================== УРОКИ ==================== */
+function fillLessonSelects() {
+  const sel = $('#lessonSel'), pr = $('#prLesson');
+  const keep = sel.value, keepPr = pr.value;
+  sel.innerHTML = ''; pr.innerHTML = '';
+  const all = document.createElement('option');
+  all.value = 'all'; all.textContent = Sky.t('prAllLessons');
+  pr.appendChild(all);
+  L.forEach((l, i) => {
+    const label = l.icon + '  ' + (i + 1) + '. ' + l.title;
+    const a = document.createElement('option'); a.value = l.id; a.textContent = label;
+    const b = document.createElement('option'); b.value = l.id; b.textContent = label;
+    sel.appendChild(a); pr.appendChild(b);
+  });
+  sel.value = keep || L[0].id;
+  pr.value = keepPr || 'all';
+}
+
+/* Карточка фразы: кириллица, транслитерация, значение, пояснение,
+   кнопки «озвучить» и «повторить в микрофон». */
+function phraseCard(p) {
+  const wrap = document.createElement('div');
+  wrap.className = 'ren-phrase';
+
+  const acts = document.createElement('div');
+  acts.className = 'ren-acts';
+
+  const sp = document.createElement('button');
+  sp.type = 'button'; sp.className = 'ren-ico'; sp.textContent = '🔊';
+  sp.title = 'Listen';
+  sp.disabled = !CAN_HEAR;
+  sp.addEventListener('click', () => say(p.ru));
+  acts.appendChild(sp);
+
+  if (CAN_MIC) {
+    const mic = document.createElement('button');
+    mic.type = 'button'; mic.className = 'ren-ico'; mic.textContent = '🎤';
+    mic.title = 'Say it and check';
+    mic.addEventListener('click', () => micCheck(mic, p.ru, wrap));
+    acts.appendChild(mic);
+  }
+
+  const body = document.createElement('div');
+  body.className = 'ren-body';
+
+  const cyr = document.createElement('div');
+  cyr.className = 'ren-cyr';
+  cyr.textContent = p.ru;
+  if (p.you) {
+    const badge = document.createElement('span');
+    badge.className = 'ren-badge ' + p.you;
+    badge.textContent = p.you === 'ty' ? 'informal ты' : 'formal вы';
+    cyr.appendChild(badge);
+  }
+
+  const tl = document.createElement('div'); tl.className = 'ren-tl'; tl.textContent = p.tl;
+  const me = document.createElement('div'); me.className = 'ren-en'; me.textContent = p.en;
+  body.append(cyr, tl, me);
+
+  if (p.lit) {
+    const lit = document.createElement('div');
+    lit.className = 'ren-lit'; lit.textContent = 'literally: ' + p.lit;
+    body.appendChild(lit);
+  }
+  if (p.note) {
+    const nt = document.createElement('div');
+    nt.className = 'ren-hint'; nt.textContent = p.note;
+    body.appendChild(nt);
+  }
+
+  wrap.append(acts, body);
+  return wrap;
+}
+
+/* Проверка произношения прямо на карточке урока. */
+function micCheck(btn, target, host) {
+  btn.classList.add('rec');
+  btn.disabled = true;
+  RUEN.listen('ru-RU')
+    .then(res => {
+      const r = RUEN.checkSpoken(res.alternatives || res.transcript, target);
+      showHeard(host, r, target);
+    })
+    .catch(err => {
+      const code = err && err.message;
+      Sky.toast(code === 'not-allowed' || code === 'service-not-allowed'
+        ? en('micDenied') : code === 'busy' ? en('micBusy') : en('micNone'));
+    })
+    .then(() => { btn.classList.remove('rec'); btn.disabled = false; });
+}
+
+/* Показываем, ЧТО услышал браузер: без этого ученик не понимает,
+   ошибся он сам или его просто не расслышали. */
+function showHeard(host, r, target) {
+  let box = host.querySelector('.ren-heard');
+  if (!box) {
+    box = document.createElement('div');
+    box.className = 'ren-heard';
+    host.querySelector('.ren-body').appendChild(box);
+  }
+  box.classList.remove('hidden');
+  box.innerHTML = '';
+  const line = document.createElement('div');
+  line.textContent = en('heard').replace('%1', '“' + r.heard + '”');
+  const verdict = document.createElement('b');
+  verdict.textContent = r.ok
+    ? ' ✓ ' + Sky.t('right')
+    : ' ✕ ' + en('correctIs') + target;
+  line.appendChild(verdict);
+  box.appendChild(line);
+}
+
+function renderLesson() {
+  const l = L.find(x => x.id === $('#lessonSel').value) || L[0];
+  $('#lessonIntro').textContent = l.intro;
+  const box = $('#lessonPhrases');
+  box.innerHTML = '';
+  (l.phrases || []).forEach(p => box.appendChild(phraseCard(p)));
+}
+$('#lessonSel').addEventListener('change', renderLesson);
+
+/* ==================== ДИАЛОГ ==================== */
+function renderDialogue() {
+  const d = RU_EN.dialogue;
+  $('#dlgTitle').textContent = d.title;
+  $('#dlgIntro').textContent = d.intro;
+  const box = $('#dlgLines');
+  box.innerHTML = '';
+  d.lines.forEach(line => {
+    const row = document.createElement('div');
+    row.className = 'ren-line' + (line.who === 'B' ? ' b' : '');
+
+    const who = document.createElement('div');
+    who.className = 'ren-who'; who.textContent = line.who;
+
+    const body = document.createElement('div');
+    body.className = 'ren-body';
+    const cyr = document.createElement('div'); cyr.className = 'ren-cyr'; cyr.textContent = line.ru;
+    const tl  = document.createElement('div'); tl.className = 'ren-tl';  tl.textContent = line.tl;
+    const me  = document.createElement('div'); me.className = 'ren-en';  me.textContent = line.en;
+    body.append(cyr, tl, me);
+
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'ren-ico'; btn.textContent = '🔊';
+    btn.disabled = !CAN_HEAR;
+    btn.addEventListener('click', () => say(line.ru));
+
+    row.append(who, body, btn);
+    box.appendChild(row);
+  });
+}
+
+/* Проигрывание диалога подряд: каждая реплика начинается, когда
+   закончилась предыдущая (onend), а не по таймеру — длительность
+   синтеза заранее неизвестна. */
+let dlgTimer = null;
+$('#dlgPlay').addEventListener('click', () => {
+  if (!CAN_HEAR) { Sky.toast(en('noVoice')); return; }
+  const lines = RU_EN.dialogue.lines.slice();
+  let i = 0;
+  const step = () => {
+    if (i >= lines.length) return;
+    const line = lines[i++];
+    RUEN.speak(line.ru, 'ru-RU', { onend: () => { dlgTimer = setTimeout(step, 350); } });
+  };
+  step();
+});
+$('#dlgStop').addEventListener('click', () => {
+  clearTimeout(dlgTimer);
+  RUEN.stopSpeaking();
+});
+
+/* ==================== ПРАКТИКА ==================== */
+const KIND_LABEL = { read:'kRead', listen:'kListen', gap:'kGap', match:'kMatch', write:'kWrite', say:'kSay' };
+const KIND_PROMPT = { read:'pRead', listen:'pListen', gap:'pGap', match:'pMatch', write:'pWrite', say:'pSay' };
+
+/* Типы, которым нужен звук или микрофон, выключаем не «на всякий
+   случай», а по факту: слушать нечего — задание невыполнимо. */
+function kindAvailable(k) {
+  if (k === 'listen') return CAN_HEAR;
+  if (k === 'say') return CAN_MIC;
+  return true;
+}
+
+let chosenKinds = RUEN.KINDS.slice();
+
+function renderKinds() {
+  const box = $('#prKinds');
+  if (!box) return;
+  box.innerHTML = '';
+  RUEN.KINDS.forEach(k => {
+    const ok = kindAvailable(k);
+    const lab = document.createElement('label');
+    lab.className = 'ren-chip';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.value = k;
+    cb.checked = ok && chosenKinds.indexOf(k) >= 0;
+    cb.disabled = !ok;
+    cb.addEventListener('change', () => {
+      chosenKinds = Array.from(box.querySelectorAll('input:checked')).map(i => i.value);
+    });
+    const span = document.createElement('span');
+    span.textContent = Sky.t(KIND_LABEL[k]);
+    lab.append(cb, span);
+    box.appendChild(lab);
+  });
+  chosenKinds = chosenKinds.filter(kindAvailable);
+  const off = RUEN.KINDS.some(k => !kindAvailable(k));
+  $('#prKindNote').textContent = off ? en('kindOff') : '';
+  $('#prKindNote').classList.toggle('hidden', !off);
+}
+
+let queue = [], pos = 0, item = null, picked = null, answered = false, order = [];
+let session = { done:0, right:0 };
+
+$('#prStart').addEventListener('click', () => {
+  const id = $('#prLesson').value;
+  const lessons = id === 'all' ? L : L.filter(l => l.id === id);
+  queue = [];
+  lessons.forEach(l => {
+    queue = queue.concat(RUEN.buildQueue(l, ALL_PHRASES, { kinds: chosenKinds, limit: id === 'all' ? 4 : 12 }));
+  });
+  queue = RUEN.pick(queue, queue.length);          /* перемешиваем уроки между собой */
+  if (!queue.length) { Sky.toast(en('empty')); return; }
+  pos = 0; session = { done:0, right:0 };
+  $('#prSetup').classList.add('hidden');
+  $('#prQuiz').classList.remove('hidden');
+  nextItem();
+});
+
+$('#prStop').addEventListener('click', () => {
+  RUEN.stopSpeaking();
+  item = null;
+  $('#prQuiz').classList.add('hidden');
+  $('#prSetup').classList.remove('hidden');
+});
+
+function nextItem() {
+  RUEN.stopSpeaking();
+  picked = null; answered = false;
+  ['prHeard','prVerdict','prSolution'].forEach(id => $('#' + id).classList.add('hidden'));
+  if (pos >= queue.length) { renderDone(); return; }
+  item = queue[pos];
+  order = RUEN.pick(item.options ? item.options.map((_, i) => i) : [], item.options ? item.options.length : 0);
+  renderItem();
+}
+
+function renderDone() {
+  item = null;
+  $('#prKind').textContent = Sky.t('doneT');
+  $('#prPrompt').textContent = Sky.t('doneT');
+  $('#prSub').textContent = Sky.t('doneD');
+  ['prOptions','prWriteBox','prSayBox','prMatch'].forEach(id => $('#' + id).classList.add('hidden'));
+  ['prHint','prCheck','prNext'].forEach(id => $('#' + id).classList.add('hidden'));
+  renderDots();
+}
+
+function renderDots() {
+  const box = $('#prDots');
+  box.innerHTML = '';
+  queue.forEach((q, i) => {
+    const d = document.createElement('i');
+    if (q.__ok === true) d.className = 'ok';
+    else if (q.__ok === false) d.className = 'no';
+    else if (i === pos && item) d.className = 'now';
+    box.appendChild(d);
+  });
+}
+
+function renderItem() {
+  $('#prKind').textContent = Sky.t(KIND_LABEL[item.kind]);
+  $('#prCount').textContent = (pos + 1) + ' / ' + queue.length;
+  $('#prSub').textContent = en(KIND_PROMPT[item.kind]);
+  renderDots();
+
+  ['prOptions','prWriteBox','prSayBox','prMatch'].forEach(id => $('#' + id).classList.add('hidden'));
+  $('#prHint').classList.add('hidden');
+  $('#prCheck').classList.add('hidden');
+  $('#prNext').classList.add('hidden');
+
+  if (item.kind === 'read')   renderChoice(item.ru, 'en');
+  if (item.kind === 'gap')    renderChoice(item.ru, 'ru');
+  if (item.kind === 'listen') renderListen();
+  if (item.kind === 'write')  renderWrite();
+  if (item.kind === 'say')    renderSay();
+  if (item.kind === 'match')  renderMatch();
+}
+
+/* ---------- выбор из вариантов (чтение и пропуск) ---------- */
+function renderChoice(prompt, optLang) {
+  $('#prPrompt').textContent = prompt;
+  const box = $('#prOptions');
+  box.classList.remove('hidden');
+  box.innerHTML = '';
+  order.forEach((oi, shown) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'opt';
+    b.setAttribute('aria-pressed', String(picked === oi));
+    b.innerHTML = '<span class="k">' + 'ABCD'[shown] + '</span><span></span>';
+    b.lastChild.textContent = item.options[oi];
+    if (optLang === 'ru') b.lastChild.lang = 'ru';
+    if (answered) {
+      b.disabled = true;
+      if (oi === 0) b.classList.add('right');
+      else if (oi === picked) b.classList.add('wrong');
+    } else {
+      b.addEventListener('click', () => { picked = oi; renderItem(); });
+    }
+    box.appendChild(b);
+  });
+  if (!answered) {
+    $('#prCheck').classList.remove('hidden');
+    $('#prCheck').disabled = picked === null;
+  }
+  if (item.tl && !answered) {
+    $('#prHint').classList.remove('hidden');
+  }
+}
+
+/* ---------- аудирование ----------
+   Текста на экране нет специально: иначе это не «услышал», а «прочитал». */
+function renderListen() {
+  $('#prPrompt').textContent = '🔊';
+  const box = $('#prOptions');
+  box.classList.remove('hidden');
+  box.innerHTML = '';
+
+  const play = document.createElement('button');
+  play.type = 'button'; play.className = 'btn ghost';
+  play.style.marginBottom = '10px';
+  play.textContent = Sky.t('playAgain');
+  play.addEventListener('click', () => say(item.ru));
+  box.appendChild(play);
+
+  order.forEach((oi, shown) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'opt';
+    b.setAttribute('aria-pressed', String(picked === oi));
+    b.innerHTML = '<span class="k">' + 'ABCD'[shown] + '</span><span lang="ru"></span>';
+    b.lastChild.textContent = item.options[oi];
+    if (answered) {
+      b.disabled = true;
+      if (oi === 0) b.classList.add('right');
+      else if (oi === picked) b.classList.add('wrong');
+    } else {
+      b.addEventListener('click', () => { picked = oi; renderItem(); });
+    }
+    box.appendChild(b);
+  });
+
+  if (!answered) {
+    $('#prCheck').classList.remove('hidden');
+    $('#prCheck').disabled = picked === null;
+    say(item.ru);                      /* первое проигрывание — сразу */
+  }
+}
+
+/* ---------- письмо ----------
+   Экранная кириллица обязательна: на американской раскладке «Привет»
+   просто нечем набрать. */
+function renderWrite() {
+  $('#prPrompt').textContent = item.en;
+  const box = $('#prWriteBox');
+  box.classList.remove('hidden');
+  const input = $('#prWrite');
+  input.value = '';
+  input.disabled = answered;
+  input.focus();
+
+  const kb = $('#prKb');
+  kb.innerHTML = '';
+  RUEN.KEYS.forEach(row => {
+    row.split('').forEach(ch => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = ch;
+      b.addEventListener('click', () => { input.value += ch; input.focus(); });
+      kb.appendChild(b);
+    });
+  });
+  const space = document.createElement('button');
+  space.type = 'button'; space.className = 'wide'; space.textContent = 'space';
+  space.addEventListener('click', () => { input.value += ' '; input.focus(); });
+  const back = document.createElement('button');
+  back.type = 'button'; back.textContent = '⌫';
+  back.addEventListener('click', () => { input.value = input.value.slice(0, -1); input.focus(); });
+  kb.append(space, back);
+
+  $('#prCheck').classList.remove('hidden');
+  $('#prCheck').disabled = false;
+  $('#prHint').classList.remove('hidden');
+}
+
+/* ---------- произношение ---------- */
+function renderSay() {
+  $('#prPrompt').textContent = item.ru;
+  $('#prSub').textContent = en('pSay') + ' — ' + item.tl;
+  $('#prSayBox').classList.remove('hidden');
+  const mic = $('#prMic');
+  mic.textContent = Sky.t('micStart');
+  mic.disabled = false;
+  mic.onclick = () => {
+    mic.textContent = Sky.t('micGo');
+    mic.disabled = true;
+    RUEN.listen('ru-RU')
+      .then(res => {
+        const r = RUEN.checkSpoken(res.alternatives || res.transcript, item.ru);
+        $('#prHeard').classList.remove('hidden');
+        $('#prHeard').textContent = en('heard').replace('%1', '“' + r.heard + '”');
+        finish(r.ok, r);
+      })
+      .catch(err => {
+        const code = err && err.message;
+        Sky.toast(code === 'not-allowed' || code === 'service-not-allowed'
+          ? en('micDenied') : code === 'busy' ? en('micBusy') : en('micNone'));
+        mic.textContent = Sky.t('micAgain');
+        mic.disabled = false;
+      });
+  };
+}
+
+/* ---------- сопоставление ----------
+   Настоящее сопоставление, а не «выбери из четырёх»: слева четыре
+   русские фразы, справа четыре значения, пара собирается кликом. */
+let matchSel = null, matchLeft = 0, matchErr = 0;
+function renderMatch() {
+  $('#prPrompt').textContent = '';
+  $('#prSub').textContent = en('pMatch');
+  const wrap = $('#prMatch');
+  wrap.classList.remove('hidden');
+  const colRu = $('#prMatchRu'), colEn = $('#prMatchEn');
+  colRu.innerHTML = ''; colEn.innerHTML = '';
+  matchSel = null; matchErr = 0;
+  matchLeft = item.pairs.length;
+
+  const rus = RUEN.pick(item.pairs, item.pairs.length);
+  const ens = RUEN.pick(item.pairs, item.pairs.length);
+
+  rus.forEach(p => colRu.appendChild(matchBtn(p.ru, p.ru, 'ru')));
+  ens.forEach(p => colEn.appendChild(matchBtn(p.en, p.ru, 'en')));
+
+  function matchBtn(label, key, side) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'ren-m';
+    b.textContent = label;
+    b.dataset.key = key; b.dataset.side = side;
+    if (side === 'ru') b.lang = 'ru';
+    b.setAttribute('aria-pressed', 'false');
+    b.addEventListener('click', () => onMatchClick(b));
+    return b;
+  }
+}
+
+function onMatchClick(b) {
+  if (b.classList.contains('done')) return;
+  if (!matchSel) {
+    matchSel = b;
+    b.setAttribute('aria-pressed', 'true');
+    return;
+  }
+  if (matchSel === b) {                       /* повторный клик снимает выбор */
+    matchSel.setAttribute('aria-pressed', 'false');
+    matchSel = null;
+    return;
+  }
+  if (matchSel.dataset.side === b.dataset.side) {   /* та же колонка — просто переносим выбор */
+    matchSel.setAttribute('aria-pressed', 'false');
+    matchSel = b;
+    b.setAttribute('aria-pressed', 'true');
+    return;
+  }
+  const ok = matchSel.dataset.key === b.dataset.key;
+  matchSel.setAttribute('aria-pressed', 'false');
+  if (ok) {
+    [matchSel, b].forEach(x => { x.classList.add('done'); x.disabled = true; });
+    matchLeft--;
+    if (matchLeft === 0) finish(matchErr === 0);
+    else $('#prSub').textContent = en('matchLeft').replace('%1', matchLeft);
+  } else {
+    matchErr++;
+    const pair = [matchSel, b];
+    pair.forEach(x => x.classList.add('miss'));
+    setTimeout(() => pair.forEach(x => x.classList.remove('miss')), 600);
+  }
+  matchSel = null;
+}
+
+/* ---------- подсказка ---------- */
+$('#prHint').addEventListener('click', () => {
+  if (!item) return;
+  const s = $('#prSolution');
+  s.classList.remove('hidden');
+  s.textContent = item.kind === 'write'
+    ? item.tl                                     /* как это звучит — но не сами буквы */
+    : (item.tl || item.en || '');
+});
+
+/* ---------- проверка ---------- */
+$('#prCheck').addEventListener('click', () => {
+  if (!item || answered) return;
+  if (item.kind === 'write') {
+    const r = RUEN.check(item, $('#prWrite').value);
+    finish(r.ok, r);
+    return;
+  }
+  const r = RUEN.check(item, picked);
+  finish(r.ok, r);
+});
+
+/* Общий финал для всех типов: вердикт, разбор, запись в статистику. */
+function finish(ok, detail) {
+  if (answered) return;
+  answered = true;
+  queue[pos].__ok = ok;
+  session.done++;
+  if (ok) session.right++;
+
+  /* Пишем в тот же журнал, что и тренажёр: предмет 'ruen'. Тогда
+     занятия здесь попадают в общую статистику и в повторение. */
+  Sky.record('ruen', item.id, ok);
+
+  const v = $('#prVerdict');
+  v.className = 'verdict ' + (ok ? 'ok' : 'no');
+  v.textContent = ok ? '✓ ' + Sky.t('right') : '✕ ' + Sky.t('wrong');
+  if (!ok && item.kind !== 'match') {
+    const right = item.kind === 'write' || item.kind === 'say' ? item.ru : item.options[0];
+    v.textContent += ' — ' + en('correctIs') + right;
+  }
+  v.classList.remove('hidden');
+
+  /* Разбор: транслитерация, дословный перевод, объяснение пропуска —
+     всё, что помогает понять ошибку, а не просто увидеть ответ. */
+  const bits = [];
+  if (item.ru && item.tl) bits.push(item.ru + ' — ' + item.tl + (item.en ? ' — ' + item.en : ''));
+  if (item.why) bits.push(item.why);
+  if (item.kind === 'say' && detail && detail.score != null && !ok) {
+    bits.push(en('close').replace('%1', Math.round(detail.score * 100)));
+  }
+  const s = $('#prSolution');
+  if (bits.length) { s.textContent = bits.join('\n'); s.classList.remove('hidden'); }
+
+  if (item.kind === 'read' || item.kind === 'gap' || item.kind === 'listen') renderItem();
+  if (item.kind === 'write') $('#prWrite').disabled = true;
+  if (item.kind === 'say') $('#prMic').disabled = true;
+
+  $('#prCheck').classList.add('hidden');
+  $('#prHint').classList.add('hidden');
+  $('#prNext').classList.remove('hidden');
+  renderDots();
+  renderSessionStats();
+}
+
+$('#prNext').addEventListener('click', () => { pos++; nextItem(); });
+
+function renderSessionStats() {
+  $('#stDone').textContent = session.done;
+  $('#stRight').textContent = session.right;
+  $('#stAcc').textContent = Sky.pct(session.right, session.done) + '%';
+}
+
+/* ==================== СТАРТ ==================== */
+function renderAll() {
+  syncLangNote();
+  fillLessonSelects();
+  renderAlphabet();
+  renderLesson();
+  renderDialogue();
+  renderKinds();
+  renderSessionStats();
+}
+renderAll();
+refreshCapabilities(false);
+</script>
+</body>
+</html>

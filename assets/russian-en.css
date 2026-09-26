@@ -1,0 +1,160 @@
+/* Стили страницы «Russian for English speakers».
+
+   ПОЧЕМУ ОТДЕЛЬНЫЙ ФАЙЛ, А НЕ БЛОК В sky.css.
+   Именно из-за sky.css у нас уже было расхождение веток: один и тот же
+   файл правили с двух сторон, и блок стилей то появлялся, то исчезал.
+   Страничные стили, которые нужны ровно одной странице, ничего не теряют
+   от жизни в своём файле — зато перестают быть местом встречи чужих
+   правок. В проекте так уже сделано для шахмат (chess-ui-polish.css,
+   chess-lesson-ui.css), здесь тот же приём.
+
+   Все цвета — только через переменные sky.css, поэтому тёмная тема
+   работает сама, без отдельных правил. */
+
+/* ---------- заметка для русскоязычного посетителя ---------- */
+.ren-lang-note{border-left-color:var(--m-teach)}
+
+/* ---------- алфавит ---------- */
+.ren-alpha{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));
+  gap:8px;margin-top:12px;
+}
+.ren-letter{
+  display:flex;gap:10px;align-items:baseline;min-width:0;
+  padding:9px 11px;border:1px solid var(--line);border-radius:var(--r-sm);
+  background:var(--panel-2);
+}
+/* Буква-ловушка: выглядит как латинская, читается иначе. Красим её,
+   потому что именно эти шесть букв ломают чтение в первые недели. */
+.ren-letter.trap{border-color:var(--warn);background:var(--warn-soft)}
+.ren-letter b{font-size:16px;font-weight:900;flex:none;color:var(--ink)}
+.ren-letter i{font-style:normal;font-weight:800;color:var(--accent);font-size:12.5px;flex:none}
+.ren-letter span{font-size:11px;color:var(--muted);line-height:1.3;min-width:0}
+
+/* ---------- транслитератор ---------- */
+.ren-tool{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-top:12px}
+.ren-tool .field{flex:1 1 240px}
+.ren-out{
+  margin-top:10px;padding:12px 14px;border-radius:var(--r-sm);
+  background:var(--m-learn-soft);border:1px solid var(--line);
+  font-size:17px;font-weight:800;color:var(--ink);min-height:22px;
+  word-break:break-word;
+}
+.ren-out:empty::before{content:attr(data-empty);color:var(--muted);font-weight:600}
+
+/* ---------- карточка фразы ---------- */
+.ren-phrase{
+  display:flex;gap:12px;align-items:flex-start;
+  padding:12px 14px;margin-top:10px;
+  background:var(--panel);border:1px solid var(--line);
+  border-left:4px solid var(--m-learn);border-radius:12px;
+}
+.ren-phrase .ren-body{flex:1;min-width:0}
+.ren-cyr{font-size:18px;font-weight:900;color:var(--ink);line-height:1.3}
+.ren-tl{font-size:13px;font-weight:700;color:var(--accent);margin-top:2px}
+.ren-en{font-size:14px;color:var(--ink-2);margin-top:4px}
+.ren-lit{font-size:12px;color:var(--muted);margin-top:3px;font-style:italic}
+.ren-hint{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.45}
+.ren-badge{
+  display:inline-block;margin-left:7px;padding:2px 7px;border-radius:99px;
+  font-size:9.5px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;
+  vertical-align:middle;
+}
+.ren-badge.ty{background:var(--ok-soft);color:var(--ok)}
+.ren-badge.vy{background:var(--m-chess-soft);color:var(--m-chess)}
+
+/* кнопки «озвучить» и «микрофон» */
+.ren-acts{display:flex;flex-direction:column;gap:6px;flex:none}
+.ren-ico{
+  width:38px;height:38px;flex:none;display:grid;place-items:center;
+  border:1px solid var(--line);border-radius:11px;background:var(--panel-2);
+  font-size:16px;cursor:pointer;transition:transform .12s,border-color .12s,background .12s;
+}
+.ren-ico:hover:not(:disabled){border-color:var(--accent);transform:translateY(-1px)}
+.ren-ico:disabled{opacity:.4;cursor:not-allowed}
+.ren-ico.rec{background:var(--no-soft);border-color:var(--no);animation:renPulse 1s infinite}
+@keyframes renPulse{50%{opacity:.55}}
+
+/* ---------- диалог ---------- */
+.ren-line{display:flex;gap:10px;align-items:flex-start;margin-top:10px}
+.ren-who{
+  width:28px;height:28px;flex:none;display:grid;place-items:center;border-radius:50%;
+  font-size:12px;font-weight:900;background:var(--m-learn-soft);color:var(--m-learn);
+}
+.ren-line.b .ren-who{background:var(--m-life-soft);color:var(--m-life)}
+.ren-line .ren-body{flex:1;min-width:0}
+
+/* ---------- практика ---------- */
+.ren-prompt{font-size:20px;font-weight:900;line-height:1.4;margin:14px 0 6px;color:var(--ink)}
+.ren-sub{font-size:13px;color:var(--muted);margin-bottom:14px}
+.ren-type{margin-bottom:2px}
+
+/* сопоставление: две колонки кликом */
+.ren-match{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.ren-col{display:flex;flex-direction:column;gap:8px}
+.ren-m{
+  padding:11px 12px;border:1px solid var(--line);border-radius:var(--r-sm);
+  background:var(--panel);font-size:14px;font-weight:700;color:var(--ink);
+  cursor:pointer;text-align:left;transition:border-color .12s,background .12s;
+}
+.ren-m:hover:not(:disabled){border-color:var(--accent)}
+.ren-m[aria-pressed="true"]{border-color:var(--accent);background:var(--m-learn-soft)}
+.ren-m.done{border-color:var(--ok);background:var(--ok-soft);cursor:default;opacity:.75}
+.ren-m.miss{border-color:var(--no);background:var(--no-soft)}
+.ren-m:disabled{cursor:default}
+
+/* письмо: поле ввода + экранная клавиатура */
+.ren-write{
+  width:100%;padding:14px;border:1px solid var(--line-2);border-radius:12px;
+  background:var(--panel);color:var(--ink);font-size:20px;font-weight:800;
+  text-align:center;font-family:inherit;
+}
+.ren-write:focus{outline:none;border-color:var(--accent)}
+.ren-kb{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin-top:12px}
+.ren-kb button{
+  min-width:34px;height:36px;padding:0 6px;
+  border:1px solid var(--line);border-radius:8px;background:var(--panel-2);
+  color:var(--ink);font-size:15px;font-weight:800;font-family:inherit;cursor:pointer;
+}
+.ren-kb button:hover{border-color:var(--accent);background:var(--m-learn-soft)}
+.ren-kb button.wide{min-width:82px;font-size:12px;letter-spacing:.04em}
+
+/* выбор типов заданий ---------- */
+.ren-label{
+  display:block;font-size:11px;font-weight:900;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:8px;
+}
+.ren-kinds{display:flex;flex-wrap:wrap;gap:8px}
+.ren-chip{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:8px 12px;border:1px solid var(--line);border-radius:99px;
+  background:var(--panel-2);font-size:13px;font-weight:800;color:var(--ink);
+  cursor:pointer;user-select:none;
+}
+.ren-chip:hover{border-color:var(--accent)}
+.ren-chip input{accent-color:var(--accent);width:15px;height:15px;cursor:pointer}
+/* Недоступный тип (нет голоса или микрофона) гасим, но не прячем:
+   пусть видно, что он есть и почему сейчас не работает. */
+.ren-chip:has(input:disabled){opacity:.45;cursor:not-allowed}
+.ren-chip:has(input:disabled) input{cursor:not-allowed}
+
+/* что услышал микрофон */
+.ren-heard{
+  margin-top:12px;padding:10px 12px;border-radius:var(--r-sm);
+  background:var(--panel-2);border:1px solid var(--line);
+  font-size:13px;color:var(--ink-2);
+}
+.ren-heard b{color:var(--ink)}
+
+/* прогресс урока */
+.ren-dots{display:flex;gap:5px;flex-wrap:wrap;margin-top:10px}
+.ren-dots i{width:9px;height:9px;border-radius:50%;background:var(--line-2);display:block}
+.ren-dots i.ok{background:var(--ok)}
+.ren-dots i.no{background:var(--no)}
+.ren-dots i.now{background:var(--accent);transform:scale(1.25)}
+
+@media (max-width:560px){
+  .ren-match{grid-template-columns:1fr}
+  .ren-alpha{grid-template-columns:1fr 1fr}
+  .ren-letter span{display:none}          /* на узком экране оставляем букву и чтение */
+}
