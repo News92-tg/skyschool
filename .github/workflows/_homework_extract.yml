@@ -1,4 +1,4 @@
-name: temporary homework import
+name: homework staging diagnostic
 
 on:
   push:
@@ -11,34 +11,32 @@ permissions:
   contents: write
 
 jobs:
-  apply:
+  check:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Apply archive patch
+      - uses: actions/checkout@v4
+      - name: Validate staged patch
         shell: bash
         run: |
           set -euo pipefail
-          cat _homework_bz2_part*.txt > /tmp/homework.patch.b64
-          base64 -d -i /tmp/homework.patch.b64 | bunzip2 > /tmp/homework.diff
-          git apply --check --exclude=assets/db.js /tmp/homework.diff
-          git apply --exclude=assets/db.js /tmp/homework.diff
-
-          rm -f _homework_bz2_part*.txt
-          rm -f _homework_upload_part*.txt _homework_diff.gz.b64 _homework_diff_part*.txt
-          rm -f ".github/workflows/_homework_extract.yml"
-          rm -f "домашка-по-фото.zip"
-
-          git diff --check
-          git add -A
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Homework check sessions: several photos, local midnight, paywall"
-          git push
+          python3 - <<'PY'
+          import base64, bz2, hashlib, pathlib
+          parts=sorted(pathlib.Path('.').glob('_homework_bz2_part*.txt'))
+          data=b''
+          for p in parts:
+              s=p.read_text()
+              print(p.name, 'len=', len(s))
+              base64.b64decode(s, validate=True)
+              data += s.encode()
+          print('enc_len=', len(data))
+          print('enc_sha256=', hashlib.sha256(data).hexdigest())
+          expected='74f341ed9a5a7731560b747334ddc5d635a3285910d06812a48e4b8731450f49'
+          if hashlib.sha256(data).hexdigest()!=expected:
+              raise SystemExit('ENC_SHA_MISMATCH')
+          raw=base64.b64decode(data)
+          diff=bz2.decompress(raw)
+          print('diff_sha256=', hashlib.sha256(diff).hexdigest())
+          if hashlib.sha256(diff).hexdigest()!='7db886e4b62aad6ea4e2c00f0ca004b8ebf639e6a156c37e8b6b74c4a3683f36':
+              raise SystemExit('DIFF_SHA_MISMATCH')
+          print('PATCH_OK')
+          PY
