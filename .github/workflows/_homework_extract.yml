@@ -1,0 +1,46 @@
+name: temporary homework import
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "_homework_diff.gz.b64"
+      - "_homework_upload_part*.txt"
+      - "_homework_diff_part*.txt"
+      - ".github/workflows/_homework_extract.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply archive patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s _homework_diff.gz.b64
+          base64 -d _homework_diff.gz.b64 | gunzip > /tmp/homework.diff
+          git apply --check --exclude=assets/db.js /tmp/homework.diff
+          git apply --exclude=assets/db.js /tmp/homework.diff
+
+          rm -f _homework_diff.gz.b64
+          rm -f _homework_upload_part*.txt _homework_diff_part*.txt
+          rm -f ".github/workflows/_homework_extract.yml"
+          rm -f "домашка-по-фото.zip"
+
+          git diff --check
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Homework check sessions: several photos, local midnight, paywall"
+          git push
