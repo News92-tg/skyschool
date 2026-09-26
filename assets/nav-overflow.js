@@ -76,11 +76,17 @@
          подписью требует 63 — и ряд торчал за край. Ниже 560px
          показываем значок вместо подписи: получается тот самый
          гамбургер, которого на этом сайте не было. */
-      #mainMenu .nav-burger{display:none;font-size:15px;line-height:1}
+      #mainMenu .nav-burger{display:none;width:18px;height:14px;position:relative;flex:0 0 18px}
       @media (max-width:560px){
         #mainMenu .nav-overflow-trigger{padding:8px 9px}
         #mainMenu .nav-more-label{display:none}
         #mainMenu .nav-burger{display:inline-block}
+        #mainMenu .nav-burger::before,
+        #mainMenu .nav-burger::after,
+        #mainMenu .nav-burger span{content:"";position:absolute;left:0;width:18px;height:2px;border-radius:2px;background:currentColor}
+        #mainMenu .nav-burger::before{top:1px}
+        #mainMenu .nav-burger span{top:6px}
+        #mainMenu .nav-burger::after{top:11px}
         #mainMenu .nav-overflow-trigger .nav-caret{display:none}
       }
       #mainMenu .nav-group-trigger,
@@ -303,7 +309,7 @@
         /* Значок нужен только на узких экранах, где подпись прячется
            (см. media-запрос в стилях). Здесь он всегда в разметке,
            показывает его CSS. */
-        '<span class="nav-burger" aria-hidden="true">☰</span>' +
+        '<span class="nav-burger" aria-hidden="true"><span></span></span>' +
         '<span class="nav-more-label">' + (isEnglish ? 'More' : 'Ещё') + '</span>' +
         '<span class="nav-caret" aria-hidden="true">⌄</span>' +
       '</button>' +
