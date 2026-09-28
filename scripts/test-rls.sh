@@ -89,3 +89,25 @@ else
   echo "ТЕСТЫ НЕ ПРОШЛИ — смотрите таблицу выше." >&2
   exit 1
 fi
+
+# Тарифы — на отдельной базе. На живой базе photo_checks устроена как в
+# schema-photo-limits.sql (user_id), а schema-classes.sql выше создаёт
+# другую (student_id); в одной базе обе не уживутся.
+TDB="skyschool_tariffs_test"
+run "$PSQL -c 'create database $TDB'" >/dev/null
+echo
+echo "→ тарифы: заглушка, лимиты фото, тарифы (дважды — файл должен переживать повторный запуск)…"
+run "$PSQL -d $TDB -f '$ROOT/sql/tests/00-supabase-stub.sql'" >/dev/null
+run "$PSQL -d $TDB -f '$ROOT/sql/schema-photo-limits.sql'" >/dev/null
+run "$PSQL -d $TDB -f '$ROOT/sql/schema-tariffs.sql'" >/dev/null
+run "$PSQL -d $TDB -f '$ROOT/sql/schema-tariffs.sql'" >/dev/null
+echo "→ тесты тарифов:"
+echo
+if run "psql -h $SOCKET_DIR -p $PGPORT -U postgres -d $TDB -q -f '$ROOT/sql/tests/tariffs-tests.sql'"; then
+  echo
+  echo "Готово: тарифы и лимиты работают как задумано."
+else
+  echo
+  echo "ТЕСТЫ ТАРИФОВ НЕ ПРОШЛИ — смотрите таблицу выше." >&2
+  exit 1
+fi
