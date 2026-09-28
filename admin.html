@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Админ-панель — SkyySchool</title>
+<meta name="theme-color" content="#f6faff">
+<link rel="icon" href="assets/icon-512.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/sky.css">
+<!--
+  Админ-панель SkyySchool. Отдельная страница, в меню сайта её нет.
+
+  Ключей здесь нет. Страница входит обычным аккаунтом (Google или почта)
+  и вызывает функции admin_* из sql/schema-admin.sql. Каждая функция
+  сама проверяет, что вошедший есть в таблице app_admins, — поэтому
+  чужой аккаунт увидит только «нет доступа», даже если откроет адрес.
+  Логика — assets/admin.js.
+-->
+<style>
+  .adm-bar .inner{max-width:1180px}
+  .adm-bar .brand .adm-badge{font-size:10.5px;font-weight:900;letter-spacing:.07em;text-transform:uppercase;
+    padding:3px 8px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);color:var(--muted)}
+  .adm-who{font-size:12.5px;font-weight:800;color:var(--muted);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  @media (max-width:640px){.adm-who{display:none}}
+  .adm.wrap{max-width:1180px;padding-top:24px}
+
+  .adm-gate{max-width:440px;margin:40px auto 0;display:grid;gap:14px}
+  .adm-gate h1{font-size:24px;margin:0}
+  .adm-gate .lead{margin:0}
+  .adm-or{text-align:center;font-size:12px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.08em}
+  .adm-loading{display:flex;align-items:center;gap:12px;font-weight:800;color:var(--muted)}
+
+  .adm-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .adm-head h1{margin:0 auto 0 0;font-size:26px}
+  .adm-head .upd{font-size:12px;color:var(--faint);font-weight:700}
+  .adm-tabs{margin-top:18px;display:flex;flex-wrap:wrap;width:max-content;max-width:100%}
+  .adm-tabs button{padding:9px 15px;font-size:13px;display:inline-flex;align-items:center;gap:7px}
+  .adm-tabs .cnt{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--no);color:#fff;
+    font-size:11px;display:inline-grid;place-items:center}
+  @media (max-width:560px){
+    .adm-tabs{width:100%}
+    .adm-tabs button{flex:1 1 30%;justify-content:center;padding:9px 6px;font-size:12.5px}
+  }
+  .adm-tab{margin-top:18px}
+  .adm-tab > .panel + .panel{margin-top:16px}
+
+  .stats .stat.link{cursor:pointer;text-align:left;font:inherit;color:inherit}
+  .stats .stat.link:hover{border-color:var(--accent)}
+  .stat small{display:block;margin-top:4px;font-size:11.5px;color:var(--faint);font-weight:700}
+  .stat.warn b{color:var(--warn)}
+
+  /* столбики за 14 дней: фото и текст стопкой */
+  .chart{display:grid;grid-template-columns:repeat(14,minmax(0,1fr));gap:6px;align-items:end;height:170px;margin-top:14px}
+  .chart .col{display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:2px;min-width:0}
+  .chart .n{font-size:10.5px;font-weight:800;color:var(--muted);text-align:center;margin-bottom:2px}
+  .chart .bar{border-radius:5px 5px 2px 2px;min-height:0}
+  .chart .bar.ph{background:var(--accent)}
+  .chart .bar.tx{background:var(--ok)}
+  .chart-days{display:grid;grid-template-columns:repeat(14,minmax(0,1fr));gap:6px;margin-top:6px}
+  .chart-days span{font-size:10px;font-weight:700;color:var(--faint);text-align:center;white-space:nowrap;overflow:hidden}
+  .chart-days i{font-style:normal}
+  @media (max-width:560px){.chart-days i{display:none}}   /* на телефоне — только число */
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;font-weight:800;color:var(--muted);margin-top:10px}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+  details.adm-more{margin-top:14px}
+  details.adm-more summary{cursor:pointer;font-weight:800;font-size:13px;color:var(--accent)}
+
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  .toolbar input[type=search]{flex:1 1 240px;min-width:0;padding:10px 12px;border:1px solid var(--line);border-radius:12px;
+    background:var(--panel-2);color:var(--ink);font:inherit;font-size:13.5px}
+  .toolbar .days{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:800;color:var(--muted)}
+  .toolbar .days input{width:74px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);
+    color:var(--ink);font:inherit;font-size:13px}
+  .toolbar .seg button{padding:7px 12px;font-size:12px}
+
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .atable{width:100%;border-collapse:collapse;font-size:13px}
+  .atable th{text-align:left;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);
+    padding:8px;border-bottom:1px solid var(--line);white-space:nowrap}
+  .atable td{padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.45}
+  .atable tr:last-child td{border-bottom:none}
+  .atable .sub{display:block;font-size:11.5px;color:var(--muted);font-weight:600}
+  .atable .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .atable .nowrap{white-space:nowrap}
+  .atable .acts{display:flex;gap:6px;flex-wrap:wrap}
+  .atable .btn{white-space:nowrap}
+  .atable .cmt{max-width:340px;color:var(--ink-2)}
+  .atable.users{min-width:880px}
+  .atable.pays{min-width:640px}
+  .atable.checks{min-width:900px}
+  .empty{padding:18px 4px;color:var(--muted);font-weight:700;font-size:13.5px}
+  .gr{display:inline-grid;place-items:center;min-width:28px;height:28px;padding:0 6px;border-radius:9px;color:#fff;font-weight:900}
+  .gr.g5{background:var(--ok)} .gr.g4{background:#4c9f4c} .gr.g3{background:var(--warn)}
+  .gr.g2{background:#e07a3f} .gr.g1{background:var(--no)} .gr.gx{background:var(--faint)}
+  .gr{grid-template-columns:none}
+
+  .plan-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+  .plan-card{display:grid;gap:12px}
+  .plan-card h3{margin:0;display:flex;align-items:center;gap:8px;font-size:17px}
+  .plan-card h3 code{font-size:11.5px;color:var(--muted);font-weight:700}
+  .plan-card .pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .plan-card .grp{font-size:11px;font-weight:900;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+  .plan-card .feat{display:grid;gap:6px}
+  .plan-card .feat label{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:700;cursor:pointer}
+  .plan-card .feat input{width:17px;height:17px;accent-color:var(--accent);margin:0}
+  .plan-card .field{margin:0}
+  .plan-card .field .help{margin-top:3px}
+
+  .adm-modal{display:grid;gap:12px;width:100%}
+  .adm-modal h2{margin:0}
+  .adm-modal p{margin:0;color:var(--muted);font-size:13px;word-break:break-all}
+  .adm-modal .acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:4px}
+</style>
+</head>
+<body>
+<header class="appbar adm-bar">
+  <div class="inner">
+    <a class="brand" href="index.html" id="admBrand"></a>
+    <div class="tools">
+      <span class="adm-who" id="admWho"></span>
+      <div class="seg" id="admLang" role="group" aria-label="Language">
+        <button type="button" data-lang="ru">RU</button>
+        <button type="button" data-lang="en">EN</button>
+      </div>
+      <button type="button" class="btn ghost small" id="admTheme" data-i18n="aTheme"></button>
+      <button type="button" class="btn ghost small hidden" id="admOut" data-i18n="aOut"></button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap adm">
+  <!-- Состояния до входа -->
+  <section class="panel adm-gate" id="gateLoading">
+    <div class="adm-loading"><span class="spin"></span><span data-i18n="aLoading"></span></div>
+  </section>
+  <section class="panel adm-gate hidden" id="gateNoCloud">
+    <h1 data-i18n="aH1"></h1>
+    <p class="lead" data-i18n="aNoCloud"></p>
+  </section>
+  <section class="panel adm-gate hidden" id="gateLogin">
+    <h1 data-i18n="aLoginH"></h1>
+    <p class="lead" data-i18n="aLoginLead"></p>
+    <button type="button" class="btn full big" id="loginGoogle" data-i18n="aGoogle"></button>
+    <div class="adm-or" data-i18n="aOr"></div>
+    <div class="field"><label for="loginMail" data-i18n="aMail"></label><input type="email" id="loginMail" autocomplete="email"></div>
+    <div class="field"><label for="loginPass" data-i18n="aPass"></label><input type="password" id="loginPass" autocomplete="current-password"></div>
+    <button type="button" class="btn ghost full" id="loginGo" data-i18n="aLogin"></button>
+  </section>
+  <section class="panel adm-gate hidden" id="gateDenied">
+    <h1 data-i18n="aDeniedH"></h1>
+    <p class="lead"><span data-i18n="aDenied"></span> <b id="deniedMail"></b></p>
+    <button type="button" class="btn ghost full" id="deniedOut" data-i18n="aOutOther"></button>
+  </section>
+
+  <!-- Панель -->
+  <div id="admApp" class="hidden">
+    <div class="adm-head">
+      <h1 data-i18n="aH1"></h1>
+      <span class="upd" id="admUpdated"></span>
+      <button type="button" class="btn ghost small" id="admRefresh" data-i18n="aRefresh"></button>
+    </div>
+
+    <div class="seg seg-lg adm-tabs" id="admTabs" role="tablist">
+      <button type="button" role="tab" data-tab="overview" aria-pressed="true"><span data-i18n="tOverview"></span></button>
+      <button type="button" role="tab" data-tab="users" aria-pressed="false"><span data-i18n="tUsers"></span></button>
+      <button type="button" role="tab" data-tab="payments" aria-pressed="false"><span data-i18n="tPayments"></span><span class="cnt hidden" id="payCnt"></span></button>
+      <button type="button" role="tab" data-tab="checks" aria-pressed="false"><span data-i18n="tChecks"></span></button>
+      <button type="button" role="tab" data-tab="plans" aria-pressed="false"><span data-i18n="tPlans"></span></button>
+    </div>
+
+    <!-- Обзор -->
+    <section class="adm-tab" id="tab-overview">
+      <div class="stats" id="ovStats"></div>
+      <div class="panel" style="margin-top:16px">
+        <h2 data-i18n="ovChartH"></h2>
+        <div id="ovChart"></div>
+      </div>
+    </section>
+
+    <!-- Пользователи -->
+    <section class="adm-tab hidden" id="tab-users">
+      <div class="panel">
+        <div class="toolbar">
+          <input type="search" id="userSearch" data-i18n-ph="uSearch" autocomplete="off">
+        </div>
+        <div class="table-wrap" id="usersBox"></div>
+      </div>
+    </section>
+
+    <!-- Оплаты -->
+    <section class="adm-tab hidden" id="tab-payments">
+      <div class="panel">
+        <div class="toolbar">
+          <div class="seg" id="payStatus" role="group">
+            <button type="button" data-status="pending" aria-pressed="true" data-i18n="pPending"></button>
+            <button type="button" data-status="paid" aria-pressed="false" data-i18n="pPaid"></button>
+            <button type="button" data-status="rejected" aria-pressed="false" data-i18n="pRejected"></button>
+            <button type="button" data-status="" aria-pressed="false" data-i18n="pAll"></button>
+          </div>
+          <label class="days"><span data-i18n="pDays"></span><input type="number" id="payDays" min="1" max="3660" value="30" inputmode="numeric"></label>
+        </div>
+        <p class="note" data-i18n="pNote"></p>
+        <div class="table-wrap" id="paysBox"></div>
+      </div>
+    </section>
+
+    <!-- Проверки -->
+    <section class="adm-tab hidden" id="tab-checks">
+      <div class="panel">
+        <div class="toolbar">
+          <div class="seg" id="checkMode" role="group">
+            <button type="button" data-mode="" aria-pressed="true" data-i18n="cAll"></button>
+            <button type="button" data-mode="photo" aria-pressed="false" data-i18n="cPhoto"></button>
+            <button type="button" data-mode="text" aria-pressed="false" data-i18n="cText"></button>
+          </div>
+        </div>
+        <div class="table-wrap" id="checksBox"></div>
+      </div>
+    </section>
+
+    <!-- Тарифы -->
+    <section class="adm-tab hidden" id="tab-plans">
+      <p class="note" data-i18n="plNote"></p>
+      <div class="plan-grid" id="plansBox" style="margin-top:16px"></div>
+    </section>
+  </div>
+</main>
+
+<script src="assets/config.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/db.js"></script>
+<script src="assets/admin.js"></script>
+</body>
+</html>
