@@ -235,6 +235,16 @@ Sky.db = (function () {
     try { await sb.storage.from(bucket).remove(paths); } catch (e) { /* уборка не критична */ }
   }
 
+  /* Временная ссылка на файл. Worker /api/check-photo берёт картинку
+     только по адресу, а бакет homework закрытый (sql/schema-storage.sql)
+     и обычной публичной ссылки у файлов нет. Ссылка живёт sec секунд. */
+  async function signedUrl(bucket, path, sec) {
+    if (!sb) throw new Error('offline');
+    const { data, error } = await sb.storage.from(bucket).createSignedUrl(path, sec || 300);
+    if (error) throw error;
+    return data.signedUrl;
+  }
+
   async function token() {
     if (!sb) return null;
     try {
@@ -284,7 +294,7 @@ Sky.db = (function () {
     isCloud: () => mode === 'cloud',
     list, insert, update, remove, subscribe,
     signUp, signIn, signInGoogle, signOut, becomeLocal,
-    me, isTeacher, isStudent, token, rpc, upload, removeFiles,
+    me, isTeacher, isStudent, token, rpc, upload, removeFiles, signedUrl,
     allProfiles: () => list('profiles'),
     uid
   };

@@ -93,7 +93,9 @@
   .cap-note{margin-top:8px;font-size:12px;color:var(--muted)}
   .used-note{margin:10px 0 0;padding:10px 12px;border-radius:12px;background:var(--panel-2);
     font-size:12.5px;line-height:1.5;color:var(--ink-2)}
-  .progress{margin-top:12px}
+  /* В sky.css .progress — это сама полоска в 9px с overflow:hidden. Здесь
+     .progress — блок «текст + полоска», и без сброса текст срезался. */
+  .progress{margin-top:12px;height:auto;overflow:visible;background:none;border:0;border-radius:0}
   .progress-text{font-size:13px;font-weight:800;margin-bottom:6px}
   .progress-bar{height:8px;border-radius:99px;background:var(--panel-2);overflow:hidden}
   .progress-bar i{display:block;height:100%;width:0;background:var(--accent);border-radius:99px;transition:width .25s}
@@ -203,11 +205,11 @@
       <div class="used-note hidden" id="usedNote"></div>
       <button class="btn full big" id="checkBtn" disabled data-i18n="checkBtn"></button>
 
-      <!-- Прогресс. Счётчик «k из N» — только там, где он правдив:
-           на подготовке и загрузке фото идут по одному. Проверка — один
-           запрос к модели на все фото сразу, и «проверяю фото 2 из 5»
-           был бы выдуманным числом; там полоса бежит без счёта. -->
-      <div class="progress hidden" id="progress">
+      <!-- Прогресс. Фото и загружаются, и проверяются по одному
+           (Worker берёт одну картинку за запрос), поэтому счётчик
+           «k из N» правдив на обоих шагах. Сколько модель думает над
+           одним фото, заранее неизвестно — там полоса бежит без счёта. -->
+      <div class="progress hidden" id="progress" aria-live="polite">
         <div class="progress-text" id="progressText"></div>
         <div class="progress-bar"><i id="progressFill"></i></div>
       </div>
@@ -264,7 +266,8 @@ Sky.init({
   capFree:{ru:'Бесплатно — до 5 фото за раз. В VIP — до 20.',en:'Free: up to 5 photos at once. VIP: up to 20.'},
   capVip:{ru:'За одну проверку — не больше 20 фото.',en:'At most 20 photos per check.'},
   pgUpload:{ru:'Загружаю фото %1 из %2',en:'Uploading photo %1 of %2'},
-  pgCheck:{ru:'Проверяю фото: %1 шт. Это может занять до минуты',en:'Checking %1 photo(s). This may take up to a minute'},
+  pgCheck:{ru:'Идёт проверка, это займёт 5-15 секунд...',en:'Checking, this takes 5-15 seconds...'},
+  pgCheckN:{ru:'Идёт проверка фото %1 из %2, каждое — 5-15 секунд...',en:'Checking photo %1 of %2, 5-15 seconds each...'},
   upFail:{ru:'Не удалось загрузить фото. Проверьте интернет и попробуйте ещё раз.',en:'Could not upload photos. Check your connection.'},
   tooBigAfter:{ru:'Фото %1 не получилось сжать до 1,5 МБ. Попробуйте другое.',en:'Photo %1 could not be compressed to 1.5 MB.'},
   usedToday:{ru:'Сегодня бесплатная проверка по предмету «%1» уже была. Следующая — в 00:00 по вашему времени.',
@@ -306,6 +309,15 @@ Sky.init({
   taskLabel:{ru:'Что было задано (необязательно, но с этим проверка точнее)',
              en:'What was set (optional, but it makes marking more accurate)'},
   checkBtn:{ru:'Проверить работу',en:'Check the work'},
+  checking:{ru:'Проверяю...',en:'Checking...'},
+  againBtn:{ru:'Проверить ещё раз',en:'Check again'},
+  photoN:{ru:'Фото %1',en:'Photo %1'},
+  gradeL:{ru:'Оценка',en:'Mark'},
+  errNoPhoto:{ru:'Не выбрано фото',en:'No photo selected'},
+  errKey:{ru:'Ошибка ключа API, сообщите администратору',en:'API key error, please tell the administrator'},
+  errRate:{ru:'Слишком много запросов, попробуйте через минуту',en:'Too many requests, try again in a minute'},
+  errDown:{ru:'Сервис временно недоступен, попробуйте позже',en:'The service is temporarily unavailable, try later'},
+  errTimeout:{ru:'Превышено время ожидания',en:'The request timed out'},
 
   resultH:{ru:'Разбор',en:'Review'},
   recogH:{ru:'Что прочитала модель',en:'What the model read'},
@@ -544,6 +556,7 @@ function setBusy(on) {
   $('#subjRow').querySelectorAll('button').forEach(b => { b.disabled = on; });
   $('#thumbs').querySelectorAll('button').forEach(b => { b.disabled = on; });
   $('#clearBtn').disabled = on;
+  $('#checkBtn').innerHTML = on ? `<span class="spin"></span> ${esc(Sky.t('checking'))}` : esc(Sky.t('checkBtn'));
   renderThumbs(false);
 }
 
@@ -628,11 +641,10 @@ function openPaywall(kind) {
    2. Фото сжимаются и загружаются в хранилище ПО ОДНОМУ, await в
       цикле. Не Promise.all: двадцать снимков, разжатых разом, — это
       больше гигабайта памяти, и вкладка на телефоне падает.
-   3. Worker получает пути и делает один запрос к модели на все фото.
-   4. Если загрузка оборвалась посередине — уже загруженное стираем.
-
-   Сеанс списывается на шаге 3, на сервере. Сбой на шаге 2 сеанс не
-   тратит. */
+   3. Каждое фото по очереди уходит в Worker: GET /api/check-photo?img=
+      с временной ссылкой на файл (Worker берёт только адрес, не base64,
+      и одну картинку за запрос). После проверки файлы стираем.
+   4. Если загрузка оборвалась посередине — уже загруженное стираем. */
 async function check() {
   if (!photos.length || busy) return;
 
@@ -667,60 +679,114 @@ async function check() {
     return;
   }
 
-  progress(Sky.t('pgCheck').replace('%1', n), null);
-
-  let r, data;
-  try {
-    r = await fetch(AI_BASE.replace(/\/+$/, '') + '/check-homework', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt },
-      body: JSON.stringify({
-        lang: Sky.lang, subject, tz: TZ, paths: uploaded,
-        taskText: $('#taskText').value.trim().slice(0, 800)
-      })
-    });
-    data = await r.json().catch(() => null);
-  } catch (e) {
-    /* До Worker не достучались — фото он не удалит, убираем сами.
-       Если достучались и ответ потерялся, повторное удаление ничего
-       не сломает. */
-    await Sky.db.removeFiles('homework', uploaded);
-    progressDone(); setBusy(false);
-    Sky.toast(Sky.t('aiNoNet') || 'Нет связи с сервером разбора.', 5000);
-    return;
+  const texts = [];
+  let fail = null;
+  for (let i = 0; i < n && !fail; i++) {
+    progress(n > 1 ? Sky.t('pgCheckN').replace('%1', i + 1).replace('%2', n) : Sky.t('pgCheck'), null);
+    let img;
+    try { img = await Sky.db.signedUrl('homework', uploaded[i], 300); }
+    catch (e) { fail = Sky.t('upFail'); break; }
+    try { texts.push(await checkOne(img)); }
+    catch (e) { fail = e.message; }
   }
 
+  /* Worker файлы не удаляет, а картинку модель уже забрала — убираем сами. */
+  await Sky.db.removeFiles('homework', uploaded);
   progressDone(); setBusy(false);
+  renderHomeworkResult(texts, fail);
+  if (fail) return;   /* фото остаются в списке: можно сразу нажать «Проверить работу» ещё раз */
 
-  if (!r.ok) {
-    if (r.status === 402 && data && data.paywall) {
-      if (data.reason === 'limit') {
-        usage = usage || { vip: false, photo_limit: FREE_PHOTOS, used_subjects: [] };
-        if (!usage.used_subjects.includes(subject)) usage.used_subjects.push(subject);
-        renderUsage();
-      }
-      openPaywall(data.reason === 'too_many_photos' ? 'photos' : 'limit');
-      return;
-    }
-    Sky.toast((data && data.error) || ('Ошибка ' + r.status), 6000);
-    return;
-  }
-
-  renderHomeworkResult(data);
   clearPhotos();
   if (usage && !usage.vip && !usage.used_subjects.includes(subject)) usage.used_subjects.push(subject);
   renderUsage();
   await renderHistory();
 }
 
-function renderHomeworkResult(data) {
+/* Одно фото → Worker → Z.AI. Возвращает текст разбора или бросает
+   ошибку с уже понятным ученику текстом. */
+const CHECK_TIMEOUT_MS = 30000;
+const ERR_BY_STATUS = { 400: 'errNoPhoto', 401: 'errKey', 429: 'errRate' };
+
+async function checkOne(img) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), CHECK_TIMEOUT_MS);
+  let r, body;
+  try {
+    r = await fetch(AI_BASE.replace(/\/+$/, '') + '/api/check-photo?img=' + encodeURIComponent(img),
+                    { signal: ctl.signal });
+    body = await r.text();
+  } catch (e) {
+    throw new Error(Sky.t(e && e.name === 'AbortError' ? 'errTimeout' : 'aiNoNet'));
+  } finally { clearTimeout(timer); }
+
+  let data = null;
+  try { data = JSON.parse(body); } catch (e) {}
+
+  /* Worker пересылает ответ Z.AI как есть и со статусом 200 даже тогда,
+     когда Z.AI вернула ошибку, — её видно только по телу. Коды Z.AI:
+     1000–1004 — ключ, 1302–1305 — частота и лимиты. */
+  let status = r.status;
+  if (status === 200 && data && data.error) {
+    const code = String(data.error.code || '');
+    status = /^100[0-4]$/.test(code) ? 401 : /^130[2-5]$/.test(code) ? 429 : 502;
+  }
+  if (status !== 200) {
+    console.warn('[photo] /api/check-photo', r.status, body.slice(0, 300));
+    const key = ERR_BY_STATUS[status] || (status >= 500 ? 'errDown' : null);
+    throw new Error(key ? Sky.t(key) : 'Ошибка ' + status);
+  }
+
+  const msg = data && data.choices && data.choices[0] && data.choices[0].message;
+  /* glm-4.6v-flash оборачивает итог в служебные метки <|begin_of_box|>. */
+  const text = String((msg && msg.content) || '').replace(/<\|(?:begin|end)_of_box\|>/g, '').trim();
+  if (!text) throw new Error(Sky.t('errDown'));
+  return text;
+}
+
+/* Оценку модель пишет прозой («Оценка: 4», «**Оценка** — 5/5»).
+   Берём последнее упоминание: в начале ответа слово «оценка» бывает
+   и в другом смысле. Не нашли — плашку с оценкой не показываем. */
+function gradeOf(text) {
+  const all = [...String(text).replace(/\*/g, '').matchAll(/оценк[а-я]*[^0-9]{0,25}?([1-5])(?![0-9])/gi)];
+  return all.length ? Number(all[all.length - 1][1]) : null;
+}
+
+/* Ответ модели — markdown. Превращаем только заголовки, **жирный** и
+   маркеры списков, остальное показываем как есть. */
+function mdLite(text) {
+  return esc(text).split('\n').map(l => {
+    const h = l.match(/^\s*#{1,6}\s+(.*)$/);
+    if (h) return `<b style="font-size:15px">${h[1].replace(/\*\*/g, '')}</b>`;
+    if (/^\s*(-{3,}|\*{3,})\s*$/.test(l)) return '';
+    return l.replace(/^(\s*)[-*•]\s+/, '$1• ').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  }).join('\n').replace(/\n{3,}/g, '\n\n');
+}
+
+function renderHomeworkResult(texts, fail) {
+  const many = texts.length > 1 || (texts.length > 0 && !!fail);
+  const photoN = i => esc(Sky.t('photoN').replace('%1', i + 1));
   $('#resultSection').classList.remove('hidden');
   $('#result').innerHTML =
-    `<div class="hw-text">${esc(data.text || '').replace(/\n/g, '<br>')}</div>` +
-    (data.truncated ? `<div class="limit-note">${esc(Sky.t('truncated'))}</div>` : '') +
-    (data.quota && !data.quota.vip
-      ? `<div class="hw-left">${esc(Sky.t('nextFree').replace('%1', subjName(data.subject || subject)))}</div>` : '');
+    texts.map((text, i) => {
+      const g = gradeOf(text);
+      return (many ? `<h3 style="margin:${i ? 22 : 0}px 0 10px;font-size:14px">${photoN(i)}</h3>` : '') +
+        (g ? `<div class="gradebox"><div class="grade g${g}">${g}</div>
+                <div class="said"><b>${esc(Sky.t('gradeL'))}</b></div></div>` : '') +
+        `<div class="hw-text" style="white-space:pre-line">${mdLite(text)}</div>`;
+    }).join('') +
+    (fail ? `<div class="limit-note">${many ? photoN(texts.length) + ': ' : ''}${esc(fail)}</div>` : '') +
+    `<button type="button" class="btn ghost" id="againBtn" style="margin-top:14px">${esc(Sky.t('againBtn'))}</button>`;
+  $('#againBtn').addEventListener('click', resetCheck);
   $('#resultSection').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/* «Проверить ещё раз»: убрать разбор и вернуть страницу к выбору фото. */
+function resetCheck() {
+  $('#resultSection').classList.add('hidden');
+  $('#result').innerHTML = '';
+  progressDone();
+  setBusy(false);
+  $('.shot').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 /* ---------- сохранение ---------- */
