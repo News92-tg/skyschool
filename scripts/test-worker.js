@@ -583,6 +583,29 @@ async function main() {
   r = await postText({ text: 'После лимита.' }, { ip: '10.0.4.4' });
   ok('текст: следующий вызов после 429 ждёт не дольше 2 с', r.status === 200 && Date.now() - t0 >= 1900 && Date.now() - t0 < 3500);
 
+  /* ---------- прежние адреса: код worker/worker.js внутри ---------- */
+  reset();
+  const embed = require('./embed-legacy-worker.js');
+  ok('копия worker/worker.js в news92-orders.js не отстала', embed.current().text === embed.block());
+  r = await call('/health');
+  ok('/health: в списке и новые, и прежние адреса', ['/api/check-photo', '/api/check-text', '/explain', '/check-photo', '/check-homework', '/chess-explain', '/grade-essay']
+    .every(p => r.body.endpoints.includes(p)), r.text);
+  const SITE = { Origin: 'https://news92-tg.github.io', 'Content-Type': 'application/json' };
+  groqQueue.push(groqOk('Потому что 2+2=4.'));
+  r = await call('/explain', { method: 'POST', headers: SITE, body: JSON.stringify({ task: '2+2=?', userAnswer: '5', correctAnswer: '4', lang: 'ru' }) });
+  ok('POST /explain — прежний код: объяснение от Groq', r.status === 200 && r.body.explanation === 'Потому что 2+2=4.' &&
+    r.headers.get('Access-Control-Allow-Origin') === 'https://news92-tg.github.io', r.text);
+  groqQueue.push(groqOk({ grade: 4, criteria: [{ name: 'тема', score: 5, comment: 'ок' }], strengths: [], issues: [], overall_feedback: 'Хорошо', next_step: '' }));
+  r = await call('/grade-essay', { method: 'POST', headers: SITE, body: JSON.stringify({ text: 'Сочинение', lang: 'ru' }) });
+  ok('POST /grade-essay — прежний код: оценка и критерии', r.status === 200 && r.body.grade === 4 && r.body.criteria[0].score === 5, r.text);
+  r = await call('/grade-essay', { method: 'OPTIONS', headers: { Origin: 'https://news92-tg.github.io' } });
+  ok('OPTIONS прежних адресов — их собственный CORS', r.status === 204 && r.headers.get('Access-Control-Allow-Headers') === 'Content-Type');
+  r = await call('/check-photo');
+  ok('GET /check-photo — как в прежнем коде: 405 use POST', r.status === 405 && r.body.error === 'use POST');
+  r = await call('/explain', { method: 'POST', headers: { Origin: 'https://evil.test', 'Content-Type': 'application/json' }, body: '{"task":"x"}' });
+  ok('чужой сайт — 403, как в прежнем коде', r.status === 403);
+  ok('прежние адреса не трогают тарифы и Supabase', !sbCalls.length && !windows.size);
+
   /* ---------- без Supabase ---------- */
   reset();
   const bare = { ZAI_API_KEY: 'zai' };

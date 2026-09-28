@@ -1,7 +1,7 @@
 /* ============================================================
-   «Домашка по фото» и «Проверка сочинения» в настоящем браузере:
-   запросы к Worker такие, как их принимает worker/worker.js
-   (развёрнут под именем news92-orders):
+   «Домашка по фото» и «Проверка сочинения» в настоящем браузере,
+   когда по адресу news92-orders стоит ПРЕЖНИЙ Worker (worker/worker.js,
+   GET /health без /api/… в списке). Запросы — такие, как он принимает:
 
      POST /check-photo  { imageBase64, mime, subject, taskText, lang, teacher, strictness }
      POST /grade-essay  { text, topic, subject, kind, criteria, lang, teacher, strictness }
@@ -10,6 +10,7 @@
    пропускает), и ни одного запроса на /api/… — таких адресов у Worker нет.
 
    Запуск:  node scripts/test-photo.js
+   С новым Worker (worker/news92-orders.js) — scripts/test-photo-orders.js.
 
    Worker подменён: ответы собираются здесь, в тесте. Supabase
    недоступен (страница уходит в локальный режим).
@@ -63,6 +64,9 @@ function ok(name, cond, extra) {
     const reply = (status, data) => route.fulfill({
       status, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(data)
     });
+    if (url.pathname === '/health') {
+      return reply(200, { ok: true, service: 'skyschool-ai', endpoints: ['/explain', '/check-photo', '/check-homework', '/chess-explain', '/grade-essay'] });
+    }
     if (state.delay) await new Promise(r => setTimeout(r, state.delay));
     if (req.method() !== 'POST') return reply(405, { error: 'use POST' });
     const q = state.queue[url.pathname];
@@ -107,7 +111,8 @@ function ok(name, cond, extra) {
   await page.waitForSelector('.modal .tariffs');
   await page.click('.tf-card [data-buy="premium_tariff"]');
   await page.waitForFunction(() => /Оплата скоро/.test((document.querySelector('.toast') || {}).textContent || ''));
-  ok('«Купить» — «Оплата скоро», без запроса к Worker', !state.calls.length);
+  ok('Worker опознан по /health как прежний', await page.evaluate(() => SkyCheck.mode()) === 'legacy');
+  ok('«Купить» — «Оплата скоро», без запроса к Worker', state.calls.every(c => c.path === '/health'));
   await page.click('.modal [data-close]');
 
   await page.fill('#taskText', '№ 5');
@@ -258,8 +263,9 @@ function ok(name, cond, extra) {
   ok('essay.html: замечание с цитатой и причиной', /Нет запятой — Придаточное/.test(await page.textContent('#result')));
   await page.close();
 
-  ok('ни одного запроса на /api/… и ни одного GET к Worker',
-    state.calls.every(c => !c.path.startsWith('/api/') && c.method === 'POST'), state.calls.filter(c => c.path.startsWith('/api/') || c.method !== 'POST').map(c => c.method + ' ' + c.path).join());
+  ok('ни одного запроса на /api/… и ни одного GET к Worker, кроме /health',
+    state.calls.every(c => !c.path.startsWith('/api/') && (c.method === 'POST' || c.path === '/health')),
+    state.calls.filter(c => c.path.startsWith('/api/') || (c.method !== 'POST' && c.path !== '/health')).map(c => c.method + ' ' + c.path).join());
   ok('ошибок JavaScript на странице нет', !errors.length, errors.join(' | '));
   await browser.close();
   console.log(`\nПрошло: ${passed}, провалено: ${failed}`);

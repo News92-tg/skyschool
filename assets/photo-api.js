@@ -2,10 +2,10 @@
    SkyySchool — проверка ДЗ по фото: общее для photo.html
 
    Здесь то, чем пользуются оба режима страницы (ученик и учитель):
-     запросы к Worker (AI_BASE_ORDERS) — POST с JSON, как требует
-     worker/worker.js, развёрнутый под именем news92-orders,
-     проверка работы по фото (POST /check-photo),
-     лимит запросов с обратным отсчётом,
+     какой Worker стоит по адресу AI_BASE_ORDERS (mode(): 'orders' или
+     'legacy') и запросы к нему в его формате,
+     проверка работы по фото,
+     тариф и лимит запросов с обратным отсчётом,
      окно «Тарифы» и заявка на оплату,
      счётчик потраченных токенов,
      сжатие фото перед загрузкой.
@@ -64,6 +64,43 @@ window.SkyCheck = (function () {
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
   const base = () => (Sky.cfg.AI_BASE_ORDERS || Sky.cfg.AI_BASE || '').trim().replace(/\/+$/, '');
   const hasWorker = () => /^https?:\/\//i.test(base());
+
+  /* ---------- какой Worker стоит ----------
+
+     'orders' — worker/news92-orders.js: тарифы и лимиты (/api/limits),
+       проверка фото по ссылке (/api/check-photo), режим учителя,
+       текст через Groq (/api/check-text), заявки на оплату. Ученика
+       узнаёт по заголовку Authorization — его CORS это пропускает.
+     'legacy' — worker/worker.js: только POST /check-photo (фото base64,
+       без входа), /grade-essay и др. Его CORS пропускает один
+       заголовок Content-Type, поэтому токен ему не шлём, а адресов
+       /api/… у него нет.
+
+     Узнаём по GET /health: у news92-orders.js в списке есть
+     /api/check-photo. Ответ запоминаем на время страницы; если
+     Worker не ответил — считаем 'legacy' и спросим снова в следующий раз. */
+  let modeCache = null;
+  let modeInflight = null;
+  function mode() {
+    if (modeCache) return Promise.resolve(modeCache);
+    if (modeInflight) return modeInflight;
+    modeInflight = (async () => {
+      if (!hasWorker()) return 'legacy';
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 8000);
+      try {
+        const r = await fetch(base() + '/health', { signal: ctl.signal });
+        const d = await r.json();
+        modeCache = Array.isArray(d.endpoints) && d.endpoints.includes('/api/check-photo') ? 'orders' : 'legacy';
+        return modeCache;
+      } catch (e) {
+        return 'legacy';
+      } finally {
+        clearTimeout(timer);
+      }
+    })().finally(() => { modeInflight = null; });
+    return modeInflight;
+  }
 
   /* Ключи совпадают с Worker; русские названия он тоже понимает. */
   const SUBJECTS = [
@@ -157,18 +194,19 @@ window.SkyCheck = (function () {
 
   async function request(path, o) {
     o = o || {};
-    /* Адресов /api/… в Worker нет (режим учителя, отправка работ по
-       ссылке, заявки на оплату): такие запросы не отправляем вовсе и
-       сразу отдаём понятную ошибку вместо 404. */
-    if (/^\/api\//.test(path)) return { ok: false, status: 0, data: { code: 'unsupported' } };
+    const m = await mode();
+    /* У прежнего Worker адресов /api/… нет (режим учителя, отправка
+       работ по ссылке, заявки на оплату): такие запросы не отправляем
+       вовсе и сразу отдаём понятную ошибку вместо 404. */
+    if (m === 'legacy' && /^\/api\//.test(path)) return { ok: false, status: 0, data: { code: 'unsupported' } };
     const ctl = new AbortController();
     let timer = null;
     const arm = () => { clearTimeout(timer); if (o.timeout) timer = setTimeout(() => ctl.abort(), o.timeout); };
     arm();
-    /* Authorization — только по явной просьбе (o.auth). CORS этого
-       Worker разрешает один заголовок, Content-Type: с Authorization
-       браузер запрос не отправит вовсе («Failed to fetch»). */
-    const headers = Object.assign(o.auth ? await authHeaders() : {}, o.headers || {});
+    /* Authorization — только новому Worker. CORS прежнего разрешает
+       один заголовок, Content-Type: с Authorization браузер запрос не
+       отправит вовсе («Failed to fetch»). */
+    const headers = Object.assign(m === 'orders' ? await authHeaders() : {}, o.headers || {});
     let body = o.body;
     if (o.json !== undefined) { headers['Content-Type'] = 'application/json'; body = JSON.stringify(o.json); }
     if (o.onProgress) headers.Accept = 'application/x-ndjson';
@@ -252,7 +290,24 @@ window.SkyCheck = (function () {
     return d.error || (Sky.lang === 'en' ? 'Error ' : 'Ошибка ') + res.status;
   }
 
-  /* Проверка работы: POST /check-photo
+  /* Новый Worker: одна работа (одно или несколько фото) — один запрос
+     GET /api/check-photo?img=…&img=…&mode=…&subject=… с временными
+     ссылками на фото в хранилище. Ответ — JSON только с теми полями,
+     что просили (оценка, сверка, тест, списывание…). */
+  async function checkPhotoOrders(p) {
+    const qs = new URLSearchParams();
+    p.imgs.forEach(u => qs.append('img', u));
+    qs.set('mode', p.mode || 'check');
+    if (p.subject) qs.set('subject', p.subject);
+    if (p.task) qs.set('task', p.task);
+    if (p.grade) qs.set('grade', 'true');
+    if (p.gradeText) qs.set('grade_text', 'true');
+    if (p.accuracy) qs.set('accuracy', 'true');
+    qs.set('length', p.length === 'short' ? 'short' : 'long');
+    return request('/api/check-photo?' + qs, { timeout: p.timeout });
+  }
+
+  /* Прежний Worker: POST /check-photo
        { imageBase64, mime, subject, taskText, lang, teacher, strictness }
      Одно фото — один запрос; фото уходит base64 прямо в JSON.
 
@@ -346,20 +401,40 @@ window.SkyCheck = (function () {
     notify();
   }
 
-  /* Лимиты. /api/limits в Worker нет, а фото проверяется без входа,
-     поэтому показываем то, что действует на деле: одно фото раз в
-     PHOTO_INTERVAL_S секунд с адреса, до 5 фото за раз. К серверу
-     не обращаемся. */
+  /* Тариф и лимит.
+     Новый Worker — из /api/limits: тариф ученика (его выдают и в
+     админке), окно запросов, лимит текста. Одновременные вызовы
+     (вход, окончание окна, старт страницы) склеиваются в один запрос.
+     Прежний Worker тарифов не знает и проверяет без входа: одно фото
+     раз в PHOTO_INTERVAL_S секунд с адреса, до 5 фото за раз, — это
+     и показываем, без запроса к серверу. */
   const STUB_LIMITS = {
     plan: 'free', title: 'Бесплатный', price_rub: 0, user: false,
     limits: { requests: 1, window_seconds: PHOTO_INTERVAL_S, photos: 5 },
     features: { compare: false, teacher: false, plagiarism: false },
     rate: { allowed: true, remaining: 1, retry_after: 0, reset_in: 0 }
   };
+  let inflight = null;
   function loadLimits() {
-    limits = hasWorker() ? JSON.parse(JSON.stringify(STUB_LIMITS)) : null;
-    notify();
-    return Promise.resolve(limits);
+    if (inflight) return inflight;
+    inflight = (async () => {
+      if (!hasWorker()) { limits = null; notify(); return null; }
+      if (await mode() === 'legacy') {
+        limits = JSON.parse(JSON.stringify(STUB_LIMITS));
+        notify();
+        return limits;
+      }
+      const res = await request('/api/limits', { timeout: 10000 });
+      if (res.ok && res.data && res.data.plan) {
+        limits = res.data;
+        setWait(res.data.rate && !res.data.rate.allowed ? res.data.rate.retry_after : 0);
+      } else {
+        limits = null;
+        notify();
+      }
+      return limits;
+    })().finally(() => { inflight = null; });
+    return inflight;
   }
 
   /* После ответа проверки: сколько осталось в окне. */
@@ -437,8 +512,9 @@ window.SkyCheck = (function () {
       });
   }
 
-  /* Оплата не подключена, а приёма заявок (/api/payments) в Worker
-     нет: честно говорим «скоро», запроса к серверу нет. */
+  /* Оплата не подключена: новый Worker оставляет заявку (pending) —
+     её видно в админке, — прежний заявок не принимает. В обоих случаях
+     честно говорим «скоро». Сумму ставит Worker по справочнику тарифов. */
   async function buy(purpose, btn, close) {
     if (!(Sky.db && Sky.db.me && Sky.db.me())) {
       Sky.toast(Sky.t('buyLogin'), 5000);
@@ -447,6 +523,10 @@ window.SkyCheck = (function () {
       return;
     }
     btn.disabled = true;
+    if (await mode() === 'orders') {
+      const res = await request('/api/payments', { method: 'POST', json: { purpose }, timeout: 15000 });
+      if (!res.ok && res.data && res.data.code === 'session') { Sky.toast(Sky.t('errSession'), 5000); btn.disabled = false; return; }
+    }
     Sky.toast(Sky.t('paySoon'), 6000);
   }
 
@@ -528,7 +608,7 @@ window.SkyCheck = (function () {
   return {
     esc, hasWorker, SUBJECTS, subjName, planName,
     compress, PHOTO_MAX_BYTES, PHOTO_INTERVAL_S,
-    request, errorText, checkPhoto,
+    mode, request, errorText, checkPhoto, checkPhotoOrders,
     loadLimits, applyRate, setWait, canRequest, waitLeft, clock,
     feature, photoCap, planId, planSummary, get limits() { return limits; },
     onChange: cb => listeners.push(cb),

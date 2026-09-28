@@ -236,8 +236,8 @@
 
   <p class="note hidden" id="needWorker" style="border-left-color:var(--warn)"></p>
 
-  <!-- Ученик / учитель и тариф. Строку тарифа и лимита собирает
-       assets/photo-api.js, без запроса к серверу. -->
+  <!-- Ученик / учитель и тариф. Тариф и лимит — из Worker (/api/limits);
+       у прежнего Worker его нет, тогда строку собирает assets/photo-api.js. -->
   <div class="mode-bar">
     <div class="seg seg-lg" id="roleSeg" role="group">
       <button type="button" data-role="student" aria-pressed="true" data-i18n="roleStudent"></button>
@@ -367,7 +367,7 @@
   </div>
   </div><!-- /photoTab -->
 
-  <!-- ===== Текст: сочинение → POST /grade-essay ===== -->
+  <!-- ===== Текст: сочинение → POST /api/check-text (новый Worker) или /grade-essay (прежний) ===== -->
   <div id="textTab" class="hidden">
   <div class="section">
     <div class="panel shot">
@@ -399,6 +399,8 @@
         </div>
       </div>
 
+      <div class="cap-note hidden" id="xPlanLine"></div>
+      <div class="used-note hidden" id="xWait"></div>
       <button class="btn full big" id="xCheck" disabled data-i18n="xCheckBtn"></button>
       <div class="progress hidden" id="xProgress" aria-live="polite">
         <div class="progress-text"></div>
@@ -860,7 +862,7 @@ function setBusy(on) {
 
 /* ---------- тариф и лимит ----------
 
-   Приходят из assets/photo-api.js (SkyCheck.limits) и
+   Приходят из Worker (/api/limits) через assets/photo-api.js и
    обновляются после каждой проверки. Здесь только показ: строка
    тарифа, пометки у платных пунктов, кнопка и обратный отсчёт. */
 async function loadUsage() {
@@ -933,7 +935,11 @@ function renderLength() {
 
 /* ---------- проверка ----------
 
-   Порядок:
+   Как именно — зависит от того, какой Worker стоит (SkyCheck.mode()):
+   новый (worker/news92-orders.js) — checkOrders() ниже, прежний
+   (worker/worker.js) — check().
+
+   Прежний Worker, порядок:
    1. Если лимит ещё не открылся или фото больше, чем можно, — сразу
       говорим, без работы впустую.
    2. Фото сжимаются ПО ОДНОМУ, await в цикле. Не Promise.all: двадцать
@@ -948,6 +954,7 @@ const CHECK_TIMEOUT_MS = 60000;           /* распознавание + раз
 
 async function check() {
   if (!photos.length || busy) return;
+  if (await SkyCheck.mode() === 'orders') return checkOrders();
   if (!SkyCheck.canRequest()) {
     Sky.toast(Sky.t('waitNext').replace('%1', SkyCheck.clock(SkyCheck.waitLeft())), 4000);
     return;
@@ -995,6 +1002,91 @@ async function check() {
   await renderHistory();
 }
 
+/* Новый Worker (worker/news92-orders.js), порядок:
+   1. Лимит тарифа ещё не открылся или фото больше, чем можно, — сразу
+      говорим, без загрузки впустую.
+   2. Фото сжимаются и загружаются в хранилище ПО ОДНОМУ.
+   3. Все фото работы уходят в Worker ОДНИМ запросом:
+      GET /api/check-photo?img=…&img=…&mode=…&subject=… — с временными
+      ссылками на файлы и с входом ученика (его тариф выдают и в
+      админке). Один запрос — одна единица лимита тарифа. После
+      проверки файлы стираем.
+   4. Если загрузка оборвалась посередине — уже загруженное стираем. */
+const ORDERS_TIMEOUT_MS = 30000;
+
+async function checkOrders() {
+  if (!SkyCheck.canRequest()) {
+    Sky.toast(Sky.t('waitNext').replace('%1', SkyCheck.clock(SkyCheck.waitLeft())), 4000);
+    return;
+  }
+
+  const jwt = await Sky.db.token();
+  const me = Sky.db.me();
+  if (!jwt || !me) { Sky.toast(Sky.t('needLogin'), 6000); return; }
+
+  if (photos.length > capNow()) { openPaywall('photos'); return; }
+  const opt = readOptions();
+
+  setBusy(true);
+  $('#resultSection').classList.add('hidden');
+
+  const n = photos.length;
+  const session = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const uploaded = [];
+
+  try {
+    for (let i = 0; i < n; i++) {
+      progress(Sky.t('pgUpload').replace('%1', i + 1).replace('%2', n), i / n);
+      let small;
+      try { small = await compress(photos[i].blob); }
+      catch (e) { throw new Error(Sky.t('tooBigAfter').replace('%1', i + 1)); }
+      const path = `${me.id}/${session}/${i + 1}.jpg`;
+      await Sky.db.upload('homework', path, small, 'image/jpeg');
+      uploaded.push(path);
+    }
+  } catch (e) {
+    await Sky.db.removeFiles('homework', uploaded);
+    progressDone(); setBusy(false);
+    Sky.toast(e && e.message && !/^(offline|Failed|Network)/i.test(e.message) ? e.message : Sky.t('upFail'), 6000);
+    return;
+  }
+
+  progress(n > 1 ? Sky.t('pgCheckMany').replace('%1', n) : Sky.t('pgCheck'), null);
+
+  let res;
+  const imgs = [];
+  try {
+    for (const path of uploaded) imgs.push(await Sky.db.signedUrl('homework', path, 600));
+  } catch (e) {
+    res = { ok: false, status: 0, data: null, failText: Sky.t('upFail') };
+  }
+  if (!res) {
+    /* Больше фото и сверка с решением ИИ — дольше ответ модели. */
+    const timeout = ORDERS_TIMEOUT_MS + (n - 1) * 10000 + (opt.mode === 'compare' ? 15000 : 0);
+    res = await SkyCheck.checkPhotoOrders(Object.assign({ imgs, subject, task: $('#taskText').value.trim().slice(0, 800), timeout }, opt));
+  }
+
+  /* Worker файлы не удаляет, а картинку модель уже забрала — убираем сами. */
+  await Sky.db.removeFiles('homework', uploaded);
+  progressDone(); setBusy(false);
+
+  if (!res.ok) {
+    const d = res.data || {};
+    if (d.code === 'rate_limit' && d.retry_after) SkyCheck.setWait(d.retry_after);
+    if (res.status === 402 && d.code === 'tariff') SkyCheck.openTariffs(d.need);
+    /* фото остаются в списке: можно сразу нажать «Проверить работу» ещё раз */
+    renderOrdersResult(null, res.failText || SkyCheck.errorText(res));
+    return;
+  }
+
+  SkyCheck.applyRate(res.data.rate);
+  SkyCheck.addTokens(res.data.tokens_used);
+  renderOrdersResult(res.data, null);
+  clearPhotos();
+  renderUsage();
+  await renderHistory();
+}
+
 /* Текст модели бывает с markdown. Превращаем только заголовки,
    **жирный** и маркеры списков, остальное показываем как есть. */
 function mdLite(text) {
@@ -1006,7 +1098,7 @@ function mdLite(text) {
   }).join('\n').replace(/\n{3,}/g, '\n\n');
 }
 
-/* Разбор. data.parts — ответы /check-photo по каждому фото:
+/* Разбор от прежнего Worker. data.parts — ответы /check-photo по каждому фото:
      { recognized_text, grade, correct_parts, errors:[{fragment,
        explanation, fix}], overall_feedback, next_step }
    fail — текст ошибки (разбора нет или не всех фото). */
@@ -1040,7 +1132,68 @@ function renderHomeworkResult(data, fail, opt) {
     }
   });
 
+  showHomeworkResult(html, fail, null);
+}
+
+/* Разбор от нового Worker: только те поля, что просили (оценка,
+   тест, списывание, ошибки, сверка, комментарий…). */
+function renderOrdersResult(data, fail) {
+  const block = (key, inner) => `<div class="res-block"><h3>${esc(Sky.t(key))}</h3>${inner}</div>`;
+  let html = '';
+  if (data) {
+    /* оценка */
+    if (data.assessment != null || data.assessment_text) {
+      const m = String(data.assessment_text || '').match(/\b([1-5])\b/);
+      const g = typeof data.assessment === 'number' ? data.assessment : (m ? Number(m[1]) : null);
+      html += `<div class="gradebox"><div class="grade g${g || 'x'}">${g || '—'}</div>
+        <div class="said"><b>${esc(data.assessment_text || Sky.t('gradeL'))}</b>` +
+        (data.assessment_reason ? `<br>${esc(data.assessment_reason)}` : '') + `</div></div>`;
+    }
+    /* тест */
+    if (data.test) {
+      const t = data.test;
+      const wrong = (t.answers || []).filter(a => !a.ok);
+      html += block('resTest',
+        `<div class="meters"><div class="stat accent"><b>${t.correct}/${t.total}</b><span>${esc(Sky.t('resRight'))}</span></div>
+           <div class="stat"><b>${t.percent}%</b><span>${esc(Sky.t('resRight'))}</span></div></div>` +
+        (wrong.length ? `<ul class="res-text" style="margin:10px 0 0;padding-left:18px">${wrong.map(a =>
+          `<li>${esc(Sky.t('resWrongQ').replace('%1', a.n).replace('%2', a.student).replace('%3', a.correct))}</li>`).join('')}</ul>` : ''));
+    }
+    /* списывание */
+    if ('plagiarism_flag' in data) {
+      const pct = v => v == null ? '—' : v + '%';
+      html += block('resAccuracy',
+        `<div class="meters"><div class="stat"><b>${pct(data.confidence)}</b><span>${esc(Sky.t('resConfidence'))}</span></div>
+           <div class="stat"><b>${pct(data.ai_match)}</b><span>${esc(Sky.t('resMatch'))}</span></div></div>` +
+        `<div class="flag ${data.plagiarism_flag ? 'warn' : 'ok'}">${esc(Sky.t(data.plagiarism_flag ? 'resFlagYes' : 'resFlagNo'))}` +
+        (data.plagiarism_flag && data.plagiarism_reason ? `: ${esc(data.plagiarism_reason)}` : '') + `</div>` +
+        `<p class="tok-note">${esc(Sky.t('resFlagNote'))}</p>`);
+    }
+    /* ошибки */
+    const errs = Array.isArray(data.errors) ? data.errors : [];
+    html += block('errH', errs.length
+      ? errs.map(e => `<div class="err-item">
+          ${e.type ? `<div class="kind">${esc(e.type)}</div>` : ''}
+          ${e.fragment ? `<div class="frag">${esc(e.fragment)}</div>` : ''}
+          ${e.correction ? `<div class="fix">${esc(Sky.t('fixL'))}${esc(e.correction)}</div>` : ''}
+        </div>`).join('')
+      : `<p class="lead" style="font-size:13px">${esc(Sky.t('noErrors'))}</p>`);
+    if (data.discrepancies) html += block('resDiscr', `<div class="res-text">${mdLite(data.discrepancies)}</div>`);
+    if (data.comment) html += block('resComment', `<div class="res-text">${mdLite(data.comment)}</div>`);
+    if (data.ai_solution) {
+      html += `<details class="res-more"><summary>${esc(Sky.t('resAiSol'))}</summary><div class="res-text">${mdLite(data.ai_solution)}</div></details>`;
+    }
+    if (data.recognized_text) {
+      html += `<details class="res-more"><summary>${esc(Sky.t('recogH'))}</summary><div class="recog">${esc(data.recognized_text)}</div></details>`;
+    }
+    if (data.truncated) html += `<div class="limit-note">${esc(Sky.t('resTrunc'))}</div>`;
+  }
+  showHomeworkResult(html, fail, data && data.tokens_used);
+}
+
+function showHomeworkResult(html, fail, tokens) {
   if (fail) html += `<div class="limit-note">${esc(fail)}</div>`;
+  if (tokens && tokens.total) html += `<div class="tok-note">${esc(Sky.t('resTokens').replace('%1', tokens.total))}</div>`;
   html += `<div class="res-actions"><button type="button" class="btn ghost" id="againBtn">${esc(Sky.t('againBtn'))}</button></div>`;
 
   $('#resultSection').classList.remove('hidden');
