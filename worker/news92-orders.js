@@ -10,7 +10,9 @@
 
    Эндпоинты:
      GET  / , /health                — жив ли Worker (без изменений)
-     GET  /api/check-text?text=      — Groq, заготовка (без изменений)
+     GET|POST /api/check-text        — сочинение, Groq llama-3.1-8b-instant.
+                                       Длинный текст — только POST (JSON):
+                                       в адресе Cloudflare держит до 16 КБ.
      GET  /api/check-photo?img=      — проверка фото (Z.AI). Без новых
                                        параметров — прежнее поведение.
      GET  /api/limits                — тариф и остаток запросов
@@ -22,7 +24,7 @@
 
    Секреты (Cloudflare → Worker → Settings → Variables and Secrets):
      ZAI_API_KEY           — Z.AI, фото (уже задан)
-     GROQ_API_KEY          — Groq, текст (заготовка)
+     GROQ_API_KEY          — Groq, проверка текста (уже задан)
      SUPABASE_URL          — https://gtznaybjvqwhbybhxwjq.supabase.co
      SUPABASE_ANON_KEY     — publishable/anon: проверка входа ученика
      SUPABASE_SERVICE_KEY  — secret/service_role: лимиты, история,
@@ -34,7 +36,8 @@
    Без SUPABASE_* Worker тоже работает: все считаются бесплатными,
    лимиты — в памяти по IP, история не пишется.
 
-   Нужна миграция sql/schema-tariffs.sql (функции sky_*).
+   Нужны миграции sql/schema-tariffs.sql и sql/schema-text-check.sql
+   (функции sky_*).
    ============================================================ */
 
 const ZAI_URL = "https://api.z.ai/api/paas/v4/chat/completions";
@@ -49,6 +52,19 @@ const MAX_UPLOAD_BYTES = 1572864;      // как file_size_limit бакета ho
 const SUBMIT_LIMIT = { window: 600, max: 10 };   // отправок работ за 10 минут
 const PAY_LIMIT = { window: 600, max: 5 };
 
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_MODEL = "llama-3.1-8b-instant";   // не 70B: у 8B 14 400 запросов в день, у 70B — 1 000
+const GROQ_TIMEOUT_MS = 30000;
+const GROQ_PAUSE_MS = 2000;            // пауза, когда упёрлись в лимит Groq (30 запросов/мин)
+const GROQ_TOKENS_RESERVE = 3000;      // столько токенов минуты нужно на одну подробную проверку
+const TEXT_MAX_CHARS = 15000;          // длиннее — 400, пусть разобьют на части
+const TEXT_CHECK_CHARS = 8000;         // длиннее — проверяем первые 8000
+const TEXT_MAX_TOKENS = { short: 800, long: 1800 };
+const TEXT_CACHE_DAYS = 7;
+/* Лимиты текста, если sky_plan их не отдал (миграция schema-text-check.sql
+   не выполнена): [запросов, за секунд]. */
+const TEXT_LIMITS = { free: [1, 300], paid: [2, 60], premium: [5, 60] };
+
 /* Флаг списывания ставит модель по признакам списывания (см. промт).
    В задании было «совпадение с решением ИИ < 80% → подозрение», но так
    под подозрение попадает каждый, кто просто ошибся. Если всё же нужно
@@ -59,7 +75,8 @@ const PLAGIARISM_BY_MATCH_BELOW = null;
 const FALLBACK_PLAN = {
   plan: "free", title: "Бесплатный", price_rub: 0,
   requests_per_window: 1, window_seconds: 600, photos_per_request: 5,
-  compare: false, teacher: false, plagiarism: false, expires_at: null
+  compare: false, teacher: false, plagiarism: false, expires_at: null,
+  text_requests_per_window: 1, text_window_seconds: 300
 };
 
 const SUBJECTS = {
@@ -101,48 +118,6 @@ export default {
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
-    }
-
-    // --- Проверка ТЕКСТА через Groq ---
-    if (url.pathname === "/api/check-text") {
-      const text = url.searchParams.get("text");
-      if (!text) {
-        return new Response(JSON.stringify({ error: "text param required" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
-
-      try {
-        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${env.GROQ_API_KEY}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            model: "llama-3.3-70b-versatile",
-            messages: [
-              {
-                role: "system",
-                content: "Ты учитель русского языка и литературы. Проверь сочинение: найди орфографические, пунктуационные, грамматические и стилистические ошибки. Оцени логику и структуру. Ответь кратко: оценка, список ошибок с исправлениями, комментарий."
-              },
-              { role: "user", content: text }
-            ],
-            temperature: 0.3
-          })
-        });
-
-        const data = await response.text();
-        return new Response(data, {
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      } catch (e) {
-        return new Response(JSON.stringify({ error: e.message }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
     }
 
     // --- Проверка ФОТО через Z.AI ---
@@ -199,6 +174,7 @@ export default {
     }
 
     try {
+      if (url.pathname === "/api/check-text") return await handleCheckText(request, env, ctx, url);
       if (url.pathname === "/api/limits" && request.method === "GET") return await handleLimits(request, env);
       if (url.pathname === "/api/check-test") return await handleCheckTest(request, env, ctx);
       if (url.pathname === "/api/check-teacher-report") return await handleTeacherReport(request, env, ctx);
@@ -691,6 +667,354 @@ async function handleCheckPhoto(request, env, ctx, url) {
 
 
 /* ============================================================
+   Groq — проверка текста (llama-3.1-8b-instant)
+   ------------------------------------------------------------
+   Лимиты модели: 30 запросов/мин, 14 400/день, 6 000 токенов/мин,
+   500 000/день. Заголовки ответа Groq:
+     x-ratelimit-remaining-requests — запросов осталось на сегодня
+     x-ratelimit-remaining-tokens   — токенов осталось на эту минуту
+     x-ratelimit-reset-tokens       — через сколько минута обнулится
+   Упёрлись (429 или токенов минуты меньше, чем на одну проверку) —
+   следующий вызов ждёт 2 секунды; 429 после паузы — «Лимит Groq».
+   ============================================================ */
+
+const groqPace = { until: 0 };      // раньше этого момента Groq не зовём (на экземпляр Worker)
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/* "2m59.56s", "7.66s", "480ms", "1h2m3s" → мс */
+function groqDuration(v) {
+  const m = String(v || "").trim().match(/^(?:([\d.]+)h)?(?:([\d.]+)m(?!s))?(?:([\d.]+)s)?(?:([\d.]+)ms)?$/);
+  if (!m || !m[0]) return null;
+  return Math.round(((+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0)) * 1000 + (+m[4] || 0));
+}
+
+function groqLimits(h) {
+  const num = k => { const v = h.get(k); return v == null || v === "" || isNaN(v) ? null : Number(v); };
+  return {
+    remaining_requests: num("x-ratelimit-remaining-requests"),
+    remaining_tokens: num("x-ratelimit-remaining-tokens"),
+    reset_requests_ms: groqDuration(h.get("x-ratelimit-reset-requests")),
+    reset_tokens_ms: groqDuration(h.get("x-ratelimit-reset-tokens"))
+  };
+}
+
+function groqPaceFrom(l) {
+  const now = Date.now();
+  if (l.remaining_tokens != null && l.remaining_tokens < GROQ_TOKENS_RESERVE) {
+    groqPace.until = Math.max(groqPace.until, now + (l.reset_tokens_ms || GROQ_PAUSE_MS));
+  }
+  if (l.remaining_requests === 0) {
+    groqPace.until = Math.max(groqPace.until, now + (l.reset_requests_ms || GROQ_PAUSE_MS));
+  }
+}
+
+async function groq(env, system, user, maxTokens) {
+  const wait = groqPace.until - Date.now();
+  if (wait > 0) await sleep(Math.min(wait, GROQ_PAUSE_MS));
+
+  const send = () => fetch(GROQ_URL, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${env.GROQ_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      temperature: 0.2,
+      max_tokens: maxTokens,
+      response_format: { type: "json_object" },
+      messages: [{ role: "system", content: system }, { role: "user", content: user }]
+    }),
+    signal: AbortSignal.timeout(GROQ_TIMEOUT_MS)
+  });
+
+  let r, text, limits, retryAfter = null;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      r = await send();
+      text = await r.text();
+    } catch (e) {
+      const timeout = e && (e.name === "TimeoutError" || e.name === "AbortError");
+      return { ok: false, status: timeout ? 504 : 502, body: String(e && e.message || e) };
+    }
+    limits = groqLimits(r.headers);
+    groqPaceFrom(limits);
+    if (r.status !== 429) break;
+    const ra = parseFloat(r.headers.get("retry-after"));
+    retryAfter = Number.isFinite(ra) ? Math.max(1, Math.ceil(ra)) : null;
+    groqPace.until = Math.max(groqPace.until, Date.now() + (retryAfter ? retryAfter * 1000 : GROQ_PAUSE_MS));
+    // Лимит в минуту (30 запросов) — ждём 2 с и пробуем ещё раз. Дольше ждать не держим человека.
+    if (attempt > 0 || (retryAfter && retryAfter * 1000 > GROQ_PAUSE_MS)) break;
+    await sleep(GROQ_PAUSE_MS);
+  }
+
+  let data = null;
+  try { data = JSON.parse(text); } catch (e) {}
+  const err = data && data.error;
+  // json_object: модель ответила не JSON — Groq отдаёт 400, а сам ответ кладёт в failed_generation.
+  if (r.status === 400 && err && err.code === "json_validate_failed" && err.failed_generation) {
+    return { ok: true, content: String(err.failed_generation), truncated: false, usage: ZERO_USAGE, limits };
+  }
+  if (!r.ok) return { ok: false, status: r.status, body: text, limits, retryAfter };
+  const choice = data && data.choices && data.choices[0];
+  const u = (data && data.usage) || {};
+  return {
+    ok: true,
+    content: (choice && choice.message && choice.message.content) || "",
+    truncated: !!(choice && choice.finish_reason === "length"),
+    usage: { prompt: u.prompt_tokens | 0, completion: u.completion_tokens | 0, total: u.total_tokens | 0 },
+    limits
+  };
+}
+
+/* Ошибка Groq → ответ клиенту. */
+function groqFailure(g) {
+  console.warn("[groq]", g.status, String(g.body).slice(0, 300));
+  if (g.status === 429) {
+    const ra = g.retryAfter || 60;
+    return { status: 429, body: { error: "Лимит Groq, подождите", code: "groq_limit", retry_after: ra }, headers: { "Retry-After": String(ra) } };
+  }
+  // 413 — запрос не влез в 6 000 токенов минуты
+  if (g.status === 413) return { status: 400, body: { error: "Текст слишком длинный, разбейте на части", code: "too_long" } };
+  if (g.status === 401 || g.status === 403) return { status: 401, body: { error: "Ошибка ключа API Groq", code: "groq_key" } };
+  if (g.status === 504) return { status: 504, body: { error: "Модель не ответила вовремя", code: "groq_timeout" } };
+  return { status: 502, body: { error: "Сервис проверки временно недоступен", code: "groq_down" } };
+}
+
+
+/* ============================================================
+   /api/check-text — сочинение
+   ------------------------------------------------------------
+   Параметры (GET — в адресе, POST — JSON с теми же именами):
+     text        — текст сочинения, обязательно
+     subject     — русский | английский | литература (или russian,
+                   english, literature), по умолчанию русский
+     length      — short | long, по умолчанию long
+     grade       — true: оценка числом (assessment)
+     grade_text  — true: оценка словами (assessment_text)
+     criteria    — false: без таблицы критериев (по умолчанию true;
+                   критерии есть только в length=long)
+     topic       — тема сочинения, необязательно: по ней считается
+                   topic_match; без неё модель берёт тему из заголовка
+   Модель всегда ставит оценку и критерии: так один разбор в кэше
+   годится для любых флажков, а флажки лишь отбирают поля ответа.
+   ============================================================ */
+
+const TEXT_SUBJECTS = {
+  russian:    { ru: ["русский", "русский язык"],
+                who: "Ты учитель русского языка и литературы." },
+  literature: { ru: ["литература"],
+                who: "Ты учитель русского языка и литературы.",
+                note: "Предмет — литература: главное — понимание произведения, аргументы и примеры из текста произведения; грамотность тоже учитывай." },
+  english:    { ru: ["английский", "английский язык"],
+                who: "Ты учитель английского языка.",
+                note: "Сочинение написано по-английски: fragment и correction — по-английски, type и comment — по-русски." }
+};
+const CRITERIA = ["topic_match", "argumentation", "composition", "logic", "spelling", "grammar"];
+
+function parseTextSubject(v) {
+  const s = String(v == null ? "" : v).trim().toLowerCase();
+  if (!s) return "russian";
+  if (TEXT_SUBJECTS[s]) return s;
+  const key = Object.keys(TEXT_SUBJECTS).find(k => TEXT_SUBJECTS[k].ru.includes(s));
+  if (!key) throw new BadRequest("subject must be one of: русский, английский, литература");
+  return key;
+}
+
+function textOptions(get) {
+  const length = String(get("length") || "long").trim().toLowerCase();
+  if (!["short", "long"].includes(length)) throw new BadRequest("length must be short or long");
+  const crit = get("criteria");
+  return {
+    subject: parseTextSubject(get("subject")),
+    length,
+    grade: parseBool(get("grade"), "grade"),
+    gradeText: parseBool(get("grade_text"), "grade_text"),
+    criteria: crit == null || crit === "" ? true : parseBool(crit, "criteria"),
+    topic: length === "long" ? String(get("topic") || "").replace(/\s+/g, " ").trim().slice(0, 300) : ""
+  };
+}
+
+/* Обрезка до max символов — по границе слова, если она недалеко. */
+function cutText(t, max) {
+  const cut = t.slice(0, max);
+  const sp = cut.search(/\s\S*$/);
+  return (sp > max - 200 ? cut.slice(0, sp) : cut).trim();
+}
+
+async function sha256Hex(s) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+function textLimit(plan) {
+  const d = TEXT_LIMITS[plan.plan] || TEXT_LIMITS.free;
+  return { max: plan.text_requests_per_window || d[0], window: plan.text_window_seconds || d[1] };
+}
+
+function textPrompt(o) {
+  const s = TEXT_SUBJECTS[o.subject];
+  const lines = [
+    `${s.who} Проверяешь сочинение ученика 5-11 класса. Отвечай ТОЛЬКО валидным JSON, без markdown.`,
+    s.note || null
+  ];
+  if (o.length === "short") {
+    lines.push(
+      "Найди ошибки: орфография, пунктуация, грамматика.",
+      "Для каждой: type, fragment, correction.",
+      "Поставь оценку 1-5.",
+      'Верни JSON: {"errors":[{"type":"...","fragment":"...","correction":"..."}],"assessment":N,"comment":"1 предложение"}'
+    );
+  } else {
+    lines.push(
+      "Проверь по критериям:",
+      "1. topic_match — соответствие теме (0-5)",
+      "2. argumentation — аргументация с примерами (0-5)",
+      "3. composition — композиция: вступление, основная часть, вывод (0-5)",
+      "4. logic — логика и связность (0-5)",
+      "5. spelling — орфография (0-5)",
+      "6. grammar — грамматика и речь (0-5)",
+      "Ошибки: type, fragment, correction.",
+      "Поставь оценку 1-5.",
+      "Верни JSON:",
+      '{"criteria":{"topic_match":N,"argumentation":N,"composition":N,"logic":N,"spelling":N,"grammar":N},' +
+        '"errors":[{"type":"...","fragment":"...","correction":"..."}],"assessment":N,"comment":"2-3 предложения"}',
+      "Если ошибок нет — errors: [].",
+      "Если ученик написал не по теме — topic_match: 0, остальные критерии не считай."
+    );
+  }
+  lines.push("fragment — место с ошибкой дословно из текста, correction — как правильно. assessment — целое число от 1 до 5. comment — по-русски.");
+  return lines.filter(l => l !== null).join("\n");
+}
+
+function textUser(o, text) {
+  const topic = o.length !== "long" ? ""
+    : o.topic ? `Тема сочинения: ${o.topic}\n\n`
+    : "Тема не указана — возьми её из заголовка или первой фразы.\n\n";
+  return topic + "Сочинение:\n" + text;
+}
+
+/* Разбор модели → полный результат (он же идёт в кэш и историю). */
+function normText(parsed, raw, o) {
+  const p = parsed || { comment: raw };      // не JSON — весь текст в comment
+  const r = {};
+  if (o.length === "long") {
+    const c = p.criteria && typeof p.criteria === "object" && !Array.isArray(p.criteria) ? p.criteria : {};
+    r.criteria = {};
+    CRITERIA.forEach(k => { r.criteria[k] = clampInt(c[k], 0, 5); });
+    // не по теме — остальные критерии не считаются
+    if (r.criteria.topic_match === 0) CRITERIA.slice(1).forEach(k => { r.criteria[k] = null; });
+  }
+  r.errors = normErrors(p.errors);
+  r.assessment = gradeOf(p.assessment);
+  r.comment = str(p.comment);
+  return r;
+}
+
+/* Полный результат → ответ API: поля — только те, что просили. */
+function textResponse(full, o, m) {
+  const r = { subject: o.subject, length: o.length };
+  if (o.criteria && full.criteria) r.criteria = full.criteria;
+  r.errors = full.errors;
+  if (o.grade) r.assessment = full.assessment;
+  if (o.gradeText) r.assessment_text = GRADE_WORDS[full.assessment] || "N/A";
+  r.comment = full.comment;
+  if (full.truncated) r.truncated = true;
+  if (m.cut) {
+    r.truncated_input = true;
+    r.warning = `Текст длиннее ${TEXT_CHECK_CHARS} символов — проверены первые ${TEXT_CHECK_CHARS}`;
+  }
+  r.cached = !!m.cached;
+  r.tokens_used = m.tokens;
+  r.plan = m.plan.plan;
+  r.rate = { remaining: m.rate.remaining, retry_after: m.rate.retry_after, reset_in: m.rate.reset_in };
+  if (m.limits) r.groq = { remaining_requests: m.limits.remaining_requests, remaining_tokens: m.limits.remaining_tokens };
+  return r;
+}
+
+async function textCache(env, hash) {
+  if (!sbReady(env)) return null;
+  try {
+    const rows = await sbRpc(env, "sky_text_cache", { p_hash: hash, p_days: TEXT_CACHE_DAYS });
+    const row = Array.isArray(rows) ? rows[0] : rows;
+    return row && row.result && typeof row.result === "object" ? row.result : null;
+  } catch (e) {
+    console.error("[cache]", e.message);
+    return null;
+  }
+}
+
+async function logText(env, who, o, hash, result, tokens) {
+  if (!sbReady(env)) return;
+  try {
+    await sbRpc(env, "sky_log_text", {
+      p_user: who.userId, p_ip: who.ip || null, p_subject: o.subject, p_length: o.length,
+      p_text_hash: hash, p_result: result, p_tokens: tokens || 0
+    });
+  } catch (e) {
+    console.error("[log]", e.message);
+  }
+}
+
+async function handleCheckText(request, env, ctx, url) {
+  if (request.method !== "GET" && request.method !== "POST") return json({ error: "method not allowed" }, 405);
+  let o, text;
+  try {
+    let get = k => url.searchParams.get(k);
+    if (request.method === "POST") {
+      const body = await readJsonBody(request);
+      if (!body || typeof body !== "object" || Array.isArray(body)) throw new BadRequest("body must be a JSON object");
+      get = k => body[k];
+    }
+    const t = get("text");
+    text = (t == null ? "" : String(t)).replace(/\r\n?/g, "\n").trim();
+    o = textOptions(get);
+  } catch (e) {
+    if (e instanceof BadRequest) return json({ error: e.message, code: "bad_param" }, 400);
+    throw e;
+  }
+  if (!text) return json({ error: "text param required", code: "no_text" }, 400);
+  if (text.length > TEXT_MAX_CHARS) {
+    return json({ error: "Текст слишком длинный, разбейте на части", code: "too_long", max: TEXT_MAX_CHARS }, 400);
+  }
+  const cut = text.length > TEXT_CHECK_CHARS;
+  if (cut) text = cutText(text, TEXT_CHECK_CHARS);
+
+  const who = await identify(request, env);
+  if (who.denied) return sessionExpired();
+  const plan = await getPlan(env, who.userId);
+  const lim = textLimit(plan);
+  const rate = await rateHit(env, who, "text", lim.window, lim.max, 1);
+  if (!rate.allowed) return tooMany(rate, plan);
+
+  // Кэш: тот же текст с теми же настройками за 7 дней — без вызова модели.
+  const hash = await sha256Hex([o.subject, o.length, o.topic, text].join("|"));
+  const cached = await textCache(env, hash);
+  if (cached) {
+    const full = normText(cached, "", o);
+    ctx.waitUntil(logText(env, who, o, hash, { ...full, cached: true }, 0));
+    return json(textResponse(full, o, { cut, cached: true, tokens: ZERO_USAGE, plan, rate }));
+  }
+
+  const g = await groq(env, textPrompt(o), textUser(o, text), TEXT_MAX_TOKENS[o.length]);
+  const { raw, parsed } = g.ok ? parseModelJson(g.content) : { raw: "" };
+  if (!g.ok || !raw) {
+    // Разбора нет — запрос не в счёт.
+    ctx.waitUntil(rateHit(env, who, "text", lim.window, lim.max, -1));
+    if (!g.ok) {
+      const f = groqFailure(g);
+      return json(f.body, f.status, f.headers);
+    }
+    return json({ error: "Модель вернула пустой ответ", code: "empty" }, 502);
+  }
+
+  const full = normText(parsed, raw, o);
+  if (g.truncated) full.truncated = true;
+  // Не JSON или обрезан по max_tokens — в историю пишем, в кэш (без хэша) нет.
+  const cacheable = parsed && !g.truncated;
+  ctx.waitUntil(logText(env, who, o, cacheable ? hash : null, full, g.usage.total));
+  return json(textResponse(full, o, { cut, cached: false, tokens: g.usage, plan, rate, limits: g.limits }));
+}
+
+
+/* ============================================================
    /api/limits — что можно этому человеку сейчас
    ============================================================ */
 
@@ -698,11 +1022,17 @@ async function handleLimits(request, env) {
   const who = await identify(request, env);
   if (who.denied) return sessionExpired();
   const plan = await getPlan(env, who.userId);
-  const rate = await rateHit(env, who, "check", plan.window_seconds, plan.requests_per_window, 0);
+  const lim = textLimit(plan);
+  const [rate, trate] = await Promise.all([
+    rateHit(env, who, "check", plan.window_seconds, plan.requests_per_window, 0),
+    rateHit(env, who, "text", lim.window, lim.max, 0)
+  ]);
+  const pub = r => ({ allowed: r.allowed, remaining: r.remaining, retry_after: r.retry_after, reset_in: r.reset_in });
   return json({
     ...planPublic(plan),
     user: !!who.userId,
-    rate: { allowed: rate.allowed, remaining: rate.remaining, retry_after: rate.retry_after, reset_in: rate.reset_in }
+    rate: pub(rate),
+    text: { requests: lim.max, window_seconds: lim.window, rate: pub(trate) }
   });
 }
 

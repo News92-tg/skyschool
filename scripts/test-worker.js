@@ -3,8 +3,8 @@
 
    Запуск:  node scripts/test-worker.js
 
-   Сеть не нужна: Supabase (Auth, RPC sky_*, REST, Storage) и Z.AI
-   подменены в памяти. Подмена sky_rate повторяет логику функции из
+   Сеть не нужна: Supabase (Auth, RPC sky_*, REST, Storage), Z.AI и
+   Groq подменены в памяти. Подмена sky_rate повторяет логику функции из
    sql/schema-tariffs.sql — саму функцию проверяет scripts/test-rls.sh.
    ============================================================ */
 
@@ -18,6 +18,7 @@ const { pathToFileURL } = require('url');
 const SRC = path.join(__dirname, '..', 'worker', 'news92-orders.js');
 const SB = 'https://sb.test';
 const ZAI = 'https://api.z.ai/api/paas/v4/chat/completions';
+const GROQ = 'https://api.groq.com/openai/v1/chat/completions';
 const USERS = { 'jwt-premium': 'u-premium', 'jwt-paid': 'u-paid', 'jwt-free': 'u-free' };
 const PLANS = {
   free:    { plan: 'free', title: 'Free', price_rub: 0, requests_per_window: 1, window_seconds: 600, photos_per_request: 5, compare: false, teacher: false, plagiarism: false, expires_at: null },
@@ -34,14 +35,24 @@ function ok(name, cond, extra) {
 
 /* ---------- подмена сети ---------- */
 let zaiQueue = [], zaiSent = [], sbCalls = [], windows = new Map(), storage = new Map(), rows = new Map(), payments = [];
+let groqQueue = [], groqSent = [], textLog = [];
 
 function reset() {
   zaiQueue = []; zaiSent = []; sbCalls = []; windows = new Map(); storage = new Map(); rows = new Map(); payments = [];
+  groqQueue = []; groqSent = []; textLog = [];
 }
 const zaiOk = (content, usage) => ({ status: 200, body: JSON.stringify({
   choices: [{ message: { content: typeof content === 'string' ? content : JSON.stringify(content) }, finish_reason: 'stop' }],
   usage: usage || { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 }
 }) });
+const GROQ_HEADERS = { 'x-ratelimit-remaining-requests': '14399', 'x-ratelimit-remaining-tokens': '5000',
+  'x-ratelimit-reset-requests': '6s', 'x-ratelimit-reset-tokens': '7.66s' };
+const groqOk = (content, usage, finish) => ({ status: 200, headers: GROQ_HEADERS, body: JSON.stringify({
+  choices: [{ message: { content: typeof content === 'string' ? content : JSON.stringify(content) }, finish_reason: finish || 'stop' }],
+  usage: usage || { prompt_tokens: 700, completion_tokens: 300, total_tokens: 1000 }
+}) });
+const groqErr = (status, headers, error) => ({ status, headers: Object.assign({}, GROQ_HEADERS, headers || {}),
+  body: JSON.stringify({ error: error || { message: 'x', type: 'x', code: String(status) } }) });
 const zaiErr = (status, code) => ({ status, body: JSON.stringify({ error: { code: code || String(status), message: 'x' } }) });
 
 function skyRate(a) {
@@ -76,6 +87,13 @@ globalThis.fetch = async (input, init) => {
     if (typeof next === 'function') return next(body);
     return new Response(next.body, { status: next.status });
   }
+  if (url === GROQ) {
+    const body = JSON.parse(init.body);
+    groqSent.push({ body, headers: init.headers, at: Date.now() });
+    const next = groqQueue.shift();
+    if (!next) throw new Error('Groq: нет подготовленного ответа');
+    return new Response(next.body, { status: next.status, headers: next.headers || {} });
+  }
   if (url.startsWith(SB)) {
     const p = url.slice(SB.length);
     const headers = init.headers || {};
@@ -91,6 +109,12 @@ globalThis.fetch = async (input, init) => {
     }
     if (p === '/rest/v1/rpc/sky_rate') return J(skyRate(JSON.parse(init.body)));
     if (p === '/rest/v1/rpc/sky_log_check') return J('log-id');
+    if (p === '/rest/v1/rpc/sky_text_cache') {
+      const a = JSON.parse(init.body);
+      const hit = textLog.filter(r => r.p_text_hash && r.p_text_hash === a.p_hash).pop();
+      return J(hit ? [{ result: hit.p_result, created_at: 'now' }] : []);
+    }
+    if (p === '/rest/v1/rpc/sky_log_text') { textLog.push(JSON.parse(init.body)); return J('log-id'); }
     if (p === '/rest/v1/rpc/sky_submissions_update') return J(JSON.parse(init.body).p_items.length);
     if (p.startsWith('/storage/v1/object/sign/homework/')) {
       return J({ signedURL: '/object/sign/homework/' + p.slice('/storage/v1/object/sign/homework/'.length) + '?token=t' });
@@ -408,6 +432,156 @@ async function main() {
   ok('заявка на проверку списывания +40 ₽', r.status === 201 && payments[1].amount === 40 && payments[1].plan === null);
   r = await call('/api/payments', { method: 'POST', body: '{"purpose":"gift"}', jwt: 'jwt-free' });
   ok('неизвестная покупка — 400', r.status === 400);
+
+  /* ---------- /api/check-text: сочинение через Groq ---------- */
+  reset();
+  const essay = 'Моё любимое время года\n\nЯ люблю осень. Осенью в лесу очень красиво, листья жёлтые и красные. Мы с друзьями ходим в парк.';
+  const longRes = {
+    criteria: { topic_match: 5, argumentation: '3', composition: 4, logic: 9, spelling: 4, grammar: 'хорошо' },
+    errors: [{ type: 'пунктуация', fragment: 'листья жёлтые и красные', correction: 'листья — жёлтые и красные' }, 'мусор'],
+    assessment: 4, comment: 'Хорошее сочинение. Добавьте примеры.'
+  };
+  const postText = (body, o) => call('/api/check-text', Object.assign({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, o || {}));
+
+  groqQueue.push(groqOk(longRes));
+  r = await postText({ text: essay });
+  ok('текст: POST, по умолчанию русский и подробно — 200', r.status === 200 && r.body.subject === 'russian' && r.body.length === 'long', r.text);
+  ok('текст: по умолчанию criteria есть, оценки нет',
+    JSON.stringify(Object.keys(r.body)) === '["subject","length","criteria","errors","comment","cached","tokens_used","plan","rate","groq"]', r.text);
+  ok('текст: критерии 0–5, нечисло — null', JSON.stringify(r.body.criteria) === '{"topic_match":5,"argumentation":3,"composition":4,"logic":5,"spelling":4,"grammar":null}');
+  ok('текст: ошибки без мусора', r.body.errors.length === 1 && r.body.errors[0].correction === 'листья — жёлтые и красные');
+  ok('текст: токены и заголовки Groq в ответе', r.body.tokens_used.total === 1000 && r.body.cached === false &&
+    r.body.groq.remaining_requests === 14399 && r.body.groq.remaining_tokens === 5000);
+  const gq = groqSent[0];
+  ok('текст: модель llama-3.1-8b-instant, 0.2, 1800 токенов, json_object',
+    gq.body.model === 'llama-3.1-8b-instant' && gq.body.temperature === 0.2 && gq.body.max_tokens === 1800 && gq.body.response_format.type === 'json_object');
+  ok('текст: ключ Groq только из секрета', gq.headers.Authorization === 'Bearer groq');
+  const tsys = gq.body.messages[0].content;
+  ok('текст: промт long — база и шесть критериев',
+    /^Ты учитель русского языка и литературы\. Проверяешь сочинение ученика 5-11 класса\. Отвечай ТОЛЬКО валидным JSON, без markdown\./.test(tsys) &&
+    ['topic_match — соответствие теме', 'argumentation — аргументация с примерами', 'composition — композиция: вступление, основная часть, вывод',
+     'logic — логика и связность', 'spelling — орфография', 'grammar — грамматика и речь'].every(x => tsys.includes(x)) &&
+    /Если ученик написал не по теме — topic_match: 0, остальные критерии не считай\./.test(tsys));
+  ok('текст: сочинение в сообщении ученика, тема — из заголовка', gq.body.messages[1].content.endsWith('Сочинение:\n' + essay) && /Тема не указана/.test(gq.body.messages[1].content));
+  const tlog = textLog[0] || {};
+  ok('текст: история — хэш SHA-256, предмет, длина, токены', /^[0-9a-f]{64}$/.test(tlog.p_text_hash) && tlog.p_subject === 'russian' && tlog.p_length === 'long' && tlog.p_tokens === 1000 && tlog.p_ip === '10.0.0.1');
+  ok('текст: в историю — полный разбор, без служебных полей и текста', tlog.p_result && tlog.p_result.assessment === 4 && !('rate' in tlog.p_result) && !('plan' in tlog.p_result) && !JSON.stringify(tlog.p_result).includes('Мы с друзьями'));
+  ok('текст: окно лимита — scope text, фото не тронуто', windows.has('ip:10.0.0.1|text') && !windows.has('ip:10.0.0.1|check'));
+
+  r = await postText({ text: essay });
+  ok('текст: Бесплатный — второй запрос за 5 минут — 429', r.status === 429 && r.body.code === 'rate_limit' && r.body.retry_after > 290 && r.body.retry_after <= 300, r.text);
+  r = await call('/api/limits');
+  ok('/api/limits: лимит текста 1 / 300 с, текст исчерпан, фото свободно',
+    r.body.text && r.body.text.requests === 1 && r.body.text.window_seconds === 300 && r.body.text.rate.allowed === false && r.body.rate.allowed === true, r.text);
+
+  r = await postText({ text: '  ' + essay.replace(/\n/g, '\r\n') + '\n' }, { ip: '10.0.0.3' });
+  ok('текст: тот же текст — из кэша, 0 токенов, без Groq', r.status === 200 && r.body.cached === true && r.body.tokens_used.total === 0 && groqSent.length === 1, r.text);
+  ok('текст: из кэша — те же критерии и ошибки', r.body.criteria.logic === 5 && r.body.errors.length === 1 && !('groq' in r.body));
+  ok('текст: попадание в кэш тоже в истории, с 0 токенов', textLog.length === 2 && textLog[1].p_tokens === 0 && textLog[1].p_result.cached === true);
+  groqQueue.push(groqOk(longRes));
+  r = await postText({ text: essay, length: 'short' }, { ip: '10.0.0.4' });
+  ok('текст: другие настройки — другой хэш, идём в Groq', r.body.cached === false && groqSent.length === 2 && textLog[2].p_text_hash !== textLog[0].p_text_hash);
+
+  groqQueue.push(groqOk({ errors: [{ type: 'grammar', fragment: 'He go', correction: 'He goes' }], assessment: '4', comment: 'Неплохо.' }));
+  r = await call('/api/check-text?text=' + q('He go to school.') + '&subject=' + q('английский') + '&length=short&grade=true&grade_text=true', { ip: '10.0.0.5' });
+  ok('текст: GET, английский, коротко, оценка числом и словами', r.status === 200 && r.body.subject === 'english' && r.body.assessment === 4 &&
+    r.body.assessment_text === '4 (хорошо)' && !('criteria' in r.body) && r.body.errors[0].correction === 'He goes', r.text);
+  const ssys = groqSent[2].body.messages[0].content;
+  ok('текст: промт short — 800 токенов, ошибки и оценка', groqSent[2].body.max_tokens === 800 && /^Ты учитель английского языка\./.test(ssys) &&
+    /Найди ошибки: орфография, пунктуация, грамматика\./.test(ssys) && /Поставь оценку 1-5\./.test(ssys) && !/topic_match/.test(ssys));
+
+  groqQueue.push(groqOk({ criteria: { topic_match: 0, argumentation: 4, composition: 5, logic: 4, spelling: 5, grammar: 5 }, errors: [], assessment: 2, comment: 'Не по теме.' }));
+  r = await postText({ text: 'Про футбол.', subject: 'литература', topic: 'Образ Татьяны в «Евгении Онегине»', criteria: false, grade: true }, { ip: '10.0.0.6' });
+  ok('текст: литература, тема передана модели', /^Тема сочинения: Образ Татьяны/.test(groqSent[3].body.messages[1].content) && /Предмет — литература/.test(groqSent[3].body.messages[0].content));
+  ok('текст: criteria=false — без таблицы критериев', r.status === 200 && !('criteria' in r.body) && r.body.assessment === 2, r.text);
+  ok('текст: не по теме — остальные критерии не считаются', textLog[textLog.length - 1].p_result.criteria.topic_match === 0 &&
+    textLog[textLog.length - 1].p_result.criteria.composition === null);
+
+  groqQueue.push(groqOk('Оценка 3. Ошибок немного, но мало примеров.'));
+  r = await postText({ text: 'Текст без JSON в ответе.', grade: true }, { ip: '10.0.0.7' });
+  ok('текст: Groq вернул не JSON — весь текст в comment', r.status === 200 && r.body.comment === 'Оценка 3. Ошибок немного, но мало примеров.' && r.body.errors.length === 0 && r.body.assessment === 'N/A', r.text);
+  ok('текст: такой ответ в кэш не идёт', textLog[textLog.length - 1].p_text_hash === null);
+
+  groqQueue.push(groqErr(400, {}, { message: 'Failed to generate JSON', type: 'invalid_request_error', code: 'json_validate_failed',
+    failed_generation: '{"errors": [], "assessment": 5, "comment": "Отлично"}' }));
+  r = await postText({ text: 'Почти JSON.', length: 'short', grade: true }, { ip: '10.0.0.8' });
+  ok('текст: json_validate_failed — берём failed_generation', r.status === 200 && r.body.assessment === 5 && r.body.comment === 'Отлично', r.text);
+
+  groqQueue.push(groqOk(longRes, null, 'length'));
+  r = await postText({ text: 'Обрезанный ответ.' }, { ip: '10.0.0.9' });
+  ok('текст: ответ обрезан по max_tokens — truncated, без кэша', r.body.truncated === true && textLog[textLog.length - 1].p_text_hash === null);
+
+  groqQueue.push(groqOk(longRes));
+  const big = ('Слово ' + 'а'.repeat(20) + ' ').repeat(400);          // ~11 200 символов
+  r = await postText({ text: big }, { ip: '10.0.1.1' });
+  const sentText = groqSent[groqSent.length - 1].body.messages[1].content.split('Сочинение:\n')[1];
+  ok('текст: больше 8000 — проверены первые 8000, предупреждение', r.status === 200 && r.body.truncated_input === true && /8000/.test(r.body.warning) &&
+    sentText.length <= 8000 && sentText.length > 7800 && big.startsWith(sentText), r.text);
+
+  const sentBefore = groqSent.length;
+  r = await postText({ text: 'а'.repeat(15001) }, { ip: '10.0.1.2' });
+  ok('текст: больше 15 000 — 400 «разбейте на части»', r.status === 400 && r.body.error === 'Текст слишком длинный, разбейте на части' && r.body.code === 'too_long');
+  r = await postText({ text: '   ' }, { ip: '10.0.1.2' });
+  ok('текст: пустой — 400', r.status === 400 && r.body.code === 'no_text');
+  r = await call('/api/check-text', { ip: '10.0.1.2' });
+  ok('текст: без text — 400 как раньше', r.status === 400 && r.body.error === 'text param required');
+  for (const bad of [{ subject: 'химия' }, { length: 'medium' }, { grade: 'maybe' }, { criteria: 'да' }]) {
+    r = await postText(Object.assign({ text: 'x' }, bad), { ip: '10.0.1.2' });
+    ok('текст: 400 на ' + JSON.stringify(bad), r.status === 400 && r.body.code === 'bad_param', r.text);
+  }
+  r = await call('/api/check-text', { method: 'POST', body: 'text=x', ip: '10.0.1.2' });
+  ok('текст: POST не JSON — 400', r.status === 400 && r.body.code === 'bad_param');
+  r = await call('/api/check-text', { method: 'PUT', body: '{}', ip: '10.0.1.2' });
+  ok('текст: PUT — 405', r.status === 405);
+  ok('текст: отказы 400 не зовут Groq и не тратят лимит', groqSent.length === sentBefore && !windows.has('ip:10.0.1.2|text'));
+  r = await postText({ text: 'x' }, { jwt: 'expired' });
+  ok('текст: просроченный вход — 401 session', r.status === 401 && r.body.code === 'session');
+
+  for (const [st, code, http] of [[401, 'groq_key', 401], [413, 'too_long', 400], [500, 'groq_down', 502], [503, 'groq_down', 502]]) {
+    groqQueue.push(groqErr(st));
+    r = await postText({ text: 'Ошибка ' + st }, { ip: '10.0.2.' + st % 250 });
+    ok(`текст: Groq ${st} → ${http} ${code}, лимит возвращён`, r.status === http && r.body.code === code && windows.get('ip:10.0.2.' + st % 250 + '|text').count === 0, r.text);
+  }
+
+  reset();
+  for (let i = 0; i < 5; i++) groqQueue.push(groqOk(longRes));
+  const prem = [];
+  for (let i = 0; i < 6; i++) prem.push((await postText({ text: 'Сочинение ' + i }, { jwt: 'jwt-premium' })).status);
+  ok('текст: Премиум — 5 запросов в минуту, 6-й — 429', prem.join() === '200,200,200,200,200,429', prem.join());
+  ok('текст: Премиум — лимит по пользователю', windows.has('u-premium|text'));
+  groqQueue.push(groqOk(longRes), groqOk(longRes));
+  const paid = [];
+  for (let i = 0; i < 3; i++) paid.push((await postText({ text: 'Платный ' + i }, { jwt: 'jwt-paid' })).status);
+  ok('текст: Платный — 2 запроса в минуту', paid.join() === '200,200,429', paid.join());
+  PLANS.paid.text_requests_per_window = 4; PLANS.paid.text_window_seconds = 120;
+  r = await call('/api/limits', { jwt: 'jwt-paid' });
+  ok('текст: лимиты из plan_limits важнее запасных', r.body.text.requests === 4 && r.body.text.window_seconds === 120, r.text);
+  delete PLANS.paid.text_requests_per_window; delete PLANS.paid.text_window_seconds;
+  ok('текст: только llama-3.1-8b-instant, никакой 70B', groqSent.length > 0 && groqSent.every(g => g.body.model === 'llama-3.1-8b-instant'));
+
+  reset();
+  groqQueue.push(groqOk(longRes));
+  r = await postText({ text: 'Без базы.' }, { env: { GROQ_API_KEY: 'groq' }, ip: '10.0.3.1' });
+  const r2 = await postText({ text: 'Без базы 2.' }, { env: { GROQ_API_KEY: 'groq' }, ip: '10.0.3.1' });
+  ok('текст без Supabase: проверка как бесплатная, лимит в памяти', r.status === 200 && r.body.plan === 'free' && r2.status === 429 && sbCalls.length === 0, r.text);
+
+  /* 429 от Groq — в конце: пауза после него держится в Worker */
+  reset();
+  groqQueue.push(groqErr(429, { 'retry-after': '1' }), groqOk(longRes));
+  r = await postText({ text: 'Упёрлись в 30 в минуту.' }, { ip: '10.0.4.1' });
+  ok('текст: Groq 429 — пауза 2 с и повтор', r.status === 200 && groqSent.length === 2 && groqSent[1].at - groqSent[0].at >= 1900, r.text);
+  groqQueue.push(groqErr(429, { 'retry-after': '2' }), groqErr(429, { 'retry-after': '2' }));
+  r = await postText({ text: 'Снова упёрлись.' }, { ip: '10.0.4.2' });
+  ok('текст: 429 и после паузы — 429 «Лимит Groq, подождите»', r.status === 429 && r.body.error === 'Лимит Groq, подождите' && r.body.code === 'groq_limit' &&
+    r.body.retry_after === 2 && r.headers.get('Retry-After') === '2' && windows.get('ip:10.0.4.2|text').count === 0, r.text);
+  groqQueue.push(groqErr(429, { 'retry-after': '40' }));
+  const before429 = groqSent.length;
+  r = await postText({ text: 'Дневной лимит.' }, { ip: '10.0.4.3' });
+  ok('текст: долгий retry-after — без повтора, сразу 429', r.status === 429 && r.body.retry_after === 40 && groqSent.length === before429 + 1);
+  groqQueue.push(groqOk(longRes));
+  const t0 = Date.now();
+  r = await postText({ text: 'После лимита.' }, { ip: '10.0.4.4' });
+  ok('текст: следующий вызов после 429 ждёт не дольше 2 с', r.status === 200 && Date.now() - t0 >= 1900 && Date.now() - t0 < 3500);
 
   /* ---------- без Supabase ---------- */
   reset();
