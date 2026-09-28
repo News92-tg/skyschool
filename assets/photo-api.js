@@ -2,8 +2,10 @@
    SkyySchool — проверка ДЗ по фото: общее для photo.html
 
    Здесь то, чем пользуются оба режима страницы (ученик и учитель):
-     запросы к Worker (AI_BASE_ORDERS) с входом ученика и потоком прогресса,
-     тариф и лимит запросов с обратным отсчётом,
+     запросы к Worker (AI_BASE_ORDERS) — POST с JSON, как требует
+     worker/worker.js, развёрнутый под именем news92-orders,
+     проверка работы по фото (POST /check-photo),
+     лимит запросов с обратным отсчётом,
      окно «Тарифы» и заявка на оплату,
      счётчик потраченных токенов,
      сжатие фото перед загрузкой.
@@ -54,7 +56,9 @@ window.SkyCheck = (function () {
     errStorage:{ru:'Хранилище не настроено. Сообщите администратору.',en:'Storage is not configured. Tell the administrator.'},
     errGroqLimit:{ru:'Лимит Groq, подождите',en:'Groq limit reached, please wait'},
     errTooLong:{ru:'Текст слишком длинный, разбейте на части',en:'The text is too long, split it into parts'},
-    errNoText:{ru:'Вставьте текст сочинения',en:'Paste the essay text'}
+    errNoText:{ru:'Вставьте текст сочинения',en:'Paste the essay text'},
+    errUnsupported:{ru:'Этой функции пока нет в Worker news92-orders.',en:'The news92-orders Worker does not support this yet.'},
+    secN:{ru:'%1 с',en:'%1 s'}
   });
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
@@ -104,7 +108,8 @@ window.SkyCheck = (function () {
     } finally { URL.revokeObjectURL(url); }
   }
 
-  async function compress(blob) {
+  async function compress(blob, maxBytes) {
+    const cap = maxBytes || MAX_BYTES;
     const src = await loadBitmap(blob);
     const w = src.width || src.naturalWidth, h = src.height || src.naturalHeight;
     let scale = Math.min(1, MAX_SIDE / Math.max(w, h));
@@ -121,7 +126,7 @@ window.SkyCheck = (function () {
         g.drawImage(src, 0, 0, c.width, c.height);
         for (const q of [0.8, 0.7, 0.6, 0.5]) {
           const out = await new Promise(r => c.toBlob(r, 'image/jpeg', q));
-          if (out && out.size <= MAX_BYTES) { c.width = c.height = 0; return out; }
+          if (out && out.size <= cap) { c.width = c.height = 0; return out; }
         }
         c.width = c.height = 0;          /* отдать память до следующей попытки */
         scale *= 0.8;
@@ -152,11 +157,18 @@ window.SkyCheck = (function () {
 
   async function request(path, o) {
     o = o || {};
+    /* Адресов /api/… в Worker нет (режим учителя, отправка работ по
+       ссылке, заявки на оплату): такие запросы не отправляем вовсе и
+       сразу отдаём понятную ошибку вместо 404. */
+    if (/^\/api\//.test(path)) return { ok: false, status: 0, data: { code: 'unsupported' } };
     const ctl = new AbortController();
     let timer = null;
     const arm = () => { clearTimeout(timer); if (o.timeout) timer = setTimeout(() => ctl.abort(), o.timeout); };
     arm();
-    const headers = Object.assign(await authHeaders(), o.headers || {});
+    /* Authorization — только по явной просьбе (o.auth). CORS этого
+       Worker разрешает один заголовок, Content-Type: с Authorization
+       браузер запрос не отправит вовсе («Failed to fetch»). */
+    const headers = Object.assign(o.auth ? await authHeaders() : {}, o.headers || {});
     let body = o.body;
     if (o.json !== undefined) { headers['Content-Type'] = 'application/json'; body = JSON.stringify(o.json); }
     if (o.onProgress) headers.Accept = 'application/x-ndjson';
@@ -227,7 +239,11 @@ window.SkyCheck = (function () {
       case 'groq_down':       return Sky.t('errDown');
       case 'too_long':        return Sky.t('errTooLong');
       case 'no_text':         return Sky.t('errNoText');
+      case 'unsupported':     return Sky.t('errUnsupported');
     }
+    /* Ответы Worker: { error: 'текст', reason? }. «Подождите N с» — с отсчётом. */
+    if (d.reason === 'rate' && d.waitSec) return Sky.t('waitNext').replace('%1', clock(d.waitSec));
+    if (typeof d.error === 'string' && d.error && res.status !== 404) return d.error;
     if (res.status === 400) return Sky.t('errNoPhoto');
     if (res.status === 401) return Sky.t('errKey');
     if (res.status === 402) return d.error || Sky.t('errTariff');
@@ -236,36 +252,61 @@ window.SkyCheck = (function () {
     return d.error || (Sky.lang === 'en' ? 'Error ' : 'Ошибка ') + res.status;
   }
 
-  /* Проверка одной работы (одно или несколько фото).
-     Если Worker ещё старый и прислал ответ Z.AI как есть, приводим его
-     к тому же виду: текст разбора — в legacy_text. */
-  async function checkPhoto(p) {
-    const qs = new URLSearchParams();
-    p.imgs.forEach(u => qs.append('img', u));
-    qs.set('mode', p.mode || 'check');
-    if (p.subject) qs.set('subject', p.subject);
-    if (p.task) qs.set('task', p.task);
-    if (p.grade) qs.set('grade', 'true');
-    if (p.gradeText) qs.set('grade_text', 'true');
-    if (p.accuracy) qs.set('accuracy', 'true');
-    qs.set('length', p.length === 'short' ? 'short' : 'long');
-    const res = await request('/api/check-photo?' + qs, { timeout: p.timeout });
+  /* Проверка работы: POST /check-photo
+       { imageBase64, mime, subject, taskText, lang, teacher, strictness }
+     Одно фото — один запрос; фото уходит base64 прямо в JSON.
 
-    const d = res.data;
-    if (res.ok && d && !('recognized_text' in d) && !('errors' in d) && (d.choices || d.error)) {
-      if (d.error) {
-        const code = String(d.error.code || '');
-        const status = /^100[0-4]$/.test(code) ? 401 : /^130[2-5]$/.test(code) ? 429 : 502;
-        return { ok: false, status, data: { code: status === 401 ? 'zai_key' : status === 429 ? 'zai_limit' : 'zai_down' } };
+     Почему не /check-homework (пути в хранилище, несколько фото за
+     раз): он узнаёт ученика только по заголовку Authorization, а CORS
+     Worker этот заголовок не пропускает — из браузера такой запрос не
+     уходит. /check-photo работает без входа: одно фото раз в
+     PHOTO_INTERVAL_S секунд с адреса. Если фото несколько, на ответ
+     «подождите N с» ждём сами и шлём следующее.
+
+     Возвращает { ok, status, data: { parts: [ответ Worker по каждому фото],
+     failedText? } }. */
+  const PHOTO_MAX_BYTES = 1100 * 1024;   // Worker: MAX_IMAGE_KB = 1200 по умолчанию
+  const PHOTO_INTERVAL_S = 30;           // Worker: RATE_PHOTO_SECONDS = 30 по умолчанию
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const blobToDataUrl = blob => new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result);
+    fr.onerror = () => reject(fr.error);
+    fr.readAsDataURL(blob);
+  });
+  /* Worker вставляет предмет в промпт как есть: «по предмету «…»». */
+  const subjectForWorker = k => k && k !== 'other' ? subjName(k) : (Sky.lang === 'en' ? 'school subject' : 'школьный предмет');
+
+  async function checkPhoto(p) {
+    const n = p.blobs.length;
+    const teacher = window.SkyTeachers && SkyTeachers.selectedId ? SkyTeachers.selectedId() : null;
+    const tell = ev => { if (p.onProgress) { try { p.onProgress(ev); } catch (e) {} } };
+    const parts = [];
+    for (let i = 0; i < n; i++) {
+      const body = {
+        imageBase64: await blobToDataUrl(p.blobs[i]), mime: 'image/jpeg',
+        subject: subjectForWorker(p.subject), taskText: p.task || '',
+        lang: Sky.lang, teacher, strictness: 3
+      };
+      let res;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        tell({ phase: 'check', index: i, total: n });
+        res = await request('/check-photo', { method: 'POST', json: body, timeout: p.timeout });
+        const d = res.data || {};
+        if (res.status !== 429 || d.reason !== 'rate' || !(d.waitSec > 0) || d.waitSec > 60) break;
+        for (let left = Math.ceil(d.waitSec); left > 0; left--) {
+          tell({ phase: 'wait', index: i, total: n, wait: left });
+          await sleep(1000);
+        }
       }
-      const msg = d.choices && d.choices[0] && d.choices[0].message;
-      const text = String((msg && msg.content) || '').replace(/<\|(?:begin|end)_of_box\|>/g, '').trim();
-      return text ? { ok: true, status: 200, data: { legacy_text: text, tokens_used: usageOf(d.usage) } }
-                  : { ok: false, status: 502, data: { code: 'zai_down' } };
+      if (!res.ok) {
+        if (!parts.length) return res;
+        return { ok: true, status: 200, data: { parts, failedText: errorText(res) } };
+      }
+      parts.push(res.data || {});
     }
-    return res;
+    return { ok: true, status: 200, data: { parts } };
   }
-  const usageOf = u => u ? { prompt: u.prompt_tokens | 0, completion: u.completion_tokens | 0, total: u.total_tokens | 0 } : null;
 
 
   /* ---------- тариф и лимит ---------- */
@@ -305,24 +346,20 @@ window.SkyCheck = (function () {
     notify();
   }
 
-  /* Одновременные вызовы (вход, окончание окна, старт страницы)
-     склеиваются в один запрос. */
-  let inflight = null;
+  /* Лимиты. /api/limits в Worker нет, а фото проверяется без входа,
+     поэтому показываем то, что действует на деле: одно фото раз в
+     PHOTO_INTERVAL_S секунд с адреса, до 5 фото за раз. К серверу
+     не обращаемся. */
+  const STUB_LIMITS = {
+    plan: 'free', title: 'Бесплатный', price_rub: 0, user: false,
+    limits: { requests: 1, window_seconds: PHOTO_INTERVAL_S, photos: 5 },
+    features: { compare: false, teacher: false, plagiarism: false },
+    rate: { allowed: true, remaining: 1, retry_after: 0, reset_in: 0 }
+  };
   function loadLimits() {
-    if (inflight) return inflight;
-    inflight = (async () => {
-      if (!hasWorker()) { limits = null; notify(); return null; }
-      const res = await request('/api/limits', { timeout: 10000 });
-      if (res.ok && res.data && res.data.plan) {
-        limits = res.data;
-        setWait(res.data.rate && !res.data.rate.allowed ? res.data.rate.retry_after : 0);
-      } else {
-        limits = null;
-        notify();
-      }
-      return limits;
-    })().finally(() => { inflight = null; });
-    return inflight;
+    limits = hasWorker() ? JSON.parse(JSON.stringify(STUB_LIMITS)) : null;
+    notify();
+    return Promise.resolve(limits);
   }
 
   /* После ответа проверки: сколько осталось в окне. */
@@ -338,7 +375,8 @@ window.SkyCheck = (function () {
 
   function windowText(l) {
     const n = l.requests, sec = l.window_seconds;
-    const per = sec === 60 ? Sky.t('minOne') : Sky.t('minN').replace('%1', Math.round(sec / 60));
+    const per = sec < 60 ? Sky.t('secN').replace('%1', sec)
+      : sec === 60 ? Sky.t('minOne') : Sky.t('minN').replace('%1', Math.round(sec / 60));
     return Sky.t(n === 1 ? 'perWindow' : 'perWindowN').replace('%1', n).replace('%2', per);
   }
   function planSummary() {
@@ -399,8 +437,8 @@ window.SkyCheck = (function () {
       });
   }
 
-  /* Оплата не подключена: оставляем заявку (pending) и честно говорим
-     «скоро». Сумму ставит Worker по справочнику тарифов. */
+  /* Оплата не подключена, а приёма заявок (/api/payments) в Worker
+     нет: честно говорим «скоро», запроса к серверу нет. */
   async function buy(purpose, btn, close) {
     if (!(Sky.db && Sky.db.me && Sky.db.me())) {
       Sky.toast(Sky.t('buyLogin'), 5000);
@@ -409,8 +447,6 @@ window.SkyCheck = (function () {
       return;
     }
     btn.disabled = true;
-    const res = hasWorker() ? await request('/api/payments', { method: 'POST', json: { purpose }, timeout: 15000 }) : null;
-    if (res && !res.ok && res.data && res.data.code === 'session') { Sky.toast(Sky.t('errSession'), 5000); btn.disabled = false; return; }
     Sky.toast(Sky.t('paySoon'), 6000);
   }
 
@@ -491,7 +527,7 @@ window.SkyCheck = (function () {
 
   return {
     esc, hasWorker, SUBJECTS, subjName, planName,
-    compress,
+    compress, PHOTO_MAX_BYTES, PHOTO_INTERVAL_S,
     request, errorText, checkPhoto,
     loadLimits, applyRate, setWait, canRequest, waitLeft, clock,
     feature, photoCap, planId, planSummary, get limits() { return limits; },

@@ -1,12 +1,13 @@
 /* ============================================================
    SkyySchool — проверка сочинения текстом на «Домашке по фото»
 
-   Вкладка «Текст» в режиме ученика: текст → POST /api/check-text
-   (Worker news92-orders, AI_BASE_ORDERS; модель Groq
-   llama-3.1-8b-instant). POST, а не GET: 8000 символов кириллицы в
-   адресе — около 48 КБ, а Cloudflare пропускает адрес до 16 КБ.
-   Входить не обязательно: без входа лимит считается по адресу.
-   Ключей здесь нет — они только в Worker.
+   Вкладка «Текст» в режиме ученика: текст → POST /grade-essay
+   (Worker news92-orders, AI_BASE_ORDERS) с телом
+     { text, topic, subject, kind, criteria, lang, teacher, strictness }.
+   Ответ: { grade, criteria:[{name, score, comment}], strengths,
+   issues:[{quote, problem, why}], overall_feedback, next_step }.
+   Критерии шлём свои — те же шесть, что в таблице разбора.
+   Входить не обязательно. Ключей здесь нет — они только в Worker.
    Общее (запросы, ошибки, тарифы, токены) — assets/photo-api.js.
    ============================================================ */
 'use strict';
@@ -27,7 +28,6 @@
     xCriteriaShort:{ru:'Критерии — только в подробном разборе',en:'Criteria come with the detailed review only'},
     xCheckBtn:{ru:'Проверить',en:'Check'},
     xPg:{ru:'Идёт проверка, это займёт 5-15 секунд...',en:'Checking, this takes 5-15 seconds...'},
-    xPlan:{ru:'Текст по тарифу «%1»: %2',en:'Text on the %1 plan: %2'},
     xCritH:{ru:'Критерии',en:'Criteria'},
     cr_topic_match:{ru:'Соответствие теме',en:'Relevance to the topic'},
     cr_argumentation:{ru:'Аргументация с примерами',en:'Arguments and examples'},
@@ -35,21 +35,20 @@
     cr_logic:{ru:'Логика и связность',en:'Logic and coherence'},
     cr_spelling:{ru:'Орфография',en:'Spelling'},
     cr_grammar:{ru:'Грамматика и речь',en:'Grammar and style'},
-    xOffTopic:{ru:'Сочинение не по теме — остальные критерии не оценивались.',en:'The essay is off topic, so the other criteria were not scored.'},
-    xCached:{ru:'Этот текст уже проверяли за последние 7 дней — показан сохранённый разбор, токены не потрачены.',
-             en:'This text was checked in the last 7 days — the saved review is shown, no tokens spent.'},
-    xCut:{ru:'Текст длиннее 8000 символов — проверены первые 8000.',en:'The text is longer than 8000 characters — the first 8000 were checked.'},
-    xTrunc:{ru:'Разбор оборвался: ответ модели вышел слишком длинным. Попробуйте «Коротко».',
-            en:'The review was cut off: the answer was too long. Try “Short”.'},
-    xOldWorker:{ru:'Проверка текста заработает, когда обновят Worker news92-orders.',
-                en:'Text checking will work once the news92-orders Worker is updated.'}
+    xWhy:{ru:'Почему: ',en:'Why: '}
   });
 
   const $ = s => document.querySelector(s);
   const esc = SkyCheck.esc;
   const MAX = 8000;
-  const TIMEOUT_MS = 45000;          // Worker: до 30 с на Groq и пауза 2 с на его лимит
+  const TIMEOUT_MS = 45000;
   const SUBJECTS = [['russian', 'xSubjRussian'], ['english', 'xSubjEnglish'], ['literature', 'xSubjLiterature']];
+  /* Worker вставляет предмет в промпт как есть: «по предмету «…»». */
+  const SUBJ_FOR_WORKER = {
+    russian: { ru: 'русский язык', en: 'Russian' },
+    english: { ru: 'английский язык', en: 'English' },
+    literature: { ru: 'литература', en: 'literature' }
+  };
   const CRITERIA = ['topic_match', 'argumentation', 'composition', 'logic', 'spelling', 'grammar'];
 
   const saved = Object.assign({ subject: 'russian', length: 'long', criteria: true, grade: true }, Sky.get('hwTextOpts', {}) || {});
@@ -99,7 +98,7 @@
   }
 
   function updateBtn() {
-    $('#xCheck').disabled = busy || !SkyCheck.hasWorker() || !$('#xText').value.trim() || waitLeft() > 0;
+    $('#xCheck').disabled = busy || !SkyCheck.hasWorker() || !$('#xText').value.trim();
   }
 
   function setBusy(on) {
@@ -113,127 +112,73 @@
     renderSubjects(); renderLength(); updateBtn();
   }
 
-  /* ---------- лимит текста ----------
-     Отдельный от фото: у текста своё окно (Бесплатный 1 / 5 мин,
-     Платный 2 / мин, Премиум 5 / мин). Что сейчас — из /api/limits
-     (поле text) и из ответа каждой проверки. */
-  let nextAt = 0, ticker = null, seenLimits = null;
-  const waitLeft = () => Math.max(0, Math.ceil((nextAt - Date.now()) / 1000));
-
-  function setWait(sec) {
-    nextAt = sec > 0 ? Date.now() + sec * 1000 : 0;
-    clearInterval(ticker);
-    if (nextAt) {
-      ticker = setInterval(() => {
-        renderWait();
-        if (!waitLeft()) { clearInterval(ticker); SkyCheck.loadLimits(); }
-      }, 1000);
-    }
-    renderWait();
-  }
-
-  function renderWait() {
-    const left = waitLeft();
-    const el = $('#xWait');
-    el.classList.toggle('hidden', !left);
-    if (left) el.textContent = Sky.t('waitNext').replace('%1', SkyCheck.clock(left));
-    updateBtn();
-  }
-
-  function renderPlan() {
-    const l = SkyCheck.limits;
-    const el = $('#xPlanLine');
-    const t = l && l.text;
-    el.classList.toggle('hidden', !t);
-    if (!t) return;
-    const per = t.window_seconds === 60 ? Sky.t('minOne') : Sky.t('minN').replace('%1', Math.round(t.window_seconds / 60));
-    const win = Sky.t(t.requests === 1 ? 'perWindow' : 'perWindowN').replace('%1', t.requests).replace('%2', per);
-    el.textContent = Sky.t('xPlan').replace('%1', SkyCheck.planName(l.plan)).replace('%2', win);
-  }
-
-  /* onChange зовётся и каждую секунду отсчёта фото — окно текста
-     берём только из нового ответа /api/limits. */
-  function onLimits() {
-    const l = SkyCheck.limits;
-    if (l && l !== seenLimits) {
-      seenLimits = l;
-      const r = l.text && l.text.rate;
-      if (r) setWait(r.allowed ? 0 : r.retry_after);
-    }
-    renderPlan();
-  }
-
   /* ---------- проверка ---------- */
   async function check() {
     if (busy) return;
     const text = $('#xText').value.trim();
     if (!text) { Sky.toast(Sky.t('errNoText'), 4000); $('#xText').focus(); return; }
-    if (waitLeft()) { Sky.toast(Sky.t('waitNext').replace('%1', SkyCheck.clock(waitLeft())), 4000); return; }
 
-    const body = { text, subject, length, criteria: $('#xCriteria').checked, grade: $('#xGrade').checked };
-    const topic = $('#xTopic').value.trim();
-    if (topic && length === 'long') body.topic = topic;
+    const body = {
+      text,
+      topic: length === 'long' ? $('#xTopic').value.trim().slice(0, 300) : '',
+      subject: Sky.L(SUBJ_FOR_WORKER[subject]),
+      kind: Sky.lang === 'en' ? 'essay' : 'сочинение',
+      criteria: CRITERIA.map(k => Sky.t('cr_' + k)),
+      lang: Sky.lang,
+      teacher: window.SkyTeachers && SkyTeachers.selectedId ? SkyTeachers.selectedId() : null,
+      strictness: 3
+    };
+    const opts = { length, criteria: $('#xCriteria').checked, grade: $('#xGrade').checked };
 
     setBusy(true);
     $('#xResultSec').classList.add('hidden');
-    const res = await SkyCheck.request('/api/check-text', { method: 'POST', json: body, timeout: TIMEOUT_MS });
+    const res = await SkyCheck.request('/grade-essay', { method: 'POST', json: body, timeout: TIMEOUT_MS });
     setBusy(false);
 
     if (!res.ok) {
-      const d = res.data || {};
-      if (d.code === 'rate_limit' && d.retry_after) setWait(d.retry_after);
-      /* Прежний Worker: заготовка отвечает 400 без кода (ждёт text в
-         адресе), а скрипт без /api/check-text — 404. У нового Worker
-         у каждой ошибки есть code, а 404 на этот адрес не бывает. */
-      const oldWorker = (res.status === 400 && !d.code) || res.status === 404;
-      render(null, oldWorker ? Sky.t('xOldWorker') : SkyCheck.errorText(res));
+      render(null, SkyCheck.errorText(res), opts);
       return;
     }
-    const r = res.data.rate;
-    if (r) setWait(r.remaining === 0 ? (r.retry_after || r.reset_in || 0) : 0);
-    SkyCheck.addTokens(res.data.tokens_used);
-    render(res.data, null);
-    if (typeof window.renderHistory === 'function') window.renderHistory();
+    render(res.data, null, opts);
   }
 
   /* ---------- разбор ---------- */
-  function render(data, fail) {
-    last = { data, fail };
+  /* «Коротко» — оценка, замечания и общий вывод; «Подробно» — ещё
+     критерии (если отмечено), сильные стороны и следующий шаг. */
+  function render(data, fail, opts) {
+    last = { data, fail, opts };
+    const long = opts.length === 'long';
     const block = (key, inner) => `<div class="res-block"><h3>${esc(Sky.t(key))}</h3>${inner}</div>`;
     let html = '';
     if (data) {
-      if ('assessment' in data || data.assessment_text) {
-        const g = typeof data.assessment === 'number' ? data.assessment : null;
-        html += `<div class="gradebox"><div class="grade g${g || 'x'}">${g || '—'}</div>
-          <div class="said"><b>${esc(data.assessment_text || Sky.t('gradeL'))}</b></div></div>`;
+      const g = Number(data.grade);
+      if (opts.grade && g >= 1 && g <= 5) {
+        html += `<div class="gradebox"><div class="grade g${g}">${g}</div>
+          <div class="said"><b>${esc(Sky.t('gradeL'))}</b></div></div>`;
       }
-      if (data.criteria) {
-        const c = data.criteria;
-        html += block('xCritH', `<table class="crit"><tbody>${CRITERIA.map(k => {
-          const v = typeof c[k] === 'number' ? c[k] : null;
-          return `<tr><th scope="row">${esc(Sky.t('cr_' + k))}</th>` +
+      const crit = Array.isArray(data.criteria) ? data.criteria.filter(c => c && typeof c === 'object') : [];
+      if (long && opts.criteria && crit.length) {
+        html += block('xCritH', `<table class="crit"><tbody>${crit.map(c => {
+          const v = Number(c.score) >= 1 && Number(c.score) <= 5 ? Number(c.score) : null;
+          return `<tr><th scope="row">${esc(c.name || '')}${c.comment ? `<span class="crit-c">${esc(c.comment)}</span>` : ''}</th>` +
             `<td class="crit-bar"><span><i style="width:${v == null ? 0 : v * 20}%"></i></span></td>` +
             `<td class="crit-v">${v == null ? '—' : v + '/5'}</td></tr>`;
-        }).join('')}</tbody></table>` +
-          (c.topic_match === 0 ? `<div class="flag warn">${esc(Sky.t('xOffTopic'))}</div>` : ''));
+        }).join('')}</tbody></table>`);
       }
-      const errs = Array.isArray(data.errors) ? data.errors : [];
-      html += block('errH', errs.length
-        ? errs.map(e => `<div class="err-item">
-            ${e.type ? `<div class="kind">${esc(e.type)}</div>` : ''}
-            ${e.fragment ? `<div class="frag">${esc(e.fragment)}</div>` : ''}
-            ${e.correction ? `<div class="fix">${esc(Sky.t('fixL'))}${esc(e.correction)}</div>` : ''}
+      const good = Array.isArray(data.strengths) ? data.strengths : [];
+      if (long && good.length) html += block('goodH', good.map(x => `<div class="good-item">${esc(x)}</div>`).join(''));
+      const issues = Array.isArray(data.issues) ? data.issues.filter(e => e && typeof e === 'object') : [];
+      html += block('errH', issues.length
+        ? issues.map(e => `<div class="err-item">
+            ${e.quote ? `<div class="frag">${esc(e.quote)}</div>` : ''}
+            ${e.problem ? `<div class="why">${esc(e.problem)}</div>` : ''}
+            ${e.why ? `<div class="why"><b>${esc(Sky.t('xWhy'))}</b>${esc(e.why)}</div>` : ''}
           </div>`).join('')
         : `<p class="lead" style="font-size:13px">${esc(Sky.t('noErrors'))}</p>`);
-      if (data.comment) html += block('resComment', `<div class="res-text">${esc(data.comment)}</div>`);
-      if (data.truncated) html += `<div class="limit-note">${esc(Sky.t('xTrunc'))}</div>`;
-      if (data.truncated_input) html += `<div class="limit-note">${esc(Sky.t('xCut'))}</div>`;
-      if (data.cached) html += `<p class="tok-note">${esc(Sky.t('xCached'))}</p>`;
+      if (data.overall_feedback) html += block('resComment', `<div class="res-text">${esc(data.overall_feedback)}</div>`);
+      if (long && data.next_step) html += block('nextH', `<div class="res-text">${esc(data.next_step)}</div>`);
     }
     if (fail) html += `<div class="limit-note">${esc(fail)}</div>`;
-    if (data && data.tokens_used && data.tokens_used.total) {
-      html += `<div class="tok-note">${esc(Sky.t('resTokens').replace('%1', data.tokens_used.total))}</div>`;
-    }
     html += `<div class="res-actions"><button type="button" class="btn ghost" id="xAgain">${esc(Sky.t('againBtn'))}</button></div>`;
 
     $('#xResultSec').classList.remove('hidden');
@@ -273,12 +218,11 @@
   $('#xGrade').addEventListener('change', saveOpts);
   $('#xText').addEventListener('input', () => { renderCount(); updateBtn(); });
   $('#xCheck').addEventListener('click', check);
-  SkyCheck.onChange(onLimits);
   document.addEventListener('langchange', () => {
-    renderSubjects(); renderLength(); renderCount(); renderWait(); renderPlan();
+    renderSubjects(); renderLength(); renderCount();
     if (!busy) $('#xCheck').textContent = Sky.t('xCheckBtn');
     $('#kindSeg').setAttribute('aria-label', Sky.t('kindAria'));
-    if (last) render(last.data, last.fail);
+    if (last) render(last.data, last.fail, last.opts);
   });
 
   /* ---------- запуск ---------- */
@@ -288,5 +232,5 @@
   $('#xGrade').checked = saved.grade !== false;
   const params = new URLSearchParams(location.search);
   setKind(params.get('task') ? 'photo' : params.get('kind') || Sky.get('hwKind', 'photo'));
-  renderSubjects(); renderLength(); renderCount(); onLimits(); updateBtn();
+  renderSubjects(); renderLength(); renderCount(); updateBtn();
 })();

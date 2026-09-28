@@ -704,19 +704,55 @@ function bumpStats(subject, correct) {
     }
   }
 
+  /* Worker /grade-essay ждёт { text, topic, subject, kind, criteria,
+     lang, teacher, strictness } и отвечает { grade, criteria:[{name,
+     score, comment}], strengths, issues:[{quote, problem, why}],
+     overall_feedback, next_step }. Критерии шлём свои, по одному на
+     каждую шкалу страницы, — и по порядку раскладываем ответ в scores. */
+  const ESSAY_CRITERIA = {
+    ru: ['соответствие теме', 'логика и композиция', 'аргументация и примеры', 'речевое оформление и грамотность'],
+    en: ['relevance to the topic', 'structure and logic', 'argument and examples', 'language and accuracy']
+  };
+  function essayFromWorker(data) {
+    const clamp = v => Math.min(5, Math.max(1, Number(v) || 3));
+    const c = Array.isArray(data.criteria) ? data.criteria : [];
+    const at = i => clamp(c[i] && c[i].score);
+    return {
+      scores: { relevance: at(0), structure: at(1), argumentation: at(2), language: at(3), overall_impression: clamp(data.grade) },
+      strengths: Array.isArray(data.strengths) ? data.strengths.slice(0, 8) : [],
+      issues: (Array.isArray(data.issues) ? data.issues.slice(0, 15) : []).map(i => ({
+        quote: String((i && i.quote) || ''),
+        problem: [i && i.problem, i && i.why].filter(Boolean).join(' — '),
+        fix: ''
+      })),
+      overall_feedback: String(data.overall_feedback || ''),
+      next_step: String(data.next_step || '')
+    };
+  }
+
   async function gradeEssayWithWorker(payload) {
     const base = (CFG.AI_BASE || '').trim();
     if (!/^https?:\/\//i.test(base)) return { error: t('aiBadUrl') };
     try {
       const teacherId = (window.SkyTeachers && window.SkyTeachers.selectedId) ? window.SkyTeachers.selectedId() : null;
+      const english = payload.subject === 'english';
       const r = await fetch(base.replace(/\/+$/, '') + '/grade-essay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(Object.assign({ lang, teacher: teacherId }, payload))
+        body: JSON.stringify({
+          text: payload.essay,
+          topic: payload.prompt || '',
+          subject: english ? (lang === 'ru' ? 'английский язык' : 'English') : (lang === 'ru' ? 'русский язык' : 'Russian'),
+          kind: lang === 'ru' ? 'сочинение' : 'essay',
+          criteria: ESSAY_CRITERIA[lang === 'en' ? 'en' : 'ru'],
+          lang,
+          teacher: payload.teacher || teacherId,
+          strictness: 3
+        })
       });
       const data = await r.json().catch(() => null);
       if (!r.ok) return { error: (data && data.error) || t('aiHttp').replace('%1', r.status) };
-      if (data && data.scores) return { result: data };
+      if (data && data.grade != null) return { result: essayFromWorker(data) };
       return { error: (data && data.error) ? String(data.error) : t('aiNoNet') };
     } catch (e) {
       return { error: t('aiNoNet') };
