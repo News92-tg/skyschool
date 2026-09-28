@@ -879,7 +879,9 @@ function renderUsage() {
   if (lim) {
     const chip = $('#planChip');
     chip.textContent = Sky.t('planTag').replace('%1', SkyCheck.planName(lim.plan));
-    chip.className = 'tag ' + (lim.plan === 'premium' ? 'teach' : lim.plan === 'paid' ? 'ok' : 'gray');
+    /* цвет — по возможностям, а не по имени: Family и Pro — как Премиум */
+    const f = lim.features || {};
+    chip.className = 'tag ' + (f.teacher ? 'teach' : f.compare ? 'ok' : 'gray');
     $('#planLimit').textContent = SkyCheck.planSummary();
   }
   /* Пометки тарифа прячем, когда пункт уже доступен. Если тариф стал

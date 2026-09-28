@@ -115,7 +115,11 @@ window.SkyCheck = (function () {
     ['other',     { ru: 'Другое',     en: 'Other' }]
   ];
   const subjName = k => { const s = SUBJECTS.find(x => x[0] === k); return s ? Sky.L(s[1]) : ''; };
-  const planName = p => Sky.t(p === 'premium' ? 'planPremium' : p === 'paid' ? 'planPaid' : 'planFree');
+  /* Три тарифа — по-русски и по-английски; остальные (Family, Pro,
+     Basic и любые, что заведут в админке) — названием из справочника. */
+  const PLAN_KEYS = { free: 'planFree', paid: 'planPaid', premium: 'planPremium' };
+  const planName = p => PLAN_KEYS[p || 'free'] ? Sky.t(PLAN_KEYS[p || 'free'])
+    : (limits && limits.plan === p && limits.title) || p;
 
 
   /* ---------- сжатие ----------

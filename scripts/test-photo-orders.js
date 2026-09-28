@@ -27,6 +27,9 @@ const PLANS = {
   free:    { plan: 'free', title: 'Бесплатный', price_rub: 0, limits: { requests: 1, window_seconds: 600, photos: 5 }, features: { compare: false, teacher: false, plagiarism: false },
              text: { requests: 1, window_seconds: 300, rate: { allowed: true, remaining: 1, retry_after: 0, reset_in: 0 } } },
   premium: { plan: 'premium', title: 'Премиум', price_rub: 209, limits: { requests: 3, window_seconds: 60, photos: 20 }, features: { compare: true, teacher: true, plagiarism: true },
+             text: { requests: 5, window_seconds: 60, rate: { allowed: true, remaining: 5, retry_after: 0, reset_in: 0 } } },
+  /* тариф, выданный в админке, — не из трёх основных */
+  family:  { plan: 'family', title: 'Family', price_rub: 649, limits: { requests: 3, window_seconds: 60, photos: 20 }, features: { compare: true, teacher: true, plagiarism: true },
              text: { requests: 5, window_seconds: 60, rate: { allowed: true, remaining: 5, retry_after: 0, reset_in: 0 } } }
 };
 const TEXT = {
@@ -391,6 +394,18 @@ function ok(name, cond, extra) {
   ok('текст: телефон 390 px — не шире экрана, с таблицей критериев', overflowX <= 0, String(overflowX));
   if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, 'text-phone.png'), fullPage: true });
   await page.close();
+
+  /* ========== тариф из админки (Family) ========== */
+  state.plan = 'family';
+  page = await open(PAGE);
+  await page.waitForFunction(() => /Family/.test(document.querySelector('#planChip').textContent));
+  ok('Family из админки: название, цвет как у Премиум, до 20 фото', (await text(page, '#planChip')) === 'Тариф: Family' &&
+    await page.$eval('#planChip', el => el.classList.contains('teach')) && /до 20 фото/.test(await text(page, '#planLimit')));
+  await page.click('#roleSeg [data-role="teacher"]');
+  ok('Family: режим учителя открыт', !(await visible(page, '#tLock')));
+  await page.click('#roleSeg [data-role="student"]');
+  await page.close();
+  state.plan = 'free';
 
   /* ========== телефон ========== */
   page = await open(PAGE, { width: 390, height: 844 });
