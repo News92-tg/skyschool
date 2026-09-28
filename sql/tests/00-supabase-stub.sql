@@ -19,6 +19,11 @@ create table if not exists auth.users (
   email               text,
   raw_user_meta_data  jsonb default '{}'::jsonb
 );
+-- эти поля в настоящей auth.users тоже есть; нужны админ-функциям
+alter table auth.users
+  add column if not exists created_at         timestamptz default now(),
+  add column if not exists last_sign_in_at    timestamptz,
+  add column if not exists email_confirmed_at timestamptz;
 
 -- В Supabase auth.uid() достаёт id пользователя из JWT.
 -- Локально берём из настройки сессии — так тесты могут «входить»

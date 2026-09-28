@@ -98,9 +98,14 @@ run "$PSQL -c 'create database $TDB'" >/dev/null
 echo
 echo "→ тарифы: заглушка, лимиты фото, тарифы (дважды — файл должен переживать повторный запуск)…"
 run "$PSQL -d $TDB -f '$ROOT/sql/tests/00-supabase-stub.sql'" >/dev/null
+run "$PSQL -d $TDB -f '$ROOT/sql/schema.sql'" >/dev/null           # profiles и др., как в живой базе
 run "$PSQL -d $TDB -f '$ROOT/sql/schema-photo-limits.sql'" >/dev/null
 run "$PSQL -d $TDB -f '$ROOT/sql/schema-tariffs.sql'" >/dev/null
 run "$PSQL -d $TDB -f '$ROOT/sql/schema-tariffs.sql'" >/dev/null
+echo "→ проверка текстом и админка (тоже дважды)…"
+for f in schema-text-check.sql schema-admin.sql schema-text-check.sql schema-admin.sql; do
+  run "$PSQL -d $TDB -f '$ROOT/sql/$f'" >/dev/null
+done
 echo "→ тесты тарифов:"
 echo
 if run "psql -h $SOCKET_DIR -p $PGPORT -U postgres -d $TDB -q -f '$ROOT/sql/tests/tariffs-tests.sql'"; then
@@ -109,5 +114,16 @@ if run "psql -h $SOCKET_DIR -p $PGPORT -U postgres -d $TDB -q -f '$ROOT/sql/test
 else
   echo
   echo "ТЕСТЫ ТАРИФОВ НЕ ПРОШЛИ — смотрите таблицу выше." >&2
+  exit 1
+fi
+echo
+echo "→ тесты проверки текстом и админки:"
+echo
+if run "psql -h $SOCKET_DIR -p $PGPORT -U postgres -d $TDB -q -f '$ROOT/sql/tests/text-admin-tests.sql'"; then
+  echo
+  echo "Готово: проверка текстом и админка работают как задумано."
+else
+  echo
+  echo "ТЕСТЫ ТЕКСТА И АДМИНКИ НЕ ПРОШЛИ — смотрите таблицу выше." >&2
   exit 1
 fi
