@@ -2,7 +2,7 @@
    SkyySchool — проверка ДЗ по фото: общее для photo.html
 
    Здесь то, чем пользуются оба режима страницы (ученик и учитель):
-     запросы к Worker (AI_BASE) с входом ученика и потоком прогресса,
+     запросы к Worker (AI_BASE_ORDERS) с входом ученика и потоком прогресса,
      тариф и лимит запросов с обратным отсчётом,
      окно «Тарифы» и заявка на оплату,
      счётчик потраченных токенов,
@@ -51,11 +51,14 @@ window.SkyCheck = (function () {
     errTariff:{ru:'Это доступно в другом тарифе.',en:'This needs another plan.'},
     errZaiLimit:{ru:'Слишком много запросов к модели (лимит Z.AI), попробуйте через минуту',en:'Too many requests to the model (Z.AI limit), try again in a minute'},
     errBadImg:{ru:'Модель не смогла открыть фото. Попробуйте ещё раз или выберите другое.',en:'The model could not open the photo. Try again or pick another one.'},
-    errStorage:{ru:'Хранилище не настроено. Сообщите администратору.',en:'Storage is not configured. Tell the administrator.'}
+    errStorage:{ru:'Хранилище не настроено. Сообщите администратору.',en:'Storage is not configured. Tell the administrator.'},
+    errGroqLimit:{ru:'Лимит Groq, подождите',en:'Groq limit reached, please wait'},
+    errTooLong:{ru:'Текст слишком длинный, разбейте на части',en:'The text is too long, split it into parts'},
+    errNoText:{ru:'Вставьте текст сочинения',en:'Paste the essay text'}
   });
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
-  const base = () => (Sky.cfg.AI_BASE || '').trim().replace(/\/+$/, '');
+  const base = () => (Sky.cfg.AI_BASE_ORDERS || Sky.cfg.AI_BASE || '').trim().replace(/\/+$/, '');
   const hasWorker = () => /^https?:\/\//i.test(base());
 
   /* Ключи совпадают с Worker; русские названия он тоже понимает. */
@@ -218,6 +221,12 @@ window.SkyCheck = (function () {
       case 'no_photo':        return Sky.t('errNoPhoto');
       case 'storage':         return Sky.t('errStorage');
       case 'bad_param':       return d.error || Sky.t('errDown');
+      case 'groq_limit':      return Sky.t('errGroqLimit');
+      case 'groq_key':        return Sky.t('errKey');
+      case 'groq_timeout':    return Sky.t('errTimeout');
+      case 'groq_down':       return Sky.t('errDown');
+      case 'too_long':        return Sky.t('errTooLong');
+      case 'no_text':         return Sky.t('errNoText');
     }
     if (res.status === 400) return Sky.t('errNoPhoto');
     if (res.status === 401) return Sky.t('errKey');

@@ -207,6 +207,21 @@
   .link-out{display:flex;gap:8px;flex-wrap:wrap}
   .link-out input{flex:1 1 220px;min-width:0;padding:10px 12px;border:1px solid var(--line);border-radius:12px;
     background:var(--panel-2);color:var(--ink);font:inherit;font-size:13px}
+
+  /* ---------- вкладка «Текст» (логика — assets/photo-text.js) ---------- */
+  .kind-bar{margin-top:18px}
+  .field textarea.x-text{min-height:220px}
+  .x-count{margin-top:6px;font-size:12px;color:var(--muted);font-weight:700;text-align:right}
+  .x-count.full{color:var(--warn)}
+  #textTab .opt-check:has(input:disabled){opacity:.55;cursor:default}
+  .crit{width:100%;border-collapse:collapse;font-size:13.5px}
+  .crit th{text-align:left;font-weight:700;padding:7px 10px 7px 0;border-bottom:1px solid var(--line)}
+  .crit td{padding:7px 0;border-bottom:1px solid var(--line)}
+  .crit tr:last-child th,.crit tr:last-child td{border-bottom:none}
+  .crit td.crit-bar{width:34%;padding-right:10px}
+  .crit-bar span{display:block;height:8px;border-radius:99px;background:var(--panel-2);overflow:hidden}
+  .crit-bar i{display:block;height:100%;background:var(--accent);border-radius:99px}
+  .crit td.crit-v{width:46px;text-align:right;font-weight:900;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -233,6 +248,14 @@
   </div>
 
   <div id="studentMode">
+  <!-- Фото или текст (логика — assets/photo-text.js) -->
+  <div class="kind-bar">
+    <div class="seg seg-lg" id="kindSeg" role="tablist">
+      <button type="button" role="tab" data-kind="photo" aria-pressed="true" data-i18n="kindPhoto"></button>
+      <button type="button" role="tab" data-kind="text" aria-pressed="false" data-i18n="kindText"></button>
+    </div>
+  </div>
+
   <!-- кто проверяет -->
   <div class="section">
     <div class="panel">
@@ -243,6 +266,7 @@
     </div>
   </div>
 
+  <div id="photoTab">
   <!-- съёмка -->
   <div class="section">
     <div class="panel shot">
@@ -338,6 +362,55 @@
     <div class="section-head"><h2 data-i18n="resultH"></h2></div>
     <div class="panel" id="result"></div>
   </div>
+  </div><!-- /photoTab -->
+
+  <!-- ===== Текст: сочинение → POST /api/check-text ===== -->
+  <div id="textTab" class="hidden">
+  <div class="section">
+    <div class="panel shot">
+      <div class="field">
+        <label for="xText" data-i18n="xTextLabel"></label>
+        <textarea id="xText" class="x-text" rows="10" maxlength="8000" data-i18n-ph="xTextPh"></textarea>
+        <div class="x-count" id="xCount" aria-live="polite"></div>
+      </div>
+      <div class="field">
+        <label data-i18n="subjLabel"></label>
+        <div class="subj-row" id="xSubjRow"></div>
+      </div>
+      <div class="field">
+        <label data-i18n="lengthLabel"></label>
+        <div class="seg seg-lg" id="xLengthSeg" role="group">
+          <button type="button" data-len="short" aria-pressed="false" data-i18n="lenShort"></button>
+          <button type="button" data-len="long" aria-pressed="true" data-i18n="lenLong"></button>
+        </div>
+      </div>
+      <div class="field" id="xTopicField">
+        <label for="xTopic" data-i18n="xTopicLabel"></label>
+        <input type="text" id="xTopic" maxlength="300" data-i18n-ph="xTopicPh">
+      </div>
+      <div class="field">
+        <label data-i18n="optsLabel"></label>
+        <div class="opts">
+          <label class="opt-check"><input type="checkbox" id="xCriteria" checked><span data-i18n="xCriteria"></span></label>
+          <label class="opt-check"><input type="checkbox" id="xGrade" checked><span data-i18n="optGrade"></span></label>
+        </div>
+      </div>
+
+      <div class="cap-note hidden" id="xPlanLine"></div>
+      <div class="used-note hidden" id="xWait"></div>
+      <button class="btn full big" id="xCheck" disabled data-i18n="xCheckBtn"></button>
+      <div class="progress hidden" id="xProgress" aria-live="polite">
+        <div class="progress-text"></div>
+        <div class="progress-bar indef"><i></i></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section hidden" id="xResultSec">
+    <div class="section-head"><h2 data-i18n="resultH"></h2></div>
+    <div class="panel" id="xResult"></div>
+  </div>
+  </div><!-- /textTab -->
 
   <!-- история -->
   <div class="section hidden" id="histSection">
@@ -625,7 +698,7 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;
 
 /* Разбор фото возможен ТОЛЬКО через Worker: ключ модели в браузере
    держать нельзя — его увидит любой, кто откроет исходник страницы. */
-const AI_BASE = (Sky.cfg.AI_BASE || '').trim();
+const AI_BASE = (Sky.cfg.AI_BASE_ORDERS || Sky.cfg.AI_BASE || '').trim();
 const hasWorker = /^https?:\/\//i.test(AI_BASE);
 
 let photos = [];          // выбранные фото: { blob, url } — сжимаются только при отправке
@@ -1338,5 +1411,6 @@ window.addEventListener('pagehide', closeCamera);
 })();
 </script>
 <script src="assets/photo-teacher.js"></script>
+<script src="assets/photo-text.js"></script>
 </body>
 </html>

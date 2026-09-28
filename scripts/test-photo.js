@@ -1,5 +1,6 @@
 /* ============================================================
-   «Домашка по фото» в настоящем браузере: ученик, учитель, тарифы.
+   «Домашка по фото» в настоящем браузере: ученик (фото и текст),
+   учитель, тарифы.
 
    Запуск:  node scripts/test-photo.js
 
@@ -21,8 +22,17 @@ const WORKER = 'https://news92-orders.almazpro0927.workers.dev';
 const HW_ID = '0f8fad5b-d9cb-469f-a165-70867728950e';
 
 const PLANS = {
-  free:    { plan: 'free', title: 'Бесплатный', price_rub: 0, limits: { requests: 1, window_seconds: 600, photos: 5 }, features: { compare: false, teacher: false, plagiarism: false } },
-  premium: { plan: 'premium', title: 'Премиум', price_rub: 209, limits: { requests: 3, window_seconds: 60, photos: 20 }, features: { compare: true, teacher: true, plagiarism: true } }
+  free:    { plan: 'free', title: 'Бесплатный', price_rub: 0, limits: { requests: 1, window_seconds: 600, photos: 5 }, features: { compare: false, teacher: false, plagiarism: false },
+             text: { requests: 1, window_seconds: 300, rate: { allowed: true, remaining: 1, retry_after: 0, reset_in: 0 } } },
+  premium: { plan: 'premium', title: 'Премиум', price_rub: 209, limits: { requests: 3, window_seconds: 60, photos: 20 }, features: { compare: true, teacher: true, plagiarism: true },
+             text: { requests: 5, window_seconds: 60, rate: { allowed: true, remaining: 5, retry_after: 0, reset_in: 0 } } }
+};
+const TEXT = {
+  subject: 'russian', length: 'long',
+  criteria: { topic_match: 5, argumentation: 4, composition: 4, logic: 3, spelling: 4, grammar: 5 },
+  errors: [{ type: 'пунктуация', fragment: 'Я думаю что', correction: 'Я думаю, что' }],
+  assessment: 4, comment: 'Хорошая работа, добавьте примеры.', cached: false,
+  tokens_used: { prompt: 700, completion: 300, total: 1000 }, plan: 'free', rate: { remaining: 0, retry_after: 300, reset_in: 300 }
 };
 const CHECK = {
   recognized_text: '2+2=5', errors: [{ type: 'вычислительная', fragment: '2+2=5', correction: '2+2=4' }],
@@ -42,7 +52,7 @@ function ok(name, cond, extra) {
   await ctx.route(/fonts\.(googleapis|gstatic)|jsdelivr|supabase\.co/, r => r.abort());
 
   /* ---------- подменённый Worker ---------- */
-  const state = { plan: 'free', next: {}, calls: [] };
+  const state = { plan: 'free', next: {}, calls: [], textDelay: 0 };
   await ctx.route(WORKER + '/**', async route => {
     const req = route.request();
     const url = new URL(req.url());
@@ -58,6 +68,10 @@ function ok(name, cond, extra) {
       return reply(200, Object.assign({}, PLANS[state.plan], { user: true, rate: { allowed: true, remaining: PLANS[state.plan].limits.requests, retry_after: 0, reset_in: 0 } }));
     }
     if (url.pathname === '/api/check-photo') return reply(200, CHECK);
+    if (url.pathname === '/api/check-text') {
+      await new Promise(r => setTimeout(r, state.textDelay));
+      return reply(200, TEXT);
+    }
     if (url.pathname === '/api/payments') return reply(201, { id: 'p1', status: 'pending', amount: 209, message: 'Оплата скоро' });
     if (url.pathname === '/api/submit-homework') return reply(201, { id: HW_ID, url: 'https://news92-tg.github.io/skyschool/photo.html?hw=' + HW_ID });
     if (url.pathname === '/api/homework/' + HW_ID) {
@@ -281,6 +295,107 @@ function ok(name, cond, extra) {
   await page.click('#lRun');
   await page.waitForSelector('.modal .tariffs');
   ok('Бесплатный: «Проверить все» открывает «Тарифы» на Премиум', /Премиум/.test(await text(page, '.tf-card.focus .tf-head')));
+  await page.close();
+
+  /* ========== ученик: вкладка «Текст» (сочинение) ========== */
+  state.plan = 'free';
+  page = await open(PAGE);
+  await page.click('#roleSeg [data-role="student"]');       /* выше страницу оставили в режиме учителя */
+  ok('текст: по умолчанию открыта вкладка «Фото»', await visible(page, '#photoTab') && !(await visible(page, '#textTab')));
+  await page.click('#kindSeg [data-kind="text"]');
+  ok('текст: вкладка «Текст» — форма видна, фото спрятано', await visible(page, '#textTab') && !(await visible(page, '#photoTab')) &&
+    (await page.$eval('#kindSeg [data-kind="text"]', b => b.getAttribute('aria-pressed'))) === 'true');
+  ok('текст: поле до 8000 символов, счётчик 0 / 8 000', (await page.$eval('#xText', t => t.maxLength)) === 8000 && /^0 \/ 8\s000$/.test(await text(page, '#xCount')), await text(page, '#xCount'));
+  ok('текст: три предмета, русский по умолчанию', (await page.$$eval('#xSubjRow .subj-btn', bs => bs.map(b => b.textContent).join())) === 'Русский,Английский,Литература' &&
+    (await text(page, '#xSubjRow .subj-btn.active')) === 'Русский');
+  ok('текст: подробно, критерии и оценка включены', (await page.$eval('#xLengthSeg [data-len="long"]', b => b.getAttribute('aria-pressed'))) === 'true' &&
+    await page.$eval('#xCriteria', i => i.checked && !i.disabled) && await page.$eval('#xGrade', i => i.checked));
+  ok('текст: пустое поле — кнопка неактивна', await page.$eval('#xCheck', b => b.disabled));
+  ok('текст: строка лимита текста по тарифу', (await text(page, '#xPlanLine')) === 'Текст по тарифу «Бесплатный»: 1 запрос / 5 мин', await text(page, '#xPlanLine'));
+  await page.click('#xLengthSeg [data-len="short"]');
+  ok('текст: «Коротко» — критерии недоступны, темы нет', await page.$eval('#xCriteria', i => i.disabled) && !(await visible(page, '#xTopicField')));
+  await page.click('#xLengthSeg [data-len="long"]');
+  const essayText = 'Я думаю что осень — лучшее время года.\nЛистья жёлтые.';
+  await page.fill('#xText', essayText);
+  await page.fill('#xTopic', 'Моё любимое время года');
+  await page.click('#xSubjRow [data-subject="literature"]');
+  ok('текст: счётчик считает', (await text(page, '#xCount')).startsWith(essayText.length + ' / '));
+  state.textDelay = 700;
+  await page.click('#xCheck');
+  await page.waitForFunction(() => /Проверяю/.test(document.querySelector('#xCheck').textContent));
+  ok('текст: пока идёт проверка — «Проверяю...», кнопка неактивна, «5-15 секунд»', await page.$eval('#xCheck', b => b.disabled) &&
+    await visible(page, '#xProgress') && /Идёт проверка, это займёт 5-15 секунд/.test(await text(page, '#xProgress .progress-text')));
+  await page.waitForSelector('#xAgain');
+  state.textDelay = 0;
+  const tcall = state.calls.filter(c => c.path === '/api/check-text').pop();
+  const tbody = JSON.parse(tcall.body.toString());
+  ok('текст: POST JSON с текстом и настройками, вход в заголовке', tcall.method === 'POST' && !tcall.search && tbody.text === essayText && tbody.subject === 'literature' &&
+    tbody.length === 'long' && tbody.criteria === true && tbody.grade === true && tbody.topic === 'Моё любимое время года' && tcall.headers.authorization === 'Bearer jwt-test', JSON.stringify(tbody));
+  ok('текст: адрес Worker из AI_BASE_ORDERS', await page.evaluate(() => Sky.cfg.AI_BASE_ORDERS === 'https://news92-orders.almazpro0927.workers.dev/'));
+  ok('текст: кнопка вернулась в обычный вид', (await text(page, '#xCheck')) === 'Проверить' && !(await visible(page, '#xProgress')));
+  ok('текст: оценка', (await text(page, '#xResult .grade')) === '4');
+  ok('текст: таблица критериев — 6 строк с баллами', (await page.$$('#xResult table.crit tr')).length === 6 &&
+    /Логика и связность/.test(await page.textContent('#xResult .crit')) && (await page.$$eval('#xResult .crit-v', t => t.map(x => x.textContent).join())) === '5/5,4/5,4/5,3/5,4/5,5/5');
+  ok('текст: полоса балла по ширине', (await page.$eval('#xResult .crit tr:nth-child(4) .crit-bar i', i => i.style.width)) === '60%');
+  ok('текст: ошибка и исправление, комментарий', /Я думаю, что/.test(await text(page, '#xResult .err-item .fix')) && /добавьте примеры/.test(await page.textContent('#xResult')));
+  ok('текст: токены — в разборе и в счётчике', /ушло токенов: 1000/.test(await page.textContent('#xResult')) && /Потрачено: 1\s000 токенов/.test(await text(page, '#tokenLine')), await text(page, '#tokenLine'));
+  ok('текст: лимит исчерпан — отсчёт 05:00 и кнопка ждёт', /через 0[45]:\d\d/.test(await text(page, '#xWait')) && await page.$eval('#xCheck', b => b.disabled), await text(page, '#xWait'));
+  ok('текст: отсчёт текста не трогает лимит фото', await page.evaluate(() => SkyCheck.canRequest()));
+  await page.click('#xAgain');
+  ok('текст: «Проверить ещё раз» — разбор спрятан, текст на месте', !(await visible(page, '#xResultSec')) && (await page.$eval('#xText', t => t.value)) === essayText);
+
+  await page.evaluate(() => { document.querySelector('#xWait').classList.add('hidden'); });
+  await page.evaluate(() => SkyCheck.loadLimits());                   /* новый ответ /api/limits — окно свободно */
+  await page.waitForFunction(() => !document.querySelector('#xCheck').disabled);
+  state.next['/api/check-text'] = { status: 429, body: { error: 'Лимит Groq, подождите', code: 'groq_limit', retry_after: 2 } };
+  await page.click('#xCheck');
+  await page.waitForSelector('#xAgain');
+  ok('текст: 429 Groq — «Лимит Groq, подождите»', (await text(page, '#xResult .limit-note')) === 'Лимит Groq, подождите' && !(await visible(page, '#xResult .grade')));
+  state.next['/api/check-text'] = { status: 400, body: { error: 'Текст слишком длинный, разбейте на части', code: 'too_long' } };
+  await page.click('#xCheck');
+  await page.waitForFunction(() => /разбейте/.test((document.querySelector('#xResult .limit-note') || {}).textContent || ''));
+  ok('текст: 400 — «Текст слишком длинный, разбейте на части»', true);
+  state.next['/api/check-text'] = { status: 429, body: { error: 'x', code: 'rate_limit', retry_after: 200 } };
+  await page.click('#xCheck');
+  await page.waitForFunction(() => /03:[12]\d/.test(document.querySelector('#xWait').textContent));
+  ok('текст: 429 тарифа — отсчёт по retry_after', /следующая проверка через 03:[12]\d/.test(await text(page, '#xResult .limit-note')));
+  await page.evaluate(() => SkyCheck.loadLimits());
+  await page.waitForFunction(() => !document.querySelector('#xCheck').disabled);
+  state.next['/api/check-text'] = { status: 200, body: Object.assign({}, TEXT, { cached: true, tokens_used: { prompt: 0, completion: 0, total: 0 },
+    criteria: { topic_match: 0, argumentation: null, composition: null, logic: null, spelling: null, grammar: null }, rate: { remaining: 1, retry_after: 0, reset_in: 60 } }) };
+  await page.click('#xCheck');
+  await page.waitForSelector('#xResult .crit');
+  ok('текст: из кэша — пометка, токены не потрачены', /уже проверяли за последние 7 дней/.test(await page.textContent('#xResult')) && !/ушло токенов/.test(await page.textContent('#xResult')));
+  ok('текст: не по теме — пометка и прочерки', /не по теме/.test(await text(page, '#xResult .flag.warn')) && (await page.$$eval('#xResult .crit-v', t => t.filter(x => x.textContent === '—').length)) === 5);
+
+  await page.uncheck('#xCriteria');
+  await page.uncheck('#xGrade');
+  state.next['/api/check-text'] = { status: 200, body: { subject: 'russian', length: 'long', errors: [], comment: 'Ок', cached: false, tokens_used: TEXT.tokens_used, plan: 'free', rate: { remaining: 1 } } };
+  await page.click('#xCheck');
+  await page.waitForFunction(() => /Ошибок не нашлось/.test(document.querySelector('#xResult').textContent));
+  const tb2 = JSON.parse(state.calls.filter(c => c.path === '/api/check-text').pop().body.toString());
+  ok('текст: без критериев и оценки — так и уходит, и не показывается', tb2.criteria === false && tb2.grade === false && !(await page.$('#xResult .crit')) && !(await page.$('#xResult .grade')));
+
+  await page.evaluate(() => Sky.setLang('en'));
+  ok('текст: английский интерфейс', (await text(page, '#kindSeg [data-kind="text"]')) === 'Text' && (await text(page, '#xCheck')) === 'Check' &&
+    (await page.$eval('#xText', t => t.placeholder)).startsWith('Paste or type') && (await text(page, '#xSubjRow .subj-btn')) === 'Russian');
+  await page.evaluate(() => Sky.setLang('ru'));
+  await page.close();
+
+  page = await open(PAGE);
+  ok('текст: выбранная вкладка и настройки запоминаются', await visible(page, '#textTab') && (await text(page, '#xSubjRow .subj-btn.active')) === 'Литература' &&
+    !(await page.$eval('#xCriteria', i => i.checked)));
+  await page.close();
+  page = await open(PAGE + '?kind=photo');
+  ok('текст: ?kind=photo открывает фото', await visible(page, '#photoTab'));
+  await page.close();
+  page = await open(PAGE + '?kind=text', { width: 390, height: 844 });
+  await page.fill('#xText', 'Короткий текст.');
+  await page.click('#xCheck');
+  await page.waitForSelector('#xResult .crit');
+  const overflowX = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+  ok('текст: телефон 390 px — не шире экрана, с таблицей критериев', overflowX <= 0, String(overflowX));
+  if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, 'text-phone.png'), fullPage: true });
   await page.close();
 
   /* ========== телефон ========== */

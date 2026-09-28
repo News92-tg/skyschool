@@ -28,6 +28,13 @@ window.SKY_CONFIG = {
      Как развернуть Worker — в README, раздел «Разбор от ИИ». */
   AI_BASE: 'https://news92-orders.almazpro0927.workers.dev/',
 
+  /* --- 2б. Worker проверки домашки (news92-orders) ---
+     «Домашка по фото»: проверка по фото и текстом, тарифы и лимиты
+     (/api/check-photo, /api/check-text, /api/limits). Тоже адрес, не
+     ключ: ключи Z.AI и Groq — только в секретах Worker.
+     Пусто — берётся AI_BASE. */
+  AI_BASE_ORDERS: 'https://news92-orders.almazpro0927.workers.dev/',
+
   /* --- 3. Ссылка на сайт студии (для перехода из шапки) --- */
   STUDIO_URL: 'https://news92-tg.github.io/Design-Studio/',
 
