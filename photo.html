@@ -30,6 +30,10 @@
 }
 .grade.g5{background:var(--ok)} .grade.g4{background:#4c9f4c}
 .grade.g3{background:var(--warn)} .grade.g2{background:#e07a3f} .grade.g1{background:var(--no)}
+.grade.gx{background:var(--faint)}
+/* .g2–.g4 в sky.css — утилиты сетки на 2–4 колонки, а здесь те же
+   классы — цвет оценки. Без сброса цифра 2, 3 или 4 съезжала влево. */
+.grade,.gr,.hist-row .g{grid-template-columns:none}
 .gradebox .said{flex:1;min-width:200px;font-size:13.5px;line-height:1.6}
 
 .recog{
@@ -60,6 +64,9 @@
   width:34px;height:34px;border-radius:11px;flex:none;display:grid;place-items:center;
   font-weight:900;color:#fff;font-size:16px;
 }
+.hist-row .g{background:var(--faint)}
+.hist-row .g.g5{background:var(--ok)} .hist-row .g.g4{background:#4c9f4c} .hist-row .g.g3{background:var(--warn)}
+.hist-row .g.g2{background:#e07a3f} .hist-row .g.g1{background:var(--no)}
 .hist-row .txt{flex:1;min-width:0}
 .hist-row .txt b{font-size:13px;display:block}
 .hist-row .txt span{font-size:11.5px;color:var(--muted);display:block;margin-top:2px;
@@ -121,6 +128,85 @@
   @media (max-width:560px){.pw-grid{grid-template-columns:1fr}}
   .limit-note{margin-top:10px;padding:11px 13px;border-radius:12px;background:var(--warn-soft);
     color:var(--warn);font-size:13px;font-weight:700;line-height:1.5}
+
+  /* ---------- ученик / учитель, тариф ---------- */
+  .mode-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:22px}
+  .seg.seg-lg{display:inline-flex;flex-wrap:wrap}
+  .seg.seg-lg button{padding:9px 16px;font-size:13px;letter-spacing:.01em}
+  /* вкладки учителя на телефоне — три равные кнопки, подпись в две строки */
+  @media (max-width:520px){
+    .t-tabs{display:flex;width:100%;flex-wrap:nowrap}
+    .t-tabs button{flex:1 1 0;min-width:0;padding:9px 6px;font-size:12.5px;line-height:1.25;white-space:normal}
+  }
+  .plan-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);font-weight:700}
+  .tariffs-hdr{white-space:nowrap}
+  @media (max-width:760px){.tariffs-hdr{display:none}}   /* на телефоне шапка узкая — есть кнопка в строке тарифа */
+
+  .opts{display:grid;gap:8px;margin-top:6px}
+  .opt-check{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);
+    border-radius:12px;background:var(--panel-2);font-size:13.5px;font-weight:700;cursor:pointer;line-height:1.35}
+  /* .field label в sky.css — мелкая заглавная подпись поля; пункты-галочки внутри .field — не подписи */
+  .field .opt-check{font-size:13.5px;font-weight:700;letter-spacing:0;text-transform:none;color:var(--ink)}
+  .opt-check input{width:18px;height:18px;accent-color:var(--accent);flex:none;margin:0}
+  .opt-check .tag{margin-left:auto;flex:none}
+  .opt-check:has(input:checked){border-color:var(--accent)}
+
+  .token-line{margin-top:30px;font-size:12.5px;color:var(--muted);font-weight:700;text-align:center}
+
+  /* ---------- разбор ---------- */
+  .res-block{margin-top:18px}
+  .res-block h3{margin:0 0 9px;font-size:14px}
+  .res-text{font-size:13.5px;line-height:1.65;white-space:pre-line}
+  .meters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .flag{margin-top:10px;padding:11px 13px;border-radius:12px;font-size:13px;font-weight:700;line-height:1.5}
+  .flag.warn{background:var(--warn-soft);color:var(--warn)}
+  .flag.ok{background:var(--ok-soft);color:var(--ok)}
+  details.res-more{margin-top:14px;border:1px solid var(--line);border-radius:var(--r);padding:10px 14px;background:var(--panel-2)}
+  details.res-more summary{cursor:pointer;font-weight:800;font-size:13.5px}
+  details.res-more[open] summary{margin-bottom:10px}
+  .err-item .kind{font-size:11px;font-weight:900;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+  .tok-note{margin-top:12px;font-size:12px;color:var(--muted);font-weight:600}
+  .res-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+
+  /* ---------- окно тарифов ---------- */
+  .tf-list{display:grid;gap:10px}
+  .tf-card{border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;gap:8px}
+  .tf-card.current{border-color:var(--ok)}
+  .tf-card.focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)}
+  .tf-card.addon{margin-top:10px}
+  .tf-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+  .tf-price{font-weight:900;font-size:17px;white-space:nowrap}
+  .tf-card ul{margin:0;padding-left:18px;font-size:12.5px;line-height:1.6}
+  .tf-card .btn,.tf-card .tag{justify-self:start}
+
+  /* ---------- режим учителя ---------- */
+  .roster{display:grid;gap:8px}
+  .roster:empty{display:none}
+  .roster-row{display:grid;grid-template-columns:48px minmax(0,1fr) 84px 32px;gap:8px;align-items:center}
+  .roster-row.ref{grid-template-columns:48px minmax(0,1fr) 32px}
+  .roster-row img{width:48px;height:48px;object-fit:cover;border-radius:10px;border:1px solid var(--line);display:block}
+  .roster-row input{width:100%;min-width:0;padding:9px 10px;border:1px solid var(--line);border-radius:10px;
+    background:var(--panel);color:var(--ink);font:inherit;font-size:13px}
+  .roster-row .rm{width:32px;height:32px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);
+    color:var(--muted);font-size:16px;line-height:1;cursor:pointer}
+  .roster-row .who-line{font-size:13px;font-weight:700;min-width:0}
+  .roster-row .who-line span{display:block;font-size:11.5px;color:var(--muted);font-weight:600}
+  @media (max-width:480px){.roster-row{grid-template-columns:44px minmax(0,1fr) 64px 30px}}
+
+  .table-wrap{overflow-x:auto;margin-top:12px;-webkit-overflow-scrolling:touch}
+  .rtable{width:100%;border-collapse:collapse;font-size:13px;min-width:520px}
+  .rtable th{text-align:left;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);
+    padding:8px;border-bottom:1px solid var(--line);white-space:nowrap}
+  .rtable td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.5}
+  .rtable tr.failed td{color:var(--muted)}
+  .rtable details summary{cursor:pointer;font-size:12px;color:var(--accent);font-weight:700}
+  .rtable details ul{margin:6px 0 0;padding-left:16px;font-size:12px}
+  .gr{display:inline-grid;place-items:center;min-width:30px;height:30px;padding:0 6px;border-radius:9px;color:#fff;font-weight:900}
+  .gr.g5{background:var(--ok)} .gr.g4{background:#4c9f4c} .gr.g3{background:var(--warn)}
+  .gr.g2{background:#e07a3f} .gr.g1{background:var(--no)} .gr.gx{background:var(--faint)}
+  .link-out{display:flex;gap:8px;flex-wrap:wrap}
+  .link-out input{flex:1 1 220px;min-width:0;padding:10px 12px;border:1px solid var(--line);border-radius:12px;
+    background:var(--panel-2);color:var(--ink);font:inherit;font-size:13px}
 </style>
 </head>
 <body>
@@ -132,6 +218,21 @@
 
   <p class="note hidden" id="needWorker" style="border-left-color:var(--warn)"></p>
 
+  <!-- Ученик / учитель и тариф. Тариф и лимит приходят из Worker
+       (/api/limits); пока ответа нет — строки тарифа не видно. -->
+  <div class="mode-bar">
+    <div class="seg seg-lg" id="roleSeg" role="group">
+      <button type="button" data-role="student" aria-pressed="true" data-i18n="roleStudent"></button>
+      <button type="button" data-role="teacher" aria-pressed="false" data-i18n="roleTeacher"></button>
+    </div>
+    <div class="plan-bar hidden" id="planBar">
+      <span class="tag" id="planChip"></span>
+      <span id="planLimit"></span>
+      <button type="button" class="btn ghost small" id="planBtn" data-i18n="tariffsBtn"></button>
+    </div>
+  </div>
+
+  <div id="studentMode">
   <!-- кто проверяет -->
   <div class="section">
     <div class="panel">
@@ -184,11 +285,8 @@
 
       <div class="field">
         <label data-i18n="subjLabel"></label>
-        <div class="subj-row" id="subjRow">
-          <button type="button" class="subj-btn" data-subject="physics"></button>
-          <button type="button" class="subj-btn" data-subject="algebra"></button>
-          <button type="button" class="subj-btn" data-subject="other"></button>
-        </div>
+        <!-- кнопки предметов строит скрипт из SkyCheck.SUBJECTS -->
+        <div class="subj-row" id="subjRow"></div>
       </div>
 
       <!-- Задание, пришедшее по ссылке от учителя. -->
@@ -202,13 +300,32 @@
         <textarea id="taskText" rows="2" placeholder=""></textarea>
       </div>
 
-      <div class="used-note hidden" id="usedNote"></div>
+      <!-- Что сделать с работой. Пункты с пометкой тарифа кликабельны
+           всегда: без нужного тарифа галочка не ставится, а открывается
+           окно «Тарифы» — так видно, что и где взять. -->
+      <div class="field">
+        <label data-i18n="optsLabel"></label>
+        <div class="opts">
+          <label class="opt-check"><input type="checkbox" id="optCompare" data-need="compare"><span data-i18n="optCompare"></span><span class="tag warn lock" data-i18n="tagPaid"></span></label>
+          <label class="opt-check"><input type="checkbox" id="optGrade"><span data-i18n="optGrade"></span></label>
+          <label class="opt-check"><input type="checkbox" id="optGradeText"><span data-i18n="optGradeText"></span></label>
+          <label class="opt-check"><input type="checkbox" id="optAccuracy" data-need="plagiarism"><span data-i18n="optAccuracy"></span><span class="tag teach lock" data-i18n="tagPremium"></span></label>
+        </div>
+      </div>
+      <div class="field">
+        <label data-i18n="lengthLabel"></label>
+        <div class="seg seg-lg" id="lengthSeg" role="group">
+          <button type="button" data-len="short" aria-pressed="false" data-i18n="lenShort"></button>
+          <button type="button" data-len="long" aria-pressed="true" data-i18n="lenLong"></button>
+        </div>
+      </div>
+
+      <div class="used-note js-wait hidden"></div>
       <button class="btn full big" id="checkBtn" disabled data-i18n="checkBtn"></button>
 
-      <!-- Прогресс. Фото и загружаются, и проверяются по одному
-           (Worker берёт одну картинку за запрос), поэтому счётчик
-           «k из N» правдив на обоих шагах. Сколько модель думает над
-           одним фото, заранее неизвестно — там полоса бежит без счёта. -->
+      <!-- Прогресс. Фото загружаются по одному — там счётчик «k из N».
+           Проверка — один запрос на все фото работы, и сколько модель
+           думает, заранее неизвестно: там полоса бежит без счёта. -->
       <div class="progress hidden" id="progress" aria-live="polite">
         <div class="progress-text" id="progressText"></div>
         <div class="progress-bar"><i id="progressFill"></i></div>
@@ -227,6 +344,137 @@
     <div class="section-head"><h2 data-i18n="histH"></h2></div>
     <div class="panel" id="hist"></div>
   </div>
+  </div><!-- /studentMode -->
+
+  <!-- ===== Режим учителя (логика — assets/photo-teacher.js) ===== -->
+  <div id="teacherMode" class="hidden">
+    <div class="section">
+      <div class="seg seg-lg t-tabs" id="tTabs" role="tablist">
+        <button type="button" role="tab" data-tab="class" aria-pressed="true" data-i18n="tTabClass"></button>
+        <button type="button" role="tab" data-tab="test" aria-pressed="false" data-i18n="tTabTest"></button>
+        <button type="button" role="tab" data-tab="links" aria-pressed="false" data-i18n="tTabLinks"></button>
+      </div>
+      <p class="note hidden" id="tLock" style="border-left-color:var(--m-teach)">
+        <span data-i18n="tLock"></span>
+        <button type="button" class="btn small" id="tLockBtn" data-i18n="tariffsBtn" style="margin-left:8px"></button>
+      </p>
+      <div class="used-note js-wait hidden"></div>
+    </div>
+
+    <!-- А) Проверка класса -->
+    <section class="section" id="tab-class">
+      <div class="panel shot">
+        <div class="row">
+          <div class="field"><label data-i18n="tSubject"></label><select id="cSubject" class="js-subjects"></select></div>
+          <div class="field"><label data-i18n="tClassAll"></label><input type="text" id="cClass" maxlength="20" data-i18n-ph="tClassPh"></div>
+        </div>
+        <div class="field"><label data-i18n="taskLabel"></label><textarea id="cTask" rows="2"></textarea></div>
+        <label class="opt-check"><input type="checkbox" id="cGrade" checked><span data-i18n="optGrade"></span></label>
+        <div class="shot-actions">
+          <button type="button" class="btn ghost" id="cPick" data-i18n="tPickMany"></button>
+          <button type="button" class="btn ghost small hidden" id="cClear" data-i18n="clearBtn"></button>
+        </div>
+        <input type="file" id="cFiles" accept="image/jpeg,image/png,image/webp" multiple hidden>
+        <div class="roster" id="cRoster"></div>
+        <p class="cap-note" data-i18n="tNameHint"></p>
+        <button type="button" class="btn full big" id="cRun" disabled data-i18n="tRunClass"></button>
+        <div class="progress hidden" id="cProgress" aria-live="polite">
+          <div class="progress-text"></div>
+          <div class="progress-bar"><i></i></div>
+        </div>
+      </div>
+      <div class="section hidden" id="cResultSec">
+        <div class="section-head"><h2 data-i18n="tResults"></h2><button type="button" class="btn ghost small" id="cCsv" data-i18n="tCsv"></button></div>
+        <div class="panel" id="cResult"></div>
+      </div>
+    </section>
+
+    <!-- Б) Проверка теста -->
+    <section class="section hidden" id="tab-test">
+      <div class="panel shot">
+        <div class="field">
+          <label data-i18n="tRefLabel"></label>
+          <div class="shot-actions">
+            <button type="button" class="btn ghost" id="tRefPick" data-i18n="tRefPick"></button>
+          </div>
+          <input type="file" id="tRefFile" accept="image/jpeg,image/png,image/webp" hidden>
+          <div class="roster" id="tRef"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label data-i18n="tSubject"></label><select id="tSubject" class="js-subjects"></select></div>
+          <div class="field"><label data-i18n="tTotal"></label><input type="number" id="tTotal" min="1" max="200" inputmode="numeric"></div>
+          <div class="field"><label data-i18n="tClassAll"></label><input type="text" id="tClass" maxlength="20" data-i18n-ph="tClassPh"></div>
+        </div>
+        <div class="field">
+          <label data-i18n="tWorksLabel"></label>
+          <div class="shot-actions">
+            <button type="button" class="btn ghost" id="tPick" data-i18n="tPickMany"></button>
+            <button type="button" class="btn ghost small hidden" id="tClear" data-i18n="clearBtn"></button>
+          </div>
+        </div>
+        <input type="file" id="tFiles" accept="image/jpeg,image/png,image/webp" multiple hidden>
+        <div class="roster" id="tRoster"></div>
+        <p class="cap-note" data-i18n="tNameHint"></p>
+        <button type="button" class="btn full big" id="tRun" disabled data-i18n="tRunTest"></button>
+        <div class="progress hidden" id="tProgress" aria-live="polite">
+          <div class="progress-text"></div>
+          <div class="progress-bar"><i></i></div>
+        </div>
+      </div>
+      <div class="section hidden" id="tResultSec">
+        <div class="section-head"><h2 data-i18n="tResults"></h2><button type="button" class="btn ghost small" id="tCsv" data-i18n="tCsv"></button></div>
+        <div class="panel" id="tResult"></div>
+      </div>
+    </section>
+
+    <!-- В) Персональное ДЗ по ссылкам -->
+    <section class="section hidden" id="tab-links">
+      <div class="panel shot">
+        <h2 data-i18n="lSendH"></h2>
+        <p class="cap-note" data-i18n="lSendLead"></p>
+        <div class="row">
+          <div class="field"><label data-i18n="lName"></label><input type="text" id="lName" maxlength="100" autocomplete="name"></div>
+          <div class="field"><label data-i18n="lClass"></label><input type="text" id="lClass" maxlength="20" data-i18n-ph="tClassPh"></div>
+          <div class="field"><label data-i18n="tSubject"></label><select id="lSubject" class="js-subjects"></select></div>
+        </div>
+        <div class="shot-actions">
+          <button type="button" class="btn ghost" id="lPick" data-i18n="fileBtn"></button>
+        </div>
+        <input type="file" id="lFile" accept="image/jpeg,image/png,image/webp" hidden>
+        <div class="roster" id="lPhoto"></div>
+        <button type="button" class="btn full big" id="lSend" disabled data-i18n="lSendBtn"></button>
+        <div class="link-out hidden" id="lOut">
+          <input type="text" id="lUrl" readonly>
+          <button type="button" class="btn" id="lCopy" data-i18n="lCopy"></button>
+        </div>
+      </div>
+
+      <div class="panel shot" style="margin-top:16px">
+        <h2 data-i18n="lCheckH"></h2>
+        <p class="cap-note" data-i18n="lCheckLead"></p>
+        <div class="field"><label data-i18n="lLinks"></label><textarea id="lLinks" rows="4" data-i18n-ph="lLinksPh"></textarea></div>
+        <div class="row">
+          <div class="field"><label data-i18n="tSubject"></label><select id="lCheckSubject" class="js-subjects"></select></div>
+        </div>
+        <label class="opt-check"><input type="checkbox" id="lGrade" checked><span data-i18n="optGrade"></span></label>
+        <div class="shot-actions">
+          <button type="button" class="btn ghost" id="lResolve" data-i18n="lResolve"></button>
+        </div>
+        <div class="roster" id="lList"></div>
+        <button type="button" class="btn full big" id="lRun" disabled data-i18n="lRun"></button>
+        <div class="progress hidden" id="lProgress" aria-live="polite">
+          <div class="progress-text"></div>
+          <div class="progress-bar"><i></i></div>
+        </div>
+      </div>
+      <div class="section hidden" id="lResultSec">
+        <div class="section-head"><h2 data-i18n="tResults"></h2><button type="button" class="btn ghost small" id="lCsv" data-i18n="tCsv"></button></div>
+        <div class="panel" id="lResult"></div>
+      </div>
+    </section>
+  </div><!-- /teacherMode -->
+
+  <p class="token-line" id="tokenLine" aria-live="polite"></p>
 </main>
 
 <footer id="appFooter"></footer>
@@ -237,6 +485,7 @@
 <script src="assets/auth.js"></script>
 <script src="data/ai-teachers.js"></script>
 <script src="assets/ai-teachers.js"></script>
+<script src="assets/photo-api.js"></script>
 <script>
 'use strict';
 Sky.init({
@@ -263,11 +512,13 @@ Sky.init({
   clearBtn:{ru:'Убрать все',en:'Remove all'},
   rmPhoto:{ru:'Убрать фото',en:'Remove photo'},
   thumbsCount:{ru:'Фото: %1 из %2',en:'Photos: %1 of %2'},
-  capFree:{ru:'Бесплатно — до 5 фото за раз. В VIP — до 20.',en:'Free: up to 5 photos at once. VIP: up to 20.'},
+  capFree:{ru:'Бесплатно — до 5 фото за раз. В тарифе Платный — до 10, в Премиум — до 20.',en:'Free: up to 5 photos at once. Paid: up to 10, Premium: up to 20.'},
+  capPlan:{ru:'Тариф «%1» — до %2 фото за раз.',en:'%1 plan: up to %2 photos at once.'},
   capVip:{ru:'За одну проверку — не больше 20 фото.',en:'At most 20 photos per check.'},
   pgUpload:{ru:'Загружаю фото %1 из %2',en:'Uploading photo %1 of %2'},
   pgCheck:{ru:'Идёт проверка, это займёт 5-15 секунд...',en:'Checking, this takes 5-15 seconds...'},
   pgCheckN:{ru:'Идёт проверка фото %1 из %2, каждое — 5-15 секунд...',en:'Checking photo %1 of %2, 5-15 seconds each...'},
+  pgCheckMany:{ru:'Идёт проверка %1 фото, это займёт до минуты...',en:'Checking %1 photos, this may take up to a minute...'},
   upFail:{ru:'Не удалось загрузить фото. Проверьте интернет и попробуйте ещё раз.',en:'Could not upload photos. Check your connection.'},
   tooBigAfter:{ru:'Фото %1 не получилось сжать до 1,5 МБ. Попробуйте другое.',en:'Photo %1 could not be compressed to 1.5 MB.'},
   usedToday:{ru:'Сегодня бесплатная проверка по предмету «%1» уже была. Следующая — в 00:00 по вашему времени.',
@@ -319,6 +570,36 @@ Sky.init({
   errDown:{ru:'Сервис временно недоступен, попробуйте позже',en:'The service is temporarily unavailable, try later'},
   errTimeout:{ru:'Превышено время ожидания',en:'The request timed out'},
 
+  roleStudent:{ru:'Ученик',en:'Student'},
+  roleTeacher:{ru:'Учитель',en:'Teacher'},
+  roleAria:{ru:'Режим страницы',en:'Page mode'},
+  planTag:{ru:'Тариф: %1',en:'Plan: %1'},
+  optsLabel:{ru:'Что сделать',en:'What to do'},
+  optCompare:{ru:'Сверить с решением ИИ',en:'Compare with the AI solution'},
+  optGrade:{ru:'Выставить оценку',en:'Give a mark'},
+  optGradeText:{ru:'Оценка текстом',en:'Mark in words'},
+  optAccuracy:{ru:'Проверить на списывание',en:'Check for cheating'},
+  tagPaid:{ru:'Платный+',en:'Paid+'},
+  tagPremium:{ru:'Премиум',en:'Premium'},
+  lengthLabel:{ru:'Разбор',en:'Review'},
+  lenShort:{ru:'Коротко',en:'Short'},
+  lenLong:{ru:'Подробно',en:'Detailed'},
+  resTest:{ru:'Тест',en:'Test'},
+  resRight:{ru:'верно',en:'correct'},
+  resWrongQ:{ru:'№%1: ответ «%2», верно «%3»',en:'#%1: answered “%2”, correct “%3”'},
+  resAccuracy:{ru:'Проверка на списывание',en:'Cheating check'},
+  resConfidence:{ru:'уверенность распознавания',en:'recognition confidence'},
+  resMatch:{ru:'совпадение с решением ИИ',en:'match with the AI solution'},
+  resFlagYes:{ru:'Подозрение на списывание',en:'Possible cheating'},
+  resFlagNo:{ru:'Признаков списывания не видно',en:'No signs of cheating'},
+  resFlagNote:{ru:'Это оценка модели по фото, а не доказательство.',en:'This is the model\'s estimate from a photo, not proof.'},
+  resDiscr:{ru:'Расхождения с решением ИИ',en:'Differences from the AI solution'},
+  resAiSol:{ru:'Решение ИИ',en:'AI solution'},
+  resComment:{ru:'Комментарий учителя',en:'Teacher\'s comment'},
+  resTokens:{ru:'На эту проверку ушло токенов: %1',en:'Tokens spent on this check: %1'},
+  resTrunc:{ru:'Разбор оборвался на середине: ответ модели вышел слишком длинным. Попробуйте «Коротко» или меньше фото.',
+            en:'The review was cut off: the model\'s answer was too long. Try “Short” or fewer photos.'},
+
   resultH:{ru:'Разбор',en:'Review'},
   recogH:{ru:'Что прочитала модель',en:'What the model read'},
   flagBtn:{ru:'Это распознано неверно',en:'This was read wrong'},
@@ -342,31 +623,19 @@ Sky.init({
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-/* Разбор фото возможен ТОЛЬКО через Worker. Своим ключом DeepSeek тут
-   не обойтись: картинки читает Gemini, а её ключ в браузере держать
-   нельзя — его увидит любой, кто откроет исходник страницы. */
+/* Разбор фото возможен ТОЛЬКО через Worker: ключ модели в браузере
+   держать нельзя — его увидит любой, кто откроет исходник страницы. */
 const AI_BASE = (Sky.cfg.AI_BASE || '').trim();
 const hasWorker = /^https?:\/\//i.test(AI_BASE);
 
 let photos = [];          // выбранные фото: { blob, url } — сжимаются только при отправке
 let busy = false;         // идёт загрузка или проверка
-let usage = null;         // что разрешено сегодня: { vip, photo_limit, used_subjects }
 let stream = null;        // поток камеры, чтобы потом закрыть
 
-/* Часовой пояс ученика — чтобы бесплатная проверка возвращалась в
-   ЕГО полночь. Время при этом берётся с сервера: перевести часы на
-   телефоне и получить новый день нельзя. */
-const TZ = (() => {
-  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; }
-  catch (e) { return 'UTC'; }
-})();
-const FREE_PHOTOS = 5;
-const capNow = () => (usage && usage.photo_limit) || FREE_PHOTOS;
-const isVip = () => !!(usage && usage.vip);
-
-/* Оплата ещё не подключена. Когда появится — впишите сюда цену и
-   ссылку на оплату, окно с тарифами подхватит их само. */
-const VIP_OFFER = { price: null, url: null };
+/* Сколько фото за раз — по тарифу из Worker (Бесплатный 5, Платный 10,
+   Премиум 20). Лимит запросов и тариф живут в assets/photo-api.js;
+   прежний «1 раз в день по предмету» заменён ими. */
+const capNow = () => SkyCheck.photoCap();
 let lastSaved = null;     // строка photo_checks для кнопки «распознано неверно»
 
 /* ---------- учитель ---------- */
@@ -433,59 +702,9 @@ function closeCamera() {
 }
 
 /* ---------- сжатие ----------
-
-   Параметры из задания: длинная сторона до 1600 px, JPEG 0.8, не
-   больше 1,5 МБ. Если на 0.8 файл тяжелее — снижаем качество, если и
-   на 0.5 не влезает — уменьшаем стороны. canvas.toBlob, а не
-   toDataURL: base64 на треть длиннее и держит копию в памяти.
-
-   Поворот: снимки с телефона часто лежат «боком» и поворачиваются
-   меткой EXIF. createImageBitmap по умолчанию эту метку в части
-   браузеров игнорирует, поэтому просим учитывать её явно. */
-const MAX_SIDE = 1600;
-const MAX_BYTES = 1.5 * 1024 * 1024;
-
-async function loadBitmap(blob) {
-  if (window.createImageBitmap) {
-    try { return await createImageBitmap(blob, { imageOrientation: 'from-image' }); } catch (e) {}
-  }
-  const url = URL.createObjectURL(blob);
-  try {
-    const img = new Image();
-    img.decoding = 'async';
-    img.src = url;
-    await img.decode();
-    return img;
-  } finally { URL.revokeObjectURL(url); }
-}
-
-async function compress(blob) {
-  const src = await loadBitmap(blob);
-  const w = src.width || src.naturalWidth, h = src.height || src.naturalHeight;
-  let scale = Math.min(1, MAX_SIDE / Math.max(w, h));
-  try {
-    for (let attempt = 0; attempt < 6; attempt++) {
-      const c = document.createElement('canvas');
-      c.width = Math.max(1, Math.round(w * scale));
-      c.height = Math.max(1, Math.round(h * scale));
-      const g = c.getContext('2d');
-      /* У png бывает прозрачный фон; в JPEG он стал бы чёрным, и
-         чёрная ручка на нём пропала бы. */
-      g.fillStyle = '#fff';
-      g.fillRect(0, 0, c.width, c.height);
-      g.drawImage(src, 0, 0, c.width, c.height);
-      for (const q of [0.8, 0.7, 0.6, 0.5]) {
-        const out = await new Promise(r => c.toBlob(r, 'image/jpeg', q));
-        if (out && out.size <= MAX_BYTES) { c.width = c.height = 0; return out; }
-      }
-      c.width = c.height = 0;          /* отдать память до следующей попытки */
-      scale *= 0.8;
-    }
-  } finally {
-    if (src.close) src.close();
-  }
-  throw new Error('too_big');
-}
+   Перенесено в assets/photo-api.js без изменений: тем же сжатием
+   пользуется режим учителя. */
+const compress = SkyCheck.compress;
 
 /* ---------- список фото ---------- */
 function addPhotos(blobs) {
@@ -528,14 +747,17 @@ function renderThumbs(overflow) {
   const full = photos.length >= cap;
   const note = $('#capNote');
   note.classList.toggle('hidden', !(full || overflow));
-  note.textContent = isVip() ? Sky.t('capVip') : Sky.t('capFree');
+  const lim = SkyCheck.limits;
+  note.textContent = lim
+    ? Sky.t('capPlan').replace('%1', SkyCheck.planName(lim.plan)).replace('%2', cap)
+    : Sky.t('capFree');
   $('#shotBtn').disabled = full;
   $('#fileBtn').disabled = full || busy;
   updateCheckBtn();
 }
 
 function updateCheckBtn() {
-  $('#checkBtn').disabled = busy || !photos.length || !hasWorker;
+  $('#checkBtn').disabled = busy || !photos.length || !hasWorker || !SkyCheck.canRequest();
 }
 
 /* ---------- прогресс ---------- */
@@ -560,100 +782,107 @@ function setBusy(on) {
   renderThumbs(false);
 }
 
-/* ---------- что разрешено сегодня ---------- */
+/* ---------- тариф и лимит ----------
+
+   Приходят из Worker (/api/limits) через assets/photo-api.js и
+   обновляются после каждой проверки. Здесь только показ: строка
+   тарифа, пометки у платных пунктов, кнопка и обратный отсчёт. */
 async function loadUsage() {
-  usage = null;
-  try {
-    await Sky.db.ready;
-    if (Sky.db.me()) {
-      const rows = await Sky.db.rpc('homework_my_usage', { p_tz: TZ });
-      const u = Array.isArray(rows) ? rows[0] : rows;
-      if (u) usage = { vip: !!u.vip, photo_limit: u.photo_limit || FREE_PHOTOS,
-                       used_subjects: u.used_subjects || [] };
-    }
-  } catch (e) {
-    /* Не узнали — не беда: окончательно решает сервер при отправке. */
-    usage = null;
-  }
-  renderUsage();
+  await SkyCheck.loadLimits();          /* renderUsage вызовет SkyCheck.onChange */
 }
 
 function subjName(k) {
-  return Sky.t(k === 'physics' ? 'subjPhysics' : k === 'algebra' ? 'subjAlgebra' : 'subjOther');
-}
-
-function usedToday() {
-  return !!(usage && !usage.vip && usage.used_subjects.includes(subject));
+  return SkyCheck.subjName(k);
 }
 
 function renderUsage() {
-  const note = $('#usedNote');
-  note.classList.toggle('hidden', !usedToday());
-  if (usedToday()) note.textContent = Sky.t('usedToday').replace('%1', subjName(subject));
+  const lim = SkyCheck.limits;
+  $('#planBar').classList.toggle('hidden', !lim);
+  if (lim) {
+    const chip = $('#planChip');
+    chip.textContent = Sky.t('planTag').replace('%1', SkyCheck.planName(lim.plan));
+    chip.className = 'tag ' + (lim.plan === 'premium' ? 'teach' : lim.plan === 'paid' ? 'ok' : 'gray');
+    $('#planLimit').textContent = SkyCheck.planSummary();
+  }
+  /* Пометки тарифа прячем, когда пункт уже доступен. Если тариф стал
+     ниже (кончился), снимаем галочки, которые теперь не пройдут. */
+  document.querySelectorAll('#studentMode [data-need]').forEach(inp => {
+    const has = SkyCheck.feature(inp.dataset.need);
+    const tag = inp.closest('.opt-check').querySelector('.lock');
+    if (tag) tag.classList.toggle('hidden', has);
+    if (lim && !has && inp.checked) { inp.checked = false; saveOptions(); }
+  });
   renderThumbs(false);
 }
 
 /* ---------- окно с тарифами ----------
-
-   Открывается ДО работы, если уже известно, что бесплатная проверка
-   по этому предмету сегодня была, — чтобы ученик не выбирал пять фото
-   и не ждал их загрузки впустую. И после ответа сервера 402 — на
-   случай, если заранее узнать не удалось. */
+   Прежнее окно VIP заменено общим окном «Тарифы» (photo-api.js).
+   kind: 'photos' — упёрлись в число фото, иначе — что подсветить. */
 function openPaywall(kind) {
-  const photosCase = kind === 'photos';
-  const price = VIP_OFFER.price ? `<div class="pw-price">${esc(VIP_OFFER.price)}</div>` : '';
-  Sky.modal(`
-    <div class="pw">
-      <h2>${Sky.t(photosCase ? 'pwHeadPhotos' : 'pwHeadLimit')}</h2>
-      <p class="pw-lead">${esc(photosCase ? Sky.t('pwLeadPhotos')
-        : Sky.t('limitHit') + ' ' + Sky.t('pwNext').replace('%1', subjName(subject)))}</p>
-      <div class="pw-grid">
-        <div class="pw-card">
-          <h3>${Sky.t('pwFree')}</h3>
-          <ul><li>${Sky.t('pwFree1')}</li><li>${Sky.t('pwFree2')}</li></ul>
-        </div>
-        <div class="pw-card vip">
-          <h3>VIP</h3>
-          <ul><li>${Sky.t('pwVip1')}</li><li>${Sky.t('pwVip2')}</li></ul>
-          ${price}
-        </div>
-      </div>
-      <div class="pw-actions">
-        <button type="button" class="btn ghost" id="pwClose">${Sky.t('pwOk')}</button>
-        <button type="button" class="btn" id="pwGo">${Sky.t('pwGo')}</button>
-      </div>
-    </div>`,
-    (box, close) => {
-      box.querySelector('#pwClose').addEventListener('click', close);
-      box.querySelector('#pwGo').addEventListener('click', () => {
-        if (VIP_OFFER.url) { location.href = VIP_OFFER.url; return; }
-        /* Не притворяемся, что оплата есть. */
-        Sky.toast(Sky.t('pwSoon'), 5000);
-      });
-    });
+  const focus = kind === 'photos' ? (SkyCheck.planId() === 'paid' ? 'premium' : 'paid') : kind;
+  SkyCheck.openTariffs(focus);
+}
+
+/* ---------- что сделать с работой ---------- */
+let lengthNow = 'long';
+
+function readOptions() {
+  return {
+    mode: $('#optCompare').checked ? 'compare' : 'check',
+    grade: $('#optGrade').checked,
+    gradeText: $('#optGradeText').checked,
+    accuracy: $('#optAccuracy').checked,
+    length: lengthNow
+  };
+}
+
+function saveOptions() {
+  const o = readOptions();
+  Sky.set('hwOpts', { compare: o.mode === 'compare', grade: o.grade, gradeText: o.gradeText, accuracy: o.accuracy, length: o.length });
+}
+
+function restoreOptions() {
+  const o = Object.assign({ grade: true }, Sky.get('hwOpts', {}) || {});
+  $('#optCompare').checked = !!o.compare;
+  $('#optGrade').checked = !!o.grade;
+  $('#optGradeText').checked = !!o.gradeText;
+  $('#optAccuracy').checked = !!o.accuracy;
+  lengthNow = o.length === 'short' ? 'short' : 'long';
+  renderLength();
+}
+
+function renderLength() {
+  $('#lengthSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.len === lengthNow)));
 }
 
 /* ---------- проверка ----------
 
    Порядок:
-   1. Если уже известно, что сегодня по предмету проверка была, —
-      сразу окно с тарифами, без работы впустую.
+   1. Если лимит тарифа ещё не открылся или фото больше, чем можно, —
+      сразу говорим, без загрузки впустую.
    2. Фото сжимаются и загружаются в хранилище ПО ОДНОМУ, await в
       цикле. Не Promise.all: двадцать снимков, разжатых разом, — это
       больше гигабайта памяти, и вкладка на телефоне падает.
-   3. Каждое фото по очереди уходит в Worker: GET /api/check-photo?img=
-      с временной ссылкой на файл (Worker берёт только адрес, не base64,
-      и одну картинку за запрос). После проверки файлы стираем.
+   3. Все фото работы уходят в Worker ОДНИМ запросом:
+      GET /api/check-photo?img=…&img=…&mode=…&subject=… — с временными
+      ссылками на файлы (Worker берёт только адреса, не base64). Один
+      запрос — одна единица лимита тарифа. После проверки файлы стираем.
    4. Если загрузка оборвалась посередине — уже загруженное стираем. */
+const CHECK_TIMEOUT_MS = 30000;
+
 async function check() {
   if (!photos.length || busy) return;
+  if (!SkyCheck.canRequest()) {
+    Sky.toast(Sky.t('waitNext').replace('%1', SkyCheck.clock(SkyCheck.waitLeft())), 4000);
+    return;
+  }
 
   const jwt = await Sky.db.token();
   const me = Sky.db.me();
   if (!jwt || !me) { Sky.toast(Sky.t('needLogin'), 6000); return; }
 
-  if (usedToday()) { openPaywall('limit'); return; }
   if (photos.length > capNow()) { openPaywall('photos'); return; }
+  const opt = readOptions();
 
   setBusy(true);
   $('#resultSection').classList.add('hidden');
@@ -679,68 +908,40 @@ async function check() {
     return;
   }
 
-  const texts = [];
-  let fail = null;
-  for (let i = 0; i < n && !fail; i++) {
-    progress(n > 1 ? Sky.t('pgCheckN').replace('%1', i + 1).replace('%2', n) : Sky.t('pgCheck'), null);
-    let img;
-    try { img = await Sky.db.signedUrl('homework', uploaded[i], 300); }
-    catch (e) { fail = Sky.t('upFail'); break; }
-    try { texts.push(await checkOne(img)); }
-    catch (e) { fail = e.message; }
+  progress(n > 1 ? Sky.t('pgCheckMany').replace('%1', n) : Sky.t('pgCheck'), null);
+
+  let res;
+  const imgs = [];
+  try {
+    for (const path of uploaded) imgs.push(await Sky.db.signedUrl('homework', path, 600));
+  } catch (e) {
+    res = { ok: false, status: 0, data: null, failText: Sky.t('upFail') };
+  }
+  if (!res) {
+    /* Больше фото и сверка с решением ИИ — дольше ответ модели. */
+    const timeout = CHECK_TIMEOUT_MS + (n - 1) * 10000 + (opt.mode === 'compare' ? 15000 : 0);
+    res = await SkyCheck.checkPhoto(Object.assign({ imgs, subject, task: $('#taskText').value.trim().slice(0, 800), timeout }, opt));
   }
 
   /* Worker файлы не удаляет, а картинку модель уже забрала — убираем сами. */
   await Sky.db.removeFiles('homework', uploaded);
   progressDone(); setBusy(false);
-  renderHomeworkResult(texts, fail);
-  if (fail) return;   /* фото остаются в списке: можно сразу нажать «Проверить работу» ещё раз */
 
+  if (!res.ok) {
+    const d = res.data || {};
+    if (d.code === 'rate_limit' && d.retry_after) SkyCheck.setWait(d.retry_after);
+    if (res.status === 402 && d.code === 'tariff') SkyCheck.openTariffs(d.need);
+    /* фото остаются в списке: можно сразу нажать «Проверить работу» ещё раз */
+    renderHomeworkResult(null, res.failText || SkyCheck.errorText(res));
+    return;
+  }
+
+  SkyCheck.applyRate(res.data.rate);
+  SkyCheck.addTokens(res.data.tokens_used);
+  renderHomeworkResult(res.data, null);
   clearPhotos();
-  if (usage && !usage.vip && !usage.used_subjects.includes(subject)) usage.used_subjects.push(subject);
   renderUsage();
   await renderHistory();
-}
-
-/* Одно фото → Worker → Z.AI. Возвращает текст разбора или бросает
-   ошибку с уже понятным ученику текстом. */
-const CHECK_TIMEOUT_MS = 30000;
-const ERR_BY_STATUS = { 400: 'errNoPhoto', 401: 'errKey', 429: 'errRate' };
-
-async function checkOne(img) {
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), CHECK_TIMEOUT_MS);
-  let r, body;
-  try {
-    r = await fetch(AI_BASE.replace(/\/+$/, '') + '/api/check-photo?img=' + encodeURIComponent(img),
-                    { signal: ctl.signal });
-    body = await r.text();
-  } catch (e) {
-    throw new Error(Sky.t(e && e.name === 'AbortError' ? 'errTimeout' : 'aiNoNet'));
-  } finally { clearTimeout(timer); }
-
-  let data = null;
-  try { data = JSON.parse(body); } catch (e) {}
-
-  /* Worker пересылает ответ Z.AI как есть и со статусом 200 даже тогда,
-     когда Z.AI вернула ошибку, — её видно только по телу. Коды Z.AI:
-     1000–1004 — ключ, 1302–1305 — частота и лимиты. */
-  let status = r.status;
-  if (status === 200 && data && data.error) {
-    const code = String(data.error.code || '');
-    status = /^100[0-4]$/.test(code) ? 401 : /^130[2-5]$/.test(code) ? 429 : 502;
-  }
-  if (status !== 200) {
-    console.warn('[photo] /api/check-photo', r.status, body.slice(0, 300));
-    const key = ERR_BY_STATUS[status] || (status >= 500 ? 'errDown' : null);
-    throw new Error(key ? Sky.t(key) : 'Ошибка ' + status);
-  }
-
-  const msg = data && data.choices && data.choices[0] && data.choices[0].message;
-  /* glm-4.6v-flash оборачивает итог в служебные метки <|begin_of_box|>. */
-  const text = String((msg && msg.content) || '').replace(/<\|(?:begin|end)_of_box\|>/g, '').trim();
-  if (!text) throw new Error(Sky.t('errDown'));
-  return text;
 }
 
 /* Оценку модель пишет прозой («Оценка: 4», «**Оценка** — 5/5»).
@@ -762,20 +963,76 @@ function mdLite(text) {
   }).join('\n').replace(/\n{3,}/g, '\n\n');
 }
 
-function renderHomeworkResult(texts, fail) {
-  const many = texts.length > 1 || (texts.length > 0 && !!fail);
-  const photoN = i => esc(Sky.t('photoN').replace('%1', i + 1));
+/* Разбор. data — ответ Worker (только те поля, что просили), либо
+   legacy_text, если Worker ещё старый и прислал разбор текстом.
+   fail — текст ошибки, когда разбора нет. */
+function renderHomeworkResult(data, fail) {
+  const h3 = key => `<h3>${esc(Sky.t(key))}</h3>`;
+  const block = (key, inner) => `<div class="res-block">${h3(key)}${inner}</div>`;
+  let html = '';
+
+  if (data && data.legacy_text) {
+    const g = gradeOf(data.legacy_text);
+    html += (g ? `<div class="gradebox"><div class="grade g${g}">${g}</div>
+                    <div class="said"><b>${esc(Sky.t('gradeL'))}</b></div></div>` : '') +
+      `<div class="hw-text" style="white-space:pre-line">${mdLite(data.legacy_text)}</div>`;
+  } else if (data) {
+    /* оценка */
+    if (data.assessment != null || data.assessment_text) {
+      const m = String(data.assessment_text || '').match(/\b([1-5])\b/);
+      const g = typeof data.assessment === 'number' ? data.assessment : (m ? Number(m[1]) : null);
+      html += `<div class="gradebox"><div class="grade g${g || 'x'}">${g || '—'}</div>
+        <div class="said"><b>${esc(data.assessment_text || Sky.t('gradeL'))}</b>` +
+        (data.assessment_reason ? `<br>${esc(data.assessment_reason)}` : '') + `</div></div>`;
+    }
+    /* тест */
+    if (data.test) {
+      const t = data.test;
+      const wrong = (t.answers || []).filter(a => !a.ok);
+      html += block('resTest',
+        `<div class="meters"><div class="stat accent"><b>${t.correct}/${t.total}</b><span>${esc(Sky.t('resRight'))}</span></div>
+           <div class="stat"><b>${t.percent}%</b><span>${esc(Sky.t('resRight'))}</span></div></div>` +
+        (wrong.length ? `<ul class="res-text" style="margin:10px 0 0;padding-left:18px">${wrong.map(a =>
+          `<li>${esc(Sky.t('resWrongQ').replace('%1', a.n).replace('%2', a.student).replace('%3', a.correct))}</li>`).join('')}</ul>` : ''));
+    }
+    /* списывание */
+    if ('plagiarism_flag' in data) {
+      const pct = v => v == null ? '—' : v + '%';
+      html += block('resAccuracy',
+        `<div class="meters"><div class="stat"><b>${pct(data.confidence)}</b><span>${esc(Sky.t('resConfidence'))}</span></div>
+           <div class="stat"><b>${pct(data.ai_match)}</b><span>${esc(Sky.t('resMatch'))}</span></div></div>` +
+        `<div class="flag ${data.plagiarism_flag ? 'warn' : 'ok'}">${esc(Sky.t(data.plagiarism_flag ? 'resFlagYes' : 'resFlagNo'))}` +
+        (data.plagiarism_flag && data.plagiarism_reason ? `: ${esc(data.plagiarism_reason)}` : '') + `</div>` +
+        `<p class="tok-note">${esc(Sky.t('resFlagNote'))}</p>`);
+    }
+    /* ошибки */
+    const errs = Array.isArray(data.errors) ? data.errors : [];
+    html += block('errH', errs.length
+      ? errs.map(e => `<div class="err-item">
+          ${e.type ? `<div class="kind">${esc(e.type)}</div>` : ''}
+          ${e.fragment ? `<div class="frag">${esc(e.fragment)}</div>` : ''}
+          ${e.correction ? `<div class="fix">${esc(Sky.t('fixL'))}${esc(e.correction)}</div>` : ''}
+        </div>`).join('')
+      : `<p class="lead" style="font-size:13px">${esc(Sky.t('noErrors'))}</p>`);
+    if (data.discrepancies) html += block('resDiscr', `<div class="res-text">${mdLite(data.discrepancies)}</div>`);
+    if (data.comment) html += block('resComment', `<div class="res-text">${mdLite(data.comment)}</div>`);
+    if (data.ai_solution) {
+      html += `<details class="res-more"><summary>${esc(Sky.t('resAiSol'))}</summary><div class="res-text">${mdLite(data.ai_solution)}</div></details>`;
+    }
+    if (data.recognized_text) {
+      html += `<details class="res-more"><summary>${esc(Sky.t('recogH'))}</summary><div class="recog">${esc(data.recognized_text)}</div></details>`;
+    }
+    if (data.truncated) html += `<div class="limit-note">${esc(Sky.t('resTrunc'))}</div>`;
+  }
+
+  if (fail) html += `<div class="limit-note">${esc(fail)}</div>`;
+  if (data && data.tokens_used && data.tokens_used.total) {
+    html += `<div class="tok-note">${esc(Sky.t('resTokens').replace('%1', data.tokens_used.total))}</div>`;
+  }
+  html += `<div class="res-actions"><button type="button" class="btn ghost" id="againBtn">${esc(Sky.t('againBtn'))}</button></div>`;
+
   $('#resultSection').classList.remove('hidden');
-  $('#result').innerHTML =
-    texts.map((text, i) => {
-      const g = gradeOf(text);
-      return (many ? `<h3 style="margin:${i ? 22 : 0}px 0 10px;font-size:14px">${photoN(i)}</h3>` : '') +
-        (g ? `<div class="gradebox"><div class="grade g${g}">${g}</div>
-                <div class="said"><b>${esc(Sky.t('gradeL'))}</b></div></div>` : '') +
-        `<div class="hw-text" style="white-space:pre-line">${mdLite(text)}</div>`;
-    }).join('') +
-    (fail ? `<div class="limit-note">${many ? photoN(texts.length) + ': ' : ''}${esc(fail)}</div>` : '') +
-    `<button type="button" class="btn ghost" id="againBtn" style="margin-top:14px">${esc(Sky.t('againBtn'))}</button>`;
+  $('#result').innerHTML = html;
   $('#againBtn').addEventListener('click', resetCheck);
   $('#resultSection').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
@@ -888,7 +1145,9 @@ async function renderHistory() {
   const me = Sky.db && Sky.db.me && Sky.db.me();
   let rows = [];
   try {
-    rows = await Sky.db.list('photo_checks', me ? { student_id: me.id } : undefined);
+    /* В живой базе photo_checks устроена по schema-photo-limits.sql:
+       владелец — user_id. Пишет её Worker после каждой проверки. */
+    rows = await Sky.db.list('photo_checks', me ? { user_id: me.id } : undefined);
   } catch (e) { rows = []; }
 
   rows = (rows || []).slice().sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
@@ -897,9 +1156,9 @@ async function renderHistory() {
   $('#histSection').classList.remove('hidden');
   $('#hist').innerHTML = rows.slice(0, 20).map(r => `
     <div class="hist-row">
-      <div class="g g${r.grade || 3}">${esc(r.grade || '—')}</div>
+      <div class="g g${r.grade || 'x'}">${esc(r.grade || '—')}</div>
       <div class="txt">
-        <b>${esc((r.recognized_text || '').split('\n')[0].slice(0, 60) || '—')}</b>
+        <b>${esc((r.recognized_text || r.ai_feedback || '').split('\n')[0].slice(0, 60) || '—')}</b>
         <span>${esc(new Date(r.created_at).toLocaleString())}</span>
       </div>
       ${r.ocr_flagged ? `<span class="flagged">${Sky.t('flagged')}</span>` : ''}
@@ -964,12 +1223,11 @@ $('#fileIn').addEventListener('change', e => {
 /* ---------- предмет ---------- */
 let subject = Sky.get('hwSubject', 'physics');
 
+if (!SkyCheck.SUBJECTS.some(s => s[0] === subject)) subject = 'physics';
+
 function renderSubjects() {
-  document.querySelectorAll('.subj-btn').forEach(b => {
-    const id = b.dataset.subject;
-    b.textContent = Sky.t(id === 'physics' ? 'subjPhysics' : id === 'algebra' ? 'subjAlgebra' : 'subjOther');
-    b.classList.toggle('active', id === subject);
-  });
+  $('#subjRow').innerHTML = SkyCheck.SUBJECTS.map(([id]) =>
+    `<button type="button" class="subj-btn${id === subject ? ' active' : ''}" data-subject="${id}"${busy ? ' disabled' : ''}>${esc(SkyCheck.subjName(id))}</button>`).join('');
 }
 
 $('#subjRow').addEventListener('click', e => {
@@ -997,7 +1255,7 @@ async function loadTeacherTask() {
     $('#tftText').textContent = t.task_text;
     $('#teacherTask').classList.remove('hidden');
     $('#taskText').value = t.task_text.slice(0, 800);
-    if (t.subject && ['physics', 'algebra', 'other'].includes(t.subject)) {
+    if (t.subject && SkyCheck.SUBJECTS.some(s => s[0] === t.subject)) {
       subject = t.subject; renderSubjects(); renderUsage();
     }
   } catch (e) {
@@ -1005,10 +1263,51 @@ async function loadTeacherTask() {
   }
 }
 
+/* ---------- опции проверки ----------
+   Пункт с пометкой тарифа без нужного тарифа не включается —
+   вместо галочки открывается окно «Тарифы» с этим пунктом. */
+document.querySelectorAll('#studentMode .opts input').forEach(inp => inp.addEventListener('change', () => {
+  const need = inp.dataset.need;
+  if (inp.checked && need && !SkyCheck.feature(need)) {
+    inp.checked = false;
+    SkyCheck.openTariffs(need === 'compare' ? 'paid' : 'plagiarism');
+    return;
+  }
+  saveOptions();
+}));
+$('#lengthSeg').addEventListener('click', e => {
+  const b = e.target.closest('button[data-len]');
+  if (!b) return;
+  lengthNow = b.dataset.len;
+  renderLength();
+  saveOptions();
+});
+
+/* ---------- ученик / учитель ----------
+   Режим учителя (assets/photo-teacher.js) слушает событие photorole.
+   Ссылка ?hw=<id> — работа, присланная учителю, — открывает его сразу. */
+function setRole(r) {
+  const role = r === 'teacher' ? 'teacher' : 'student';
+  $('#studentMode').classList.toggle('hidden', role !== 'student');
+  $('#teacherMode').classList.toggle('hidden', role !== 'teacher');
+  $('#roleSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.role === role)));
+  Sky.set('photoRole', role);
+  document.dispatchEvent(new CustomEvent('photorole', { detail: role }));
+}
+$('#roleSeg').addEventListener('click', e => {
+  const b = e.target.closest('button[data-role]');
+  if (b) setRole(b.dataset.role);
+});
+$('#planBtn').addEventListener('click', () => SkyCheck.openTariffs());
+SkyCheck.onChange(renderUsage);
+
 $('#checkBtn').addEventListener('click', check);
 document.addEventListener('teacherchange', renderTeacher);
-document.addEventListener('langchange', () => { renderTeacher(); renderSubjects(); renderUsage(); renderHistory(); });
-document.addEventListener('authchange', loadUsage);
+document.addEventListener('langchange', () => {
+  renderTeacher(); renderSubjects(); renderUsage(); renderHistory();
+  $('#roleSeg').setAttribute('aria-label', Sky.t('roleAria'));
+});
+document.addEventListener('authchange', () => { loadUsage(); renderHistory(); });
 window.addEventListener('pagehide', closeCamera);
 
 /* ---------- запуск ---------- */
@@ -1026,12 +1325,18 @@ window.addEventListener('pagehide', closeCamera);
     n.classList.remove('hidden');
     $('#checkBtn').disabled = true;
   }
+  $('#roleSeg').setAttribute('aria-label', Sky.t('roleAria'));
+  const params = new URLSearchParams(location.search);
+  setRole(params.get('hw') ? 'teacher' : params.get('task') ? 'student' : Sky.get('photoRole', 'student'));
+  restoreOptions();
   renderSubjects();
   renderThumbs(false);
   renderHistory();
   loadTeacherTask();
   loadUsage();
+  SkyCheck.renderTokens();
 })();
 </script>
+<script src="assets/photo-teacher.js"></script>
 </body>
 </html>
