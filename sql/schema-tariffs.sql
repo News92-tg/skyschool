@@ -165,23 +165,27 @@ end $$;
 alter table public.usage_limits         enable row level security;
 alter table public.homework_submissions enable row level security;
 
+-- (select auth.uid()) вместо auth.uid(): так Postgres вычисляет его один
+-- раз на запрос, а не на каждую строку (совет Supabase, lint 0003).
 drop policy if exists "users read own usage limits" on public.usage_limits;
 create policy "users read own usage limits" on public.usage_limits
-  for select using (auth.uid() = user_id);
+  for select to authenticated using ((select auth.uid()) = user_id);
 
+-- Ученик видит свои работы, учитель — адресованные ему. Одна политика
+-- на чтение, а не две: несколько разрешающих политик Postgres
+-- проверяет все подряд (lint 0006).
 drop policy if exists "students read own submissions" on public.homework_submissions;
-create policy "students read own submissions" on public.homework_submissions
-  for select using (auth.uid() = student_id);
+drop policy if exists "teachers read addressed submissions" on public.homework_submissions;
+drop policy if exists "read own or addressed submissions" on public.homework_submissions;
+create policy "read own or addressed submissions" on public.homework_submissions
+  for select to authenticated using ((select auth.uid()) in (student_id, teacher_id));
 
 -- Своя работа — только со статусом «ждёт проверки» и без результата:
 -- поставить себе «проверено, 5» в обход модели нельзя.
 drop policy if exists "students insert own submissions" on public.homework_submissions;
 create policy "students insert own submissions" on public.homework_submissions
-  for insert with check (auth.uid() = student_id and status = 'pending' and result is null);
-
-drop policy if exists "teachers read addressed submissions" on public.homework_submissions;
-create policy "teachers read addressed submissions" on public.homework_submissions
-  for select using (auth.uid() = teacher_id);
+  for insert to authenticated
+  with check ((select auth.uid()) = student_id and status = 'pending' and result is null);
 
 -- В Supabase новые таблицы по умолчанию открыты anon и authenticated
 -- целиком (RLS потом режет строки). Оставляем только нужное.
