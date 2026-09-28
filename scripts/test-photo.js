@@ -355,6 +355,10 @@ function ok(name, cond, extra) {
   await page.click('#xCheck');
   await page.waitForFunction(() => /разбейте/.test((document.querySelector('#xResult .limit-note') || {}).textContent || ''));
   ok('текст: 400 — «Текст слишком длинный, разбейте на части»', true);
+  state.next['/api/check-text'] = { status: 400, body: { error: 'text param required' } };
+  await page.click('#xCheck');
+  await page.waitForFunction(() => /обновят Worker/.test((document.querySelector('#xResult .limit-note') || {}).textContent || ''));
+  ok('текст: прежний Worker (заготовка) — понятное сообщение, а не «Не выбрано фото»', true);
   state.next['/api/check-text'] = { status: 429, body: { error: 'x', code: 'rate_limit', retry_after: 200 } };
   await page.click('#xCheck');
   await page.waitForFunction(() => /03:[12]\d/.test(document.querySelector('#xWait').textContent));

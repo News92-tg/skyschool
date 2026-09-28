@@ -40,7 +40,9 @@
              en:'This text was checked in the last 7 days — the saved review is shown, no tokens spent.'},
     xCut:{ru:'Текст длиннее 8000 символов — проверены первые 8000.',en:'The text is longer than 8000 characters — the first 8000 were checked.'},
     xTrunc:{ru:'Разбор оборвался: ответ модели вышел слишком длинным. Попробуйте «Коротко».',
-            en:'The review was cut off: the answer was too long. Try “Short”.'}
+            en:'The review was cut off: the answer was too long. Try “Short”.'},
+    xOldWorker:{ru:'Проверка текста заработает, когда обновят Worker news92-orders.',
+                en:'Text checking will work once the news92-orders Worker is updated.'}
   });
 
   const $ = s => document.querySelector(s);
@@ -180,7 +182,8 @@
     if (!res.ok) {
       const d = res.data || {};
       if (d.code === 'rate_limit' && d.retry_after) setWait(d.retry_after);
-      render(null, SkyCheck.errorText(res));
+      /* 400 без кода — это прежний Worker: его заготовка ждёт text в адресе */
+      render(null, res.status === 400 && !d.code ? Sky.t('xOldWorker') : SkyCheck.errorText(res));
       return;
     }
     const r = res.data.rate;
