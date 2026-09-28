@@ -182,8 +182,11 @@
     if (!res.ok) {
       const d = res.data || {};
       if (d.code === 'rate_limit' && d.retry_after) setWait(d.retry_after);
-      /* 400 без кода — это прежний Worker: его заготовка ждёт text в адресе */
-      render(null, res.status === 400 && !d.code ? Sky.t('xOldWorker') : SkyCheck.errorText(res));
+      /* Прежний Worker: заготовка отвечает 400 без кода (ждёт text в
+         адресе), а скрипт без /api/check-text — 404. У нового Worker
+         у каждой ошибки есть code, а 404 на этот адрес не бывает. */
+      const oldWorker = (res.status === 400 && !d.code) || res.status === 404;
+      render(null, oldWorker ? Sky.t('xOldWorker') : SkyCheck.errorText(res));
       return;
     }
     const r = res.data.rate;

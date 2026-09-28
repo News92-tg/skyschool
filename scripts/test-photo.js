@@ -359,6 +359,11 @@ function ok(name, cond, extra) {
   await page.click('#xCheck');
   await page.waitForFunction(() => /обновят Worker/.test((document.querySelector('#xResult .limit-note') || {}).textContent || ''));
   ok('текст: прежний Worker (заготовка) — понятное сообщение, а не «Не выбрано фото»', true);
+  await page.evaluate(() => { document.querySelector('#xResult').innerHTML = ''; });
+  state.next['/api/check-text'] = { status: 404, body: { error: 'not found' } };
+  await page.click('#xCheck');
+  await page.waitForFunction(() => /обновят Worker/.test((document.querySelector('#xResult .limit-note') || {}).textContent || ''));
+  ok('текст: Worker без /api/check-text (404) — то же сообщение', true);
   state.next['/api/check-text'] = { status: 429, body: { error: 'x', code: 'rate_limit', retry_after: 200 } };
   await page.click('#xCheck');
   await page.waitForFunction(() => /03:[12]\d/.test(document.querySelector('#xWait').textContent));

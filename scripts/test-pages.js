@@ -29,6 +29,10 @@ const SKIP = new Set(['single.html']);   /* это собранная копия
 
   const browser = await chromium.launch();
   const ctx = await browser.newContext();
+  /* Живой Worker в Cloudflare не трогаем: иначе результат зависит от
+     того, какая версия там развёрнута сейчас (её CORS, её адреса), а не
+     от кода страниц. Запрос просто не доходит — как без сети. */
+  await ctx.route(/\.workers\.dev\//, r => r.abort());
   /* Голоса отключаем явно. На Linux в headless их и так нет, а на
      Windows Chrome отдаёт системные голоса Microsoft — и тогда проверка
      «без голоса страница честно показывает текст» проходила бы мимо. */
