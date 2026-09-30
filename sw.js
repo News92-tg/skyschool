@@ -24,7 +24,7 @@ const PRECACHE_URLS = [
   'assets/photo-api.js','assets/photo-teacher.js','assets/photo-text.js','assets/grading-criteria.js',
   'admin.html','assets/admin.js',
   'collections.html','collection.html','assets/collection-common.js','assets/collections.js','assets/collection.js',
-  'fast-check.html','assets/fast-check.js',
+  'fast-check.html','assets/fast-check.js','assets/limits.js',
   'auth.html','assets/auth-ui.js','onboarding.html','assets/onboarding.js',
   'assets/icon-192.png','assets/icon-512.png','assets/apple-touch-icon.png',
   'data/bank-math.js','data/bank-informatics.js','data/bank-russian.js','data/bank-physics.js','data/bank-biology.js','data/bank-chemistry.js',

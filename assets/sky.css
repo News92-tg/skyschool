@@ -589,6 +589,46 @@ h3{font-size:16px;font-weight:800}
 /* «Забыли пароль?» в окне входа (assets/auth.js) */
 .au-modal-forgot{display:block;margin-top:12px;text-align:center;font-size:13px;font-weight:800;color:var(--accent)}
 
+/* ---------- окно «Тарифы» (SkyCheck.openTariffs) — общее для страниц ----------
+   Ширину не навязываем: у модалки свои отступы, содержимое занимает
+   её ширину, какой бы она ни была (на телефоне иначе вылезало за край). */
+.pw{width:100%;min-width:0;max-width:560px;box-sizing:border-box}
+.pw h2{margin:0 0 4px}
+.pw-lead{margin:0 0 14px;color:var(--muted);font-size:13px;line-height:1.5}
+.pw-reason{margin:6px 0 10px;padding:10px 12px;border-radius:12px;background:var(--m-learn-soft);color:var(--ink-2);font-size:13px;font-weight:700;line-height:1.5}
+.pw-actions{margin-top:14px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.pw-actions .btn{flex:1 1 auto}
+.tf-list{display:grid;gap:10px}
+.tf-card{border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;gap:8px}
+.tf-card.current{border-color:var(--ok)}
+.tf-card.focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)}
+.tf-card.addon{margin-top:10px}
+.tf-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.tf-price{font-weight:900;font-size:17px;white-space:nowrap}
+.tf-card ul{margin:0;padding-left:18px;font-size:12.5px;line-height:1.6}
+.tf-card .btn,.tf-card .tag{justify-self:start}
+
+/* ---------- лимит проверок (assets/limits.js) ---------- */
+.lm-chip,.lm-meter{--lm:var(--ok);--lm-soft:var(--ok-soft)}
+.lm-chip.low,.lm-meter.low{--lm:var(--warn);--lm-soft:var(--warn-soft)}
+.lm-chip.out,.lm-meter.out{--lm:var(--no);--lm-soft:var(--no-soft)}
+.lm-chip{gap:7px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.lm-chip.out{border-color:color-mix(in srgb,var(--lm) 35%,var(--line));color:var(--lm)}
+.lm-ring{
+  flex:none;width:15px;height:15px;border-radius:50%;
+  background:conic-gradient(var(--lm) calc(var(--p) * 1%), var(--line) 0);
+  -webkit-mask:radial-gradient(circle,transparent 4px,#000 4.5px);mask:radial-gradient(circle,transparent 4px,#000 4.5px);
+}
+.lm-meter{
+  display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:6px 11px;border-radius:99px;background:var(--lm-soft);
+  font-size:12.5px;font-weight:800;color:var(--ink-2);font-variant-numeric:tabular-nums;
+}
+.lm-meter[hidden]{display:none}
+.lm-meter.out{color:var(--lm)}
+.lm-more{font:inherit;font-size:12px;font-weight:900;color:var(--accent);background:none;border:0;padding:0;cursor:pointer}
+.lm-more:hover{text-decoration:underline}
+
 /* ---------- ошибки и уведомления с действием (assets/errors.js) ---------- */
 .sx-stack{
   position:fixed;right:18px;bottom:18px;z-index:210;

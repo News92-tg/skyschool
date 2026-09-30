@@ -114,17 +114,12 @@
      обрезаны карточки и кнопка «Оформить VIP». А на компьютере сама
      модалка уже 480px, и любой min-width шире неё вылезает там. Поэтому
      содержимое просто занимает ширину окна, какой бы она ни была. */
-  .pw{width:100%;min-width:0;max-width:560px;box-sizing:border-box}
-  .pw-actions .btn{flex:1 1 auto}
-  .pw h2{margin:0 0 4px}
-  .pw-lead{margin:0 0 14px;color:var(--muted);font-size:13px;line-height:1.5}
   .pw-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .pw-card{border:1px solid var(--line);border-radius:14px;padding:14px}
   .pw-card.vip{border-color:var(--accent);background:var(--panel-2)}
   .pw-card h3{margin:0 0 8px;font-size:15px}
   .pw-card ul{margin:0;padding-left:18px;font-size:12.5px;line-height:1.6}
   .pw-price{margin-top:10px;font-weight:900;font-size:18px}
-  .pw-actions{margin-top:14px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
   @media (max-width:560px){.pw-grid{grid-template-columns:1fr}}
   .limit-note{margin-top:10px;padding:11px 13px;border-radius:12px;background:var(--warn-soft);
     color:var(--warn);font-size:13px;font-weight:700;line-height:1.5}
@@ -195,16 +190,7 @@
   .part-h{margin:22px 0 10px;font-size:15px;padding-top:14px;border-top:1px solid var(--line)}
   .part-h:first-child{margin-top:0;padding-top:0;border-top:0}
 
-  /* ---------- окно тарифов ---------- */
-  .tf-list{display:grid;gap:10px}
-  .tf-card{border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;gap:8px}
-  .tf-card.current{border-color:var(--ok)}
-  .tf-card.focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)}
-  .tf-card.addon{margin-top:10px}
-  .tf-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
-  .tf-price{font-weight:900;font-size:17px;white-space:nowrap}
-  .tf-card ul{margin:0;padding-left:18px;font-size:12.5px;line-height:1.6}
-  .tf-card .btn,.tf-card .tag{justify-self:start}
+  /* окно тарифов и счётчик лимита — в assets/sky.css */
 
   /* ---------- режим учителя ---------- */
   .roster{display:grid;gap:8px}
@@ -271,6 +257,7 @@
     <div class="plan-bar hidden" id="planBar">
       <span class="tag" id="planChip"></span>
       <span id="planLimit"></span>
+      <span data-limit-meter hidden></span>
       <button type="button" class="btn ghost small" id="planBtn" data-i18n="tariffsBtn"></button>
     </div>
   </div>
@@ -376,7 +363,7 @@
       </div>
 
       <div class="used-note js-wait hidden"></div>
-      <button class="btn full big" id="checkBtn" disabled data-i18n="checkBtn"></button>
+      <button class="btn full big" id="checkBtn" data-needs-limit disabled data-i18n="checkBtn"></button>
 
       <!-- Прогресс. Фото загружаются по одному — там счётчик «k из N».
            Проверка — один запрос на все фото работы, и сколько модель
@@ -483,7 +470,7 @@
         <input type="file" id="cFiles" accept="image/jpeg,image/png,image/webp" multiple hidden>
         <div class="roster" id="cRoster"></div>
         <p class="cap-note" data-i18n="tNameHint"></p>
-        <button type="button" class="btn full big" id="cRun" disabled data-i18n="tRunClass"></button>
+        <button type="button" class="btn full big" id="cRun" data-needs-limit disabled data-i18n="tRunClass"></button>
         <div class="progress hidden" id="cProgress" aria-live="polite">
           <div class="progress-text"></div>
           <div class="progress-bar"><i></i></div>
@@ -522,7 +509,7 @@
         <input type="file" id="tFiles" accept="image/jpeg,image/png,image/webp" multiple hidden>
         <div class="roster" id="tRoster"></div>
         <p class="cap-note" data-i18n="tNameHint"></p>
-        <button type="button" class="btn full big" id="tRun" disabled data-i18n="tRunTest"></button>
+        <button type="button" class="btn full big" id="tRun" data-needs-limit disabled data-i18n="tRunTest"></button>
         <div class="progress hidden" id="tProgress" aria-live="polite">
           <div class="progress-text"></div>
           <div class="progress-bar"><i></i></div>
@@ -568,7 +555,7 @@
           <button type="button" class="btn ghost" id="lResolve" data-i18n="lResolve"></button>
         </div>
         <div class="roster" id="lList"></div>
-        <button type="button" class="btn full big" id="lRun" disabled data-i18n="lRun"></button>
+        <button type="button" class="btn full big" id="lRun" data-needs-limit disabled data-i18n="lRun"></button>
         <div class="progress hidden" id="lProgress" aria-live="polite">
           <div class="progress-text"></div>
           <div class="progress-bar"><i></i></div>
@@ -593,6 +580,7 @@
 <script src="data/ai-teachers.js"></script>
 <script src="assets/ai-teachers.js"></script>
 <script src="assets/photo-api.js"></script>
+<script src="assets/limits.js"></script>
 <script src="assets/grading-criteria.js"></script>
 <script>
 'use strict';

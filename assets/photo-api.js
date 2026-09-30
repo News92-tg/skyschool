@@ -20,6 +20,8 @@ window.SkyCheck = (function () {
     tariffsBtn:{ru:'Тарифы',en:'Plans'},
     tariffsH:{ru:'Тарифы',en:'Plans'},
     tariffsNow:{ru:'Ваш тариф: %1',en:'Your plan: %1'},
+    tariffsNeed:{ru:'Оформите тариф',en:'Choose a plan'},
+    tariffsNeedD:{ru:'Эта проверка доступна в платном тарифе.',en:'This check is part of a paid plan.'},
     planFree:{ru:'Бесплатный',en:'Free'},
     planPaid:{ru:'Платный',en:'Paid'},
     planPremium:{ru:'Премиум',en:'Premium'},
@@ -196,7 +198,17 @@ window.SkyCheck = (function () {
     } catch (e) { return {}; }
   }
 
+  /* Кто хочет знать о каждом ответе Worker (assets/limits.js: 402 —
+     окно тарифа, 429 — отсчёт). Слушатель не может сломать запрос. */
+  const responseHooks = [];
+  const tellResponse = (path, res) => { responseHooks.forEach(cb => { try { cb(res, path); } catch (e) { console.warn(e); } }); return res; };
+
   async function request(path, o) {
+    const res = await requestRaw(path, o);
+    return tellResponse(path, res);
+  }
+
+  async function requestRaw(path, o) {
     o = o || {};
     const m = await mode();
     /* У прежнего Worker адресов /api/… нет (режим учителя, отправка
@@ -434,6 +446,11 @@ window.SkyCheck = (function () {
       if (res.ok && res.data && res.data.plan) {
         limits = res.data;
         setWait(res.data.rate && !res.data.rate.allowed ? res.data.rate.retry_after : 0);
+      } else if (res.status === 404) {
+        /* Worker новый, но /api/limits в нём ещё нет — показываем
+           бесплатный тариф, а лимит Worker всё равно проверит сам. */
+        limits = JSON.parse(JSON.stringify(STUB_LIMITS));
+        notify();
       } else {
         limits = null;
         notify();
@@ -483,10 +500,22 @@ window.SkyCheck = (function () {
   ];
   const PLAGIARISM_PRICE = 40;
 
-  function openTariffs(focus) {
+  /* reason — почему открыли: ответ 402 от Worker. Тогда заголовок
+     «Оформите тариф» и причина под ним. Окно уже открыто — второе не
+     открываем (страница и assets/limits.js могут позвать оба). */
+  function openTariffs(focus, reason) {
+    const open = document.querySelector('.modal .pw.tariffs');
+    if (open) {
+      if (focus) {
+        open.querySelectorAll('.tf-card.focus').forEach(c => c.classList.remove('focus'));
+        const card = open.querySelector(`[data-plan="${focus}"]`);
+        if (card) { card.classList.add('focus'); card.scrollIntoView({ block: 'nearest' }); }
+      }
+      return;
+    }
     const cur = planId() || 'free';
     const card = t => `
-      <div class="tf-card${t.id === cur ? ' current' : ''}${t.id === focus ? ' focus' : ''}">
+      <div class="tf-card${t.id === cur ? ' current' : ''}${t.id === focus ? ' focus' : ''}" data-plan="${t.id}">
         <div class="tf-head">
           <b>${esc(planName(t.id))}</b>
           <span class="tf-price">${esc(Sky.t('rub').replace('%1', t.price))}</span>
@@ -497,10 +526,11 @@ window.SkyCheck = (function () {
       </div>`;
     Sky.modal(`
       <div class="pw tariffs">
-        <h2>${esc(Sky.t('tariffsH'))}</h2>
+        <h2>${esc(Sky.t(reason ? 'tariffsNeed' : 'tariffsH'))}</h2>
+        ${reason ? `<p class="pw-reason">${esc(reason === true ? Sky.t('tariffsNeedD') : reason)}</p>` : ''}
         <p class="pw-lead">${esc(Sky.t('tariffsNow').replace('%1', planName(cur)))}</p>
         <div class="tf-list">${TARIFFS.map(card).join('')}</div>
-        <div class="tf-card addon${focus === 'plagiarism' ? ' focus' : ''}">
+        <div class="tf-card addon${focus === 'plagiarism' ? ' focus' : ''}" data-plan="plagiarism">
           <div class="tf-head">
             <b>${esc(Sky.t('tfAddon'))}</b>
             <span class="tf-price">+${esc(Sky.t('rub').replace('%1', PLAGIARISM_PRICE))}</span>
@@ -619,6 +649,8 @@ window.SkyCheck = (function () {
     feature, photoCap, planId, planSummary, get limits() { return limits; },
     onChange: cb => listeners.push(cb),
     openTariffs,
+    onResponse: cb => responseHooks.push(cb),
+    STUB_LIMITS,
     addTokens, renderTokens,
     csvDataUrl, download
   };

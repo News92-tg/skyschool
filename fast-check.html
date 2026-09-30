@@ -71,17 +71,10 @@
   /* кнопка «Тарифы» в шапке (её ставит photo-api.js) — как в photo.html:
      на телефоне шапка узкая, кнопку прячем */
   .tariffs-hdr{white-space:nowrap}
+  .fc-limit{display:flex;justify-content:center;margin-bottom:12px}
+  .fc-limit:has([hidden]){display:none}
   @media (max-width:760px){.tariffs-hdr{display:none}}
-  /* окно «Тарифы» (SkyCheck.openTariffs) — как в photo.html */
-  .tf-list{display:grid;gap:10px}
-  .tf-card{border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;gap:8px}
-  .tf-card.current{border-color:var(--ok)}
-  .tf-card.focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)}
-  .tf-card.addon{margin-top:10px}
-  .tf-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
-  .tf-price{font-weight:900;font-size:17px;white-space:nowrap}
-  .tf-card ul{margin:0;padding-left:18px;font-size:12.5px;line-height:1.6}
-  .tf-card .btn,.tf-card .tag{justify-self:start}
+  /* окно «Тарифы» и счётчик лимита — стили в assets/sky.css */
 </style>
 </head>
 <body>
@@ -121,7 +114,8 @@
   </div>
 
   <div class="panel" style="margin-top:16px">
-    <button type="button" class="btn full big" id="fcRun" disabled data-i18n="fcRun"></button>
+    <div class="fc-limit"><span data-limit-meter hidden></span></div>
+    <button type="button" class="btn full big" id="fcRun" data-needs-limit disabled data-i18n="fcRun"></button>
     <div class="progress hidden" id="fcProgress" aria-live="polite">
       <div class="progress-text"></div>
       <div class="progress-bar"><i></i></div>
@@ -141,6 +135,7 @@
 <script src="assets/db.js"></script>
 <script src="assets/auth.js"></script>
 <script src="assets/photo-api.js"></script>
+<script src="assets/limits.js"></script>
 <script src="assets/fast-check.js"></script>
 </body>
 </html>
