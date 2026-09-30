@@ -40,10 +40,15 @@ create trigger on_auth_user_created
 after insert on auth.users
 for each row execute function public.handle_new_user();
 
+-- Функция триггера: вызывать её через /rest/v1/rpc некому. Триггер
+-- право EXECUTE не проверяет, оно нужно только при создании триггера.
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
+
 -- Keep chess game timestamps current on every move/side join.
 create or replace function public.touch_chess_game_updated_at()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   new.updated_at = now();
@@ -55,6 +60,7 @@ drop trigger if exists chess_games_touch_updated_at on public.chess_games;
 create trigger chess_games_touch_updated_at
 before update on public.chess_games
 for each row execute function public.touch_chess_game_updated_at();
+revoke execute on function public.touch_chess_game_updated_at() from public, anon, authenticated;
 
 -- Realtime is required for the second device/tab to receive moves instantly.
 do $$

@@ -402,6 +402,35 @@ reset role;
 -- за собой прибираем то, что не привязано к тестовым аккаунтам
 delete from teachers_ai where id in ('private-one','fake1','fake2');
 
+-- ===== 13. Триггер регистрации не открыт наружу =====
+-- handle_new_user() — функция триггера на auth.users. Через
+-- /rest/v1/rpc её вызывать некому, поэтому права EXECUTE у anon и
+-- authenticated нет. Регистрацию это не ломает: Postgres проверяет
+-- право на функцию триггера при создании триггера, а не при каждой
+-- вставке. Проверяем под обычной ролью без этого права — так, как
+-- в Supabase вставляет supabase_auth_admin.
+select t_record('handle_new_user: anon не может вызвать',
+  not has_function_privilege('anon', 'public.handle_new_user()', 'execute'), '');
+select t_record('handle_new_user: authenticated не может вызвать',
+  not has_function_privilege('authenticated', 'public.handle_new_user()', 'execute'), '');
+
+drop role if exists _t_auth_admin;
+create role _t_auth_admin nologin;
+grant usage on schema auth to _t_auth_admin;
+grant insert, delete on auth.users to _t_auth_admin;
+select t_record('у роли, которая регистрирует, права EXECUTE нет',
+  not has_function_privilege('_t_auth_admin', 'public.handle_new_user()', 'execute'), '');
+set role _t_auth_admin;
+insert into auth.users (id, email, raw_user_meta_data)
+values ('ffff0000-0000-0000-0000-000000000001', 'signup@rls.test', '{"name":"Новичок"}');
+reset role;
+select t_expect('регистрация без EXECUTE: профиль создан',
+  (select count(*) from profiles
+    where id = 'ffff0000-0000-0000-0000-000000000001' and name = 'Новичок'), 1);
+revoke all on auth.users from _t_auth_admin;
+revoke all on schema auth from _t_auth_admin;
+drop role _t_auth_admin;
+
 
 -- ---------------------------------------------------------------------
 -- Отчёт

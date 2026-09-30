@@ -259,3 +259,6 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function handle_new_user();
+-- Это функция триггера, через /rest/v1/rpc её звать некому. Триггер
+-- право EXECUTE не проверяет — оно нужно только при создании триггера.
+revoke execute on function handle_new_user() from public, anon, authenticated;
