@@ -143,6 +143,31 @@
   @media (max-width:760px){.tariffs-hdr{display:none}}   /* на телефоне шапка узкая — есть кнопка в строке тарифа */
 
   .opts{display:grid;gap:8px;margin-top:6px}
+  /* критерии оценивания (assets/grading-criteria.js) */
+  .crit-box{margin-top:8px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel);display:grid;gap:9px}
+  .crit-hint{margin:0;font-size:12.5px;line-height:1.5;color:var(--muted)}
+  .crit-rows{display:grid;gap:7px}
+  .crit-row{display:grid;grid-template-columns:minmax(0,1fr) 74px 34px;gap:7px;align-items:center}
+  .crit-row input{width:100%;min-width:0;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);color:var(--ink);font:inherit;font-size:13.5px}
+  .crit-row .crit-del{height:36px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);color:var(--muted);font-size:18px;cursor:pointer}
+  .crit-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .crit-tools select{padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);color:var(--ink);font:inherit;font-size:13px}
+  .crit-result{display:grid;gap:12px;margin-bottom:16px}
+  .crit-total{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  .crit-big{display:flex;align-items:baseline;gap:2px}
+  .crit-big b{font-size:40px;font-weight:900;line-height:1;color:var(--accent)}
+  .crit-big span{font-size:18px;font-weight:800;color:var(--muted)}
+  .crit-grade{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:800;color:var(--muted)}
+  .crit-grade .grade{width:46px;height:46px;border-radius:14px;font-size:24px}
+  .crit-label{flex:1;min-width:180px;font-size:13.5px;line-height:1.5}
+  .crit-label small{color:var(--muted);font-size:12px}
+  .crit-table{width:100%;border-collapse:collapse;font-size:13px}
+  .crit-table td:last-child{min-width:120px;overflow-wrap:anywhere}
+  .crit-table th{text-align:left;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding:7px 8px;border-bottom:1px solid var(--line)}
+  .crit-table td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.45}
+  .crit-table .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .crit-sc{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:8px;color:#fff;background:var(--faint)}
+  .crit-sc.s5{background:var(--ok)} .crit-sc.s4{background:#4c9f4c} .crit-sc.s3{background:var(--warn)} .crit-sc.s2{background:#e07a3f} .crit-sc.s1{background:var(--no)}
   .opt-check{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);
     border-radius:12px;background:var(--panel-2);font-size:13.5px;font-weight:700;cursor:pointer;line-height:1.35}
   /* .field label в sky.css — мелкая заглавная подпись поля; пункты-галочки внутри .field — не подписи */
@@ -337,7 +362,10 @@
           <label class="opt-check"><input type="checkbox" id="optGrade"><span data-i18n="optGrade"></span></label>
           <label class="opt-check"><input type="checkbox" id="optGradeText"><span data-i18n="optGradeText"></span></label>
           <label class="opt-check"><input type="checkbox" id="optAccuracy" data-need="plagiarism"><span data-i18n="optAccuracy"></span><span class="tag teach lock" data-i18n="tagPremium"></span></label>
+          <label class="opt-check"><input type="checkbox" id="optCriteria"><span data-i18n="critOpt"></span></label>
         </div>
+        <!-- критерии учителя [{name, weight}] — assets/grading-criteria.js -->
+        <div class="crit-box hidden" id="critBox"></div>
       </div>
       <div class="field">
         <label data-i18n="lengthLabel"></label>
@@ -446,6 +474,8 @@
         </div>
         <div class="field"><label data-i18n="taskLabel"></label><textarea id="cTask" rows="2"></textarea></div>
         <label class="opt-check"><input type="checkbox" id="cGrade" checked><span data-i18n="optGrade"></span></label>
+        <label class="opt-check" style="margin-top:8px"><input type="checkbox" id="cCriteria"><span data-i18n="critOpt"></span></label>
+        <div class="crit-box hidden" id="cCritBox"></div>
         <div class="shot-actions">
           <button type="button" class="btn ghost" id="cPick" data-i18n="tPickMany"></button>
           <button type="button" class="btn ghost small hidden" id="cClear" data-i18n="clearBtn"></button>
@@ -562,6 +592,7 @@
 <script src="data/ai-teachers.js"></script>
 <script src="assets/ai-teachers.js"></script>
 <script src="assets/photo-api.js"></script>
+<script src="assets/grading-criteria.js"></script>
 <script>
 'use strict';
 Sky.init({
@@ -906,19 +937,23 @@ function openPaywall(kind) {
 /* ---------- что сделать с работой ---------- */
 let lengthNow = 'long';
 
+/* Критерии: список [{name, weight}] или null, если галочка снята. */
+const critEditor = SkyCriteria.editor($('#critBox'), $('#optCriteria'));
+
 function readOptions() {
   return {
     mode: $('#optCompare').checked ? 'compare' : 'check',
     grade: $('#optGrade').checked,
     gradeText: $('#optGradeText').checked,
     accuracy: $('#optAccuracy').checked,
-    length: lengthNow
+    length: lengthNow,
+    criteria: critEditor.get()
   };
 }
 
 function saveOptions() {
   const o = readOptions();
-  Sky.set('hwOpts', { compare: o.mode === 'compare', grade: o.grade, gradeText: o.gradeText, accuracy: o.accuracy, length: o.length });
+  Sky.set('hwOpts', { compare: o.mode === 'compare', grade: o.grade, gradeText: o.gradeText, accuracy: o.accuracy, length: o.length, criteria: !!o.criteria });
 }
 
 function restoreOptions() {
@@ -927,8 +962,10 @@ function restoreOptions() {
   $('#optGrade').checked = !!o.grade;
   $('#optGradeText').checked = !!o.gradeText;
   $('#optAccuracy').checked = !!o.accuracy;
+  $('#optCriteria').checked = !!o.criteria;
   lengthNow = o.length === 'short' ? 'short' : 'long';
   renderLength();
+  $('#critBox').classList.toggle('hidden', !o.criteria);
 }
 
 function renderLength() {
@@ -963,6 +1000,7 @@ async function check() {
   }
   if (photos.length > capNow()) { openPaywall('photos'); return; }
   const opt = readOptions();
+  if (opt.criteria && !opt.criteria.length) { Sky.toast(Sky.t('critNeed'), 4000); return; }
 
   setBusy(true);
   $('#resultSection').classList.add('hidden');
@@ -994,6 +1032,18 @@ async function check() {
     /* фото остаются в списке: можно сразу нажать «Проверить работу» ещё раз */
     renderHomeworkResult(null, SkyCheck.errorText(res), opt);
     return;
+  }
+
+  /* Прежний Worker критериев при проверке фото не знает: распознанный
+     текст всех фото уходит в его /grade-essay со списком критериев,
+     итог и оценку считает SkyCriteria по формуле. */
+  if (opt.criteria) {
+    setBusy(true);
+    progress(Sky.t('critPg'), null);
+    const text = (res.data.parts || []).map(d => d && d.recognized_text || '').filter(Boolean).join('\n\n');
+    res.data.crit = await SkyCriteria.scoreLegacy(text, opt.criteria,
+      { task: $('#taskText').value.trim().slice(0, 300), subjectName: SkyCheck.subjName(subject) });
+    progressDone(); setBusy(false);
   }
 
   /* Следующее фото Worker примет не раньше чем через 30 с. */
@@ -1028,6 +1078,7 @@ async function checkOrders() {
 
   if (photos.length > capNow()) { openPaywall('photos'); return; }
   const opt = readOptions();
+  if (opt.criteria && !opt.criteria.length) { Sky.toast(Sky.t('critNeed'), 4000); return; }
 
   setBusy(true);
   $('#resultSection').classList.add('hidden');
@@ -1109,6 +1160,11 @@ function renderHomeworkResult(data, fail, opt) {
   const block = (key, inner) => `<div class="res-block"><h3>${esc(Sky.t(key))}</h3>${inner}</div>`;
   const parts = (data && Array.isArray(data.parts)) ? data.parts : [];
   let html = '';
+  if (data && data.crit) {
+    html += data.crit.ok
+      ? SkyCriteria.table(data.crit.criteria, data.crit.score, data.crit.grade)
+      : `<div class="limit-note">${esc(Sky.t('critLegacyFail').replace('%1', data.crit.error || ''))}</div>`;
+  }
 
   parts.forEach((d, i) => {
     if (parts.length > 1) html += `<h3 class="part-h">${esc(Sky.t('photoN').replace('%1', i + 1))}</h3>`;
@@ -1144,13 +1200,16 @@ function renderOrdersResult(data, fail) {
   let html = '';
   if (data) {
     /* оценка */
-    if (data.assessment != null || data.assessment_text) {
+    /* с критериями оценка — в их таблице ниже, отдельный квадрат не нужен */
+    if (!Array.isArray(data.criteria) && (data.assessment != null || data.assessment_text)) {
       const m = String(data.assessment_text || '').match(/\b([1-5])\b/);
       const g = typeof data.assessment === 'number' ? data.assessment : (m ? Number(m[1]) : null);
       html += `<div class="gradebox"><div class="grade g${g || 'x'}">${g || '—'}</div>
         <div class="said"><b>${esc(data.assessment_text || Sky.t('gradeL'))}</b>` +
         (data.assessment_reason ? `<br>${esc(data.assessment_reason)}` : '') + `</div></div>`;
     }
+    /* критерии учителя: таблица, итог 4.2/5 и оценка из него */
+    if (Array.isArray(data.criteria)) html += SkyCriteria.table(data.criteria, data.score, data.assessment);
     /* тест */
     if (data.test) {
       const t = data.test;

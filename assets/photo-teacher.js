@@ -192,6 +192,8 @@
   }
 
   const classList = roster($('#cRoster'), { max: MAX, meta: true, onChange: () => $('#cClear').classList.toggle('hidden', !classList.items.length) });
+  /* критерии для всего класса — тот же редактор, что у одной работы */
+  const classCrit = window.SkyCriteria && $('#cCritBox') ? SkyCriteria.editor($('#cCritBox'), $('#cCriteria')) : null;
   const refList = Object.assign(roster($('#tRef'), { max: 1, meta: false, label: 'tRef' }), { single: true });
   const testList = roster($('#tRoster'), { max: MAX, meta: true, onChange: () => $('#tClear').classList.toggle('hidden', !testList.items.length) });
   const sendList = Object.assign(roster($('#lPhoto'), { max: 1, meta: false }), { single: true });
@@ -288,16 +290,20 @@
   /* ---------- отчёт по классу (и по ссылкам) ---------- */
   function renderReport(sec, box, data) {
     const s = data.summary || {};
+    /* проверка по критериям: столбец «Балл» (4,2) и таблица в строке */
+    const withCrit = (data.reports || []).some(r => Array.isArray(r.criteria));
+    const num = v => Sky.lang === 'en' ? String(v) : String(v).replace('.', ',');
     const rows = (data.reports || []).map(r => {
       if (r.status !== 'ok') {
         return `<tr class="failed"><td>${r.index}</td><td>${esc(r.name || '—')}</td><td>${esc(r.class || '')}</td>
-          <td>—</td><td>—</td><td>${esc(Sky.t('failedRow').replace('%1', r.error || ''))}</td></tr>`;
+          <td>—</td>${withCrit ? '<td>—</td>' : ''}<td>—</td><td>${esc(Sky.t('failedRow').replace('%1', r.error || ''))}</td></tr>`;
       }
       const errs = r.errors || [];
       return `<tr><td>${r.index}</td><td>${esc(r.name || '—')}</td><td>${esc(r.class || '')}</td>
-        <td>${r.assessment === undefined ? '—' : gradeBadge(r.assessment)}</td><td>${r.errors_count}</td>
+        <td>${r.assessment === undefined ? '—' : gradeBadge(r.assessment)}</td>${withCrit ? `<td>${r.score == null ? '—' : esc(num(r.score))}</td>` : ''}<td>${r.errors_count}</td>
         <td>${esc(r.comment || '')}${errs.length ? `<details><summary>${esc(Sky.t('errList').replace('%1', errs.length))}</summary><ul>${errs.map(e =>
-          `<li>${esc(e.fragment)}${e.correction ? ' → ' + esc(e.correction) : ''}${e.type ? ` <i>(${esc(e.type)})</i>` : ''}</li>`).join('')}</ul></details>` : ''}</td></tr>`;
+          `<li>${esc(e.fragment)}${e.correction ? ' → ' + esc(e.correction) : ''}${e.type ? ` <i>(${esc(e.type)})</i>` : ''}</li>`).join('')}</ul></details>` : ''}${
+          withCrit && Array.isArray(r.criteria) ? `<details><summary>${esc(Sky.t('critTotal'))}</summary>${SkyCriteria.table(r.criteria, r.score, r.assessment)}</details>` : ''}</td></tr>`;
     }).join('');
     $(box).innerHTML =
       `<div class="stats">
@@ -307,7 +313,7 @@
        </div>
        <div class="table-wrap"><table class="rtable">
          <thead><tr><th>${esc(Sky.t('colN'))}</th><th>${esc(Sky.t('colName'))}</th><th>${esc(Sky.t('colClass'))}</th>
-           <th>${esc(Sky.t('colGrade'))}</th><th>${esc(Sky.t('colErrors'))}</th><th>${esc(Sky.t('colComment'))}</th></tr></thead>
+           <th>${esc(Sky.t('colGrade'))}</th>${withCrit ? `<th>${esc(Sky.t('critScore'))}</th>` : ''}<th>${esc(Sky.t('colErrors'))}</th><th>${esc(Sky.t('colComment'))}</th></tr></thead>
          <tbody>${rows}</tbody></table></div>`;
     $(sec).classList.remove('hidden');
     $(sec).scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -341,6 +347,8 @@
     if (busy || !ready()) return;
     const items = classList.items.slice();
     if (!items.length) { Sky.toast(Sky.t('tNeedPhotos'), 4000); return; }
+    const criteria = classCrit ? classCrit.get() : null;
+    if (criteria && !criteria.length) { Sky.toast(Sky.t('critNeed'), 4000); return; }
     const box = $('#cProgress');
     setBusy(true);
     $('#cResultSec').classList.add('hidden');
@@ -356,7 +364,8 @@
         photos: items.map((it, i) => ({ img: up.urls[i], name: it.name.trim(), class: it.cls.trim() || defClass })),
         subject: $('#cSubject').value,
         grade: $('#cGrade').checked,
-        task: $('#cTask').value.trim().slice(0, 800)
+        task: $('#cTask').value.trim().slice(0, 800),
+        criteria: criteria || undefined
       },
       timeout: 180000,
       onProgress: m => prog(box, Sky.t('tPgCheck').replace('%1', m.done).replace('%2', m.total) + (m.name ? ' — ' + m.name : ''), m.done / m.total)

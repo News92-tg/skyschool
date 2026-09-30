@@ -90,8 +90,9 @@ function ok(name, cond, extra) {
       const body = JSON.parse(req.postData());
       const reports = body.photos.map((p, i) => i === 1
         ? { index: i + 1, name: p.name || 'С фото', class: p.class, status: 'failed', error: 'Сервис проверки временно недоступен', submission_id: p.submission_id }
-        : { index: i + 1, name: p.name || 'Сидоров С.', class: p.class, assessment: 5 - i % 2, assessment_reason: 'ок', errors_count: 1,
-            errors: [{ type: 'орфография', fragment: 'малоко', correction: 'молоко' }], comment: 'Хорошо', status: 'ok', submission_id: p.submission_id });
+        : Object.assign({ index: i + 1, name: p.name || 'Сидоров С.', class: p.class, assessment: 5 - i % 2, assessment_reason: 'ок', errors_count: 1,
+            errors: [{ type: 'орфография', fragment: 'малоко', correction: 'молоко' }], comment: 'Хорошо', status: 'ok', submission_id: p.submission_id },
+            body.criteria ? { criteria: body.criteria.map((c, k) => Object.assign({ score: 5 - k * 2, comment: '' }, c)), score: 4.3 } : {}));
       const done = { reports, summary: { avg: 4.5, total: reports.length, checked: reports.filter(r => r.status === 'ok').length, failed: reports.filter(r => r.status !== 'ok').length },
         csv_url: 'data:text/csv;charset=utf-8,' + encodeURIComponent('﻿ФИО,Класс,Оценка,Комментарий,Ошибок\r\n'), tokens_used: { prompt: 300, completion: 90, total: 390 } };
       if ((req.headers().accept || '').includes('ndjson')) {
@@ -224,6 +225,44 @@ function ok(name, cond, extra) {
   if (process.env.SHOTS) await (await page.$('#resultSection')).screenshot({ path: path.join(process.env.SHOTS, 'result-premium.png') });
   ok('остался запрос в окне — кнопка не ждёт', !(await visible(page, '#studentMode .js-wait')));
 
+  /* критерии оценивания: список уходит в Worker, он же считает итог */
+  await page.click('label:has(#optCompare)');
+  await page.click('label:has(#optAccuracy)');
+  await page.click('label:has(#optCriteria)');
+  ok('критерии: редактор открыт', await visible(page, '#critBox') && (await page.$$('#critBox .crit-row')).length === 3);
+  await page.fill('#critBox .crit-row:nth-child(1) .crit-name', 'верно');
+  await page.fill('#critBox .crit-row:nth-child(1) .crit-weight', '1');
+  await page.fill('#critBox .crit-row:nth-child(2) .crit-name', 'оформление');
+  await page.fill('#critBox .crit-row:nth-child(2) .crit-weight', '0.5');
+  await page.click('#critBox .crit-row:nth-child(3) .crit-del');
+  await page.fill('#critBox .crit-row:nth-child(2) .crit-name', '');
+  await page.click('#critBox .crit-add');
+  await page.fill('#critBox .crit-row:nth-child(3) .crit-name', 'оформление');
+  await page.fill('#critBox .crit-row:nth-child(3) .crit-weight', '0.5');
+  await page.evaluate(() => SkyCheck.setWait(0));
+  state.next['/api/check-photo'] = { status: 200, body: Object.assign({}, CHECK, { assessment: 4, score: 4.3,
+    criteria: [{ name: 'верно', weight: 1, score: 5, comment: '' }, { name: 'оформление', weight: 0.5, score: 3, comment: 'Неаккуратно' }],
+    rate: { remaining: 2, retry_after: 0, reset_in: 60 } }) };
+  await page.setInputFiles('#fileIn', IMG);
+  await page.click('#checkBtn');
+  await page.waitForSelector('#result .crit-result');
+  const q3 = new URLSearchParams(state.calls.filter(c => c.path === '/api/check-photo').pop().search);
+  ok('критерии: в запросе [{name, weight}] без пустых строк', q3.get('criteria') === JSON.stringify([{ name: 'верно', weight: 1 }, { name: 'оформление', weight: 0.5 }]), q3.get('criteria'));
+  ok('критерии: итог 4,3/5, оценка 4, таблица', /4,3/.test(await text(page, '#result .crit-big')) && (await text(page, '#result .crit-grade .grade')) === '4' &&
+    (await page.$$('#result .crit-table tbody tr')).length === 2 && /Неаккуратно/.test(await page.textContent('#result .crit-table')));
+  ok('критерии: квадрат оценки не дублируется', !(await page.$('#result .gradebox')));
+  await page.click('label:has(#optCriteria)');
+  const q4 = await (async () => {
+    await page.evaluate(() => SkyCheck.setWait(0));
+    state.next['/api/check-photo'] = { status: 200, body: Object.assign({}, CHECK, { rate: { remaining: 2, retry_after: 0, reset_in: 60 } }) };
+    await page.setInputFiles('#fileIn', IMG);
+    await page.click('#againBtn');
+    await page.click('#checkBtn');
+    await page.waitForSelector('#againBtn');
+    return new URLSearchParams(state.calls.filter(c => c.path === '/api/check-photo').pop().search);
+  })();
+  ok('критерии выключены — параметра нет', !q4.has('criteria'));
+
   await page.click('#roleSeg [data-role="teacher"]');
   ok('режим учителя: вкладки, замка нет', await visible(page, '#teacherMode') && !(await visible(page, '#studentMode')) && !(await visible(page, '#tLock')));
 
@@ -232,13 +271,19 @@ function ok(name, cond, extra) {
   const rows = await page.$$('#cRoster .roster-row');
   await rows[0].$('input[data-k="name"]').then(i => i.fill('Иванов Иван'));
   await page.fill('#cClass', '9А');
+  await page.click('label:has(#cCriteria)');
+  ok('класс: галочка критериев подтягивает сохранённый набор', (await page.$$('#cCritBox .crit-row')).length === 2 &&
+    await page.$eval('#cCritBox .crit-row:nth-child(2) .crit-name', i => i.value) === 'оформление');
   await page.click('#cRun');
   await page.waitForSelector('#cResult .rtable');
   const rep = state.calls.filter(c => c.path === '/api/check-teacher-report').pop();
   const repBody = JSON.parse(rep.body.toString());
   ok('класс: 3 фото, ФИО из поля, класс «для всех», поток прогресса',
     repBody.photos.length === 3 && repBody.photos[0].name === 'Иванов Иван' && repBody.photos[2].class === '9А' && /ndjson/.test(rep.headers.accept) && repBody.grade === true);
-  ok('класс: таблица, сбой строки помечен, средний балл', (await page.$$('#cResult tbody tr')).length === 3 && (await page.$$('#cResult tr.failed')).length === 1 && /4,5/.test(await text(page, '#cResult .stat.accent b')));
+  ok('класс: критерии в запросе', JSON.stringify(repBody.criteria) === JSON.stringify([{ name: 'верно', weight: 1 }, { name: 'оформление', weight: 0.5 }]));
+  ok('класс: столбец «Балл» 4,3 и таблица критериев в строке', /Балл/.test(await text(page, '#cResult thead')) && /4,3/.test(await text(page, '#cResult tbody tr:first-child')) &&
+    (await page.$$('#cResult tbody .crit-table')).length === 2);
+  ok('класс: таблица, сбой строки помечен, средний балл', (await page.$$('#cResult .rtable > tbody > tr')).length === 3 && (await page.$$('#cResult tr.failed')).length === 1 && /4,5/.test(await text(page, '#cResult .stat.accent b')));
   if (process.env.SHOTS) await (await page.$('#tab-class')).screenshot({ path: path.join(process.env.SHOTS, 'class-report.png') });
   const dl = page.waitForEvent('download');
   await page.click('#cCsv');
@@ -279,8 +324,8 @@ function ok(name, cond, extra) {
   const lb = JSON.parse(state.calls.filter(c => c.path === '/api/check-teacher-report').pop().body.toString());
   ok('ссылки: в отчёт ушли только найденные работы с submission_id', lb.photos.length === 1 && lb.photos[0].submission_id === HW_ID && lb.photos[0].img === 'https://sb.test/sign/sub.jpg?token=t');
   ok('ссылки: статус работы обновился', /проверена/.test(await page.textContent('#lList')));
-  /* 150 (ученик) + 390 (класс) + 15 (тест) + 390 (ссылки) */
-  ok('токены за сессию сложились', /Потрачено: 945 токенов \(~0 ₽\)/.test(await text(page, '#tokenLine')), await text(page, '#tokenLine'));
+  /* 150 (ученик) + 2 × 150 (проверки с критериями и без) + 390 (класс) + 15 (тест) + 390 (ссылки) */
+  ok('токены за сессию сложились', /Потрачено: 1\s?245 токенов \(~0 ₽\)/.test(await text(page, '#tokenLine')), await text(page, '#tokenLine'));
   await page.close();
 
   /* ========== ссылка ?hw= и замок учителя на Бесплатном ========== */

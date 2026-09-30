@@ -308,6 +308,8 @@ window.SkyCheck = (function () {
     if (p.gradeText) qs.set('grade_text', 'true');
     if (p.accuracy) qs.set('accuracy', 'true');
     qs.set('length', p.length === 'short' ? 'short' : 'long');
+    /* критерии учителя [{name, weight}] — баллы и итог считает Worker */
+    if (p.criteria && p.criteria.length) qs.set('criteria', JSON.stringify(p.criteria));
     return request('/api/check-photo?' + qs, { timeout: p.timeout });
   }
 

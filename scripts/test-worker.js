@@ -284,6 +284,45 @@ async function main() {
   r = await call('/api/check-photo?img=' + q(IMG) + '&mode=grade', { jwt: 'jwt-premium' });
   ok('не JSON → весь текст в comment, оценка N/A', r.status === 200 && r.body.comment === 'Оценка 3. Ошибка в задаче 1.' && r.body.assessment === 'N/A');
 
+  /* ---------- критерии оценивания ---------- */
+  reset();
+  const CRIT = [{ name: 'верно', weight: 1 }, { name: 'оформление', weight: 0.5 }];
+  zaiQueue.push(zaiOk(Object.assign({}, full, { assessment: 2,
+    criteria: [{ name: 'Оформление', score: 3, comment: 'грязно' }, { name: 'верно', score: '5', comment: '' }] })));
+  r = await call('/api/check-photo?img=' + q(IMG) + '&criteria=' + q(JSON.stringify(CRIT)), { jwt: 'jwt-premium' });
+  const cr = r.body || {};
+  ok('критерии: 200, баллы в порядке учителя, веса на месте', r.status === 200 && cr.criteria && cr.criteria.length === 2 &&
+    cr.criteria[0].name === 'верно' && cr.criteria[0].score === 5 && cr.criteria[1].score === 3 && cr.criteria[1].weight === 0.5 && cr.criteria[1].comment === 'грязно', r.text);
+  ok('критерии: итог = Σ(вес×балл)/Σвесов = (5·1+3·0,5)/1,5 = 4.3', cr.score === 4.3);
+  ok('критерии: оценка из итога (4.3 → 4), а не от модели (2)', cr.assessment === 4);
+  ok('критерии: промт перечисляет критерии', /Оцени работу по критериям учителя: 1\) «верно»; 2\) «оформление»/.test(zaiSent[0].messages[0].content));
+  const logC = sbCalls.find(c => c.path === '/rest/v1/rpc/sky_log_check');
+  ok('критерии: в историю уходят criteria и score', logC && JSON.parse(logC.body).p_result.score === 4.3 && JSON.parse(logC.body).p_result.criteria.length === 2);
+
+  zaiQueue.push(zaiOk(Object.assign({}, full, { criteria: [{ name: 'a', score: 5 }, { name: 'b', score: 4 }] })));
+  r = await call('/api/check-photo?img=' + q(IMG) + '&criteria=' + q('[{"name":"a"},{"name":"b"}]'), { jwt: 'jwt-premium' });
+  ok('критерии: 4.5 → 5, вес по умолчанию 1', r.body.score === 4.5 && r.body.assessment === 5 && r.body.criteria[1].weight === 1);
+
+  zaiQueue.push(zaiOk(Object.assign({}, full, { criteria: [{ name: 'a', score: 5 }, { name: 'b', score: null }] })));
+  r = await call('/api/check-photo?img=' + q(IMG) + '&criteria=' + q('[{"name":"a","weight":2},{"name":"b","weight":3}]'), { jwt: 'jwt-premium' });
+  ok('критерии: без балла — в итог не входит', r.body.criteria[1].score === null && r.body.score === 5 && r.body.assessment === 5);
+
+  reset();
+  for (const [bad, why] of [['{oops', 'не JSON'], ['{"name":"a"}', 'не массив'], ['[{"name":"  "}]', 'пустые названия']]) {
+    r = await call('/api/check-photo?img=' + q(IMG) + '&criteria=' + q(bad), { jwt: 'jwt-premium' });
+    ok('критерии: ' + why + ' — 400 до модели', r.status === 400 && r.body.code === 'bad_param' && zaiSent.length === 0);
+  }
+  const many = Array.from({ length: 14 }, (_, i) => ({ name: 'к' + (i % 12), weight: i === 0 ? -5 : 50 }));
+  zaiQueue.push(zaiOk(full));
+  r = await call('/api/check-photo?img=' + q(IMG) + '&criteria=' + q(JSON.stringify(many)), { jwt: 'jwt-premium' });
+  ok('критерии: не больше 10, без повторов, вес ≤ 10, плохой вес → 1',
+    r.body.criteria.length === 10 && r.body.criteria[0].weight === 1 && r.body.criteria[1].weight === 10 && new Set(r.body.criteria.map(c => c.name)).size === 10);
+  ok('критерии: модель не оценила — итог и оценка пустые', r.body.score === null && r.body.assessment === 'N/A');
+
+  zaiQueue.push(zaiOk(full));
+  r = await call('/api/check-photo?img=' + q(IMG) + '&grade=true', { jwt: 'jwt-premium' });
+  ok('без критериев — ответ как раньше', r.body.assessment === 3 && !('criteria' in r.body) && !('score' in r.body));
+
   /* ---------- ошибки Z.AI ---------- */
   reset();
   zaiQueue.push(zaiErr(400, '1210'), zaiOk(full));
@@ -384,6 +423,15 @@ async function main() {
   ok('отчёт на Платном — 402', r.status === 402 && r.body.need === 'premium');
   r = await call('/api/check-teacher-report', { method: 'POST', body: '{"photos":[{"img":"x"}]}', jwt: 'jwt-premium' });
   ok('отчёт: плохая ссылка — 400', r.status === 400);
+
+  reset();
+  zaiQueue.push(zaiOk(Object.assign({}, full, { criteria: [{ name: 'верно', score: 4 }, { name: 'оформление', score: 5 }] })));
+  r = await call('/api/check-teacher-report', { method: 'POST', jwt: 'jwt-premium',
+    body: JSON.stringify({ photos: [{ img: IMG, name: 'Петров', class: '9А' }], grade: false, criteria: CRIT }) });
+  const rc = r.body && r.body.reports && r.body.reports[0];
+  ok('отчёт с критериями: баллы, итог 4.3 и оценка', rc && rc.score === 4.3 && rc.assessment === 4 && rc.criteria[1].score === 5, r.text);
+  const csv3 = decodeURIComponent(r.body.csv_url.split(',').slice(1).join(','));
+  ok('отчёт с критериями: CSV со столбцами «Балл» и по критерию', /Ошибок,Балл,верно \(вес 1\),оформление \(вес 0\.5\)\r\nПетров,9А,4,.*,"4,3",4,5/.test(csv3), csv3.split('\r\n').slice(0, 2).join(' | '));
 
   /* ---------- /api/submit-homework ---------- */
   reset();

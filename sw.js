@@ -21,7 +21,7 @@ const PRECACHE_URLS = [
   'assets/chess-game-modes.js','assets/chess-puzzle-coach.js','assets/chess-game-flow.js',
   'assets/chess-lessons-system.js','assets/chess-lessons-fallback.js','assets/chess-lessons-polish-v2.js','assets/chess-runtime-hardening.js',
   'assets/match3.js','assets/python-editor.js','assets/ai-teachers.js','data/ai-teachers.js','assets/sky.css',
-  'assets/photo-api.js','assets/photo-teacher.js','assets/photo-text.js',
+  'assets/photo-api.js','assets/photo-teacher.js','assets/photo-text.js','assets/grading-criteria.js',
   'admin.html','assets/admin.js',
   'collections.html','collection.html','assets/collection-common.js','assets/collections.js','assets/collection.js',
   'assets/icon-192.png','assets/icon-512.png','assets/apple-touch-icon.png',

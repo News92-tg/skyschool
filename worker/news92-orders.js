@@ -221,7 +221,7 @@ function json(obj, status = 200, extra = {}) {
   });
 }
 
-const PHOTO_PARAMS = ["mode", "subject", "grade", "grade_text", "length", "accuracy", "total", "task"];
+const PHOTO_PARAMS = ["mode", "subject", "grade", "grade_text", "length", "accuracy", "total", "task", "criteria"];
 function isLegacyPhotoRequest(url) {
   return url.searchParams.getAll("img").length <= 1 && !PHOTO_PARAMS.some(p => url.searchParams.has(p));
 }
@@ -266,6 +266,66 @@ function normErrors(list) {
     .filter(e => e && typeof e === "object")
     .map(e => ({ type: str(e.type), fragment: str(e.fragment), correction: str(e.correction) }));
 }
+
+/* ---------- Критерии оценивания от учителя ----------
+   Учитель задаёт [{name, weight}], модель ставит балл 1–5 по каждому.
+   Итог считаем здесь, а не просим у модели: арифметика модели ненадёжна.
+     score = Σ(вес × балл) / Σ(веса), до десятых   — 4.2
+     assessment = округление score                 — 4.2 → 4, 4.5 → 5
+   Критерий без балла (модель не смогла оценить) в итог не входит. */
+const CRITERIA_MAX = 10;
+
+function parseCriteria(v) {
+  if (v == null || v === "") return null;
+  let list = v;
+  if (typeof v === "string") {
+    try { list = JSON.parse(v); }
+    catch (e) { throw new BadRequest("criteria must be a JSON array: [{\"name\":\"...\",\"weight\":1}]"); }
+  }
+  if (!Array.isArray(list)) throw new BadRequest("criteria must be an array of {name, weight}");
+  const out = [], seen = new Set();
+  for (const c of list) {
+    const name = str(c && typeof c === "object" ? c.name : c).replace(/\s+/g, " ").trim().slice(0, 60);
+    const key = name.toLowerCase();
+    if (!name || seen.has(key)) continue;
+    let weight = Number(c && typeof c === "object" ? c.weight : 1);
+    if (!(weight > 0)) weight = 1;
+    weight = Math.min(10, Math.round(weight * 100) / 100);
+    seen.add(key);
+    out.push({ name, weight });
+    if (out.length >= CRITERIA_MAX) break;
+  }
+  if (!out.length) throw new BadRequest("criteria: at least one {name} is required");
+  return out;
+}
+
+function critKey(s) { return str(s).toLowerCase().replace(/ё/g, "е").replace(/[^a-zа-я0-9]+/g, ""); }
+
+/* Ответ модели → ровно те критерии, что задал учитель, в его порядке. */
+function normCriteriaScores(got, want) {
+  const list = (Array.isArray(got) ? got : []).filter(x => x && typeof x === "object");
+  return want.map((c, i) => {
+    const hit = list.find(g => critKey(g.name) === critKey(c.name)) || (list[i] && !want.some(w => critKey(w.name) === critKey(list[i].name)) ? list[i] : null);
+    return {
+      name: c.name,
+      weight: c.weight,
+      score: hit ? clampInt(hit.score, 1, 5) : null,
+      comment: hit ? str(hit.comment).slice(0, 400) : ""
+    };
+  });
+}
+
+function weightedScore(items) {
+  let sum = 0, weights = 0;
+  for (const c of items) {
+    if (typeof c.score !== "number") continue;
+    sum += c.weight * c.score;
+    weights += c.weight;
+  }
+  return weights ? Math.round(sum / weights * 10) / 10 : null;
+}
+
+const gradeFromScore = s => s == null ? "N/A" : Math.min(5, Math.max(1, Math.floor(s + 0.5)));
 
 /* Ответ модели → объект. glm-4.6v оборачивает ответ в
    <|begin_of_box|>…<|end_of_box|>, иногда в ```json. */
@@ -530,6 +590,7 @@ function checkPrompt(o) {
   if (test) shape.test = { total: o.total || 10, answers: [{ n: 1, student: "...", correct: "...", ok: true }] };
   if (wantGrade) { shape.assessment = 4; shape.assessment_text = "4 (хорошо)"; shape.assessment_reason = "..."; }
   if (o.accuracy) { shape.confidence = 90; shape.ai_match = 85; shape.plagiarism_flag = false; shape.plagiarism_reason = "..."; }
+  if (o.criteria) shape.criteria = o.criteria.map(c => ({ name: c.name, score: 4, comment: "..." }));
   shape.comment = "...";
 
   const lines = [
@@ -556,6 +617,11 @@ function checkPrompt(o) {
         "plagiarism_flag — подозрение на списывание: true, только если есть признаки — решение слово в слово как в решебнике, ответ без хода решения, резкая смена почерка или стиля, чужие исправления. Ошибки сами по себе не признак списывания. plagiarism_reason — какие признаки увидел; если флага нет — пустая строка."
       : null,
     o.label ? "student_name, student_class — ФИО и класс, если они подписаны на фото; иначе пустые строки." : null,
+    o.criteria
+      ? "Оцени работу по критериям учителя: " + o.criteria.map((c, i) => `${i + 1}) «${c.name}»`).join("; ") + ". " +
+        "criteria — массив в том же порядке и с теми же названиями: score — целое число от 1 до 5 (5 — критерий выполнен полностью), " +
+        "comment — одно предложение, за что снижен балл или что сделано хорошо. Если по фото критерий оценить нельзя — score: null."
+      : null,
     o.length === "short"
       ? "Ответь кратко: только список ошибок" + (wantGrade ? " и оценка" : "") + ". Без подробного разбора. comment — одно предложение."
       : "comment — общий комментарий учителя ученику, 2–4 предложения, по-русски.",
@@ -591,6 +657,13 @@ function normCheck(parsed, raw, o) {
   if (o.grade) r.assessment = gradeOf(p.assessment);
   if (o.gradeText) r.assessment_text = str(p.assessment_text) || GRADE_WORDS[gradeOf(p.assessment)] || "N/A";
   if (o.grade || o.gradeText) r.assessment_reason = str(p.assessment_reason);
+  if (o.criteria) {
+    /* с критериями оценка — из них, а не «на глаз» модели */
+    r.criteria = normCriteriaScores(p.criteria, o.criteria);
+    r.score = weightedScore(r.criteria);
+    r.assessment = gradeFromScore(r.score);
+    if (o.gradeText) r.assessment_text = GRADE_WORDS[r.assessment] || "N/A";
+  }
   if (o.accuracy) {
     r.confidence = clampInt(p.confidence, 0, 100);
     r.ai_match = clampInt(p.ai_match, 0, 100);
@@ -621,7 +694,8 @@ function photoOptions(get) {
     gradeText: parseBool(get("grade_text"), "grade_text"),
     accuracy: parseBool(get("accuracy"), "accuracy"),
     total,
-    task: String(get("task") || "").trim().slice(0, 800)
+    task: String(get("task") || "").trim().slice(0, 800),
+    criteria: parseCriteria(get("criteria"))
   };
 }
 
@@ -1262,7 +1336,8 @@ async function handleTeacherReport(request, env, ctx) {
       length: body.length === "short" ? "short" : "long",
       task: str(body.task).trim().slice(0, 800),
       label: true,
-      photos: 1
+      photos: 1,
+      criteria: parseCriteria(body.criteria)
     };
   } catch (e) {
     if (e instanceof BadRequest) return json({ error: e.message, code: "bad_param" }, 400);
@@ -1298,8 +1373,10 @@ async function handleTeacherReport(request, env, ctx) {
             index: i + 1,
             name: p.name || r.student_name,
             class: p.class || r.student_class,
-            assessment: o.grade ? r.assessment : undefined,
+            assessment: o.grade || o.criteria ? r.assessment : undefined,
             assessment_reason: r.assessment_reason,
+            criteria: r.criteria,
+            score: r.score,
             errors_count: r.errors.length,
             errors: r.errors,
             comment: r.comment,
@@ -1325,18 +1402,23 @@ async function handleTeacherReport(request, env, ctx) {
       checked: ok.length,
       failed: reports.length - ok.length
     };
-    const csv_url = csvDataUrl(["ФИО", "Класс", "Оценка", "Комментарий", "Ошибок"],
+    /* с критериями — ещё столбец итогового балла и по столбцу на критерий */
+    const crit = o.criteria || [];
+    const csv_url = csvDataUrl(["ФИО", "Класс", "Оценка", "Комментарий", "Ошибок"]
+        .concat(crit.length ? ["Балл"].concat(crit.map(c => `${c.name} (вес ${c.weight})`)) : []),
       reports.map(r => [r.name, r.class,
         r.status === "ok" ? (r.assessment == null ? "" : r.assessment) : "",
         r.status === "ok" ? r.comment : "Не проверено: " + r.error,
-        r.status === "ok" ? r.errors_count : ""]));
+        r.status === "ok" ? r.errors_count : ""]
+        .concat(crit.length ? [r.status === "ok" && r.score != null ? String(r.score).replace(".", ",") : ""]
+          .concat(crit.map((c, k) => r.status === "ok" && r.criteria && r.criteria[k].score != null ? r.criteria[k].score : "")) : [])));
 
     // Работы по ссылкам: отметить проверенные.
     const items = reports.filter(r => r.submission_id).map(r => ({
       id: r.submission_id,
       status: r.status === "ok" ? "checked" : "failed",
       result: r.status === "ok"
-        ? { assessment: r.assessment, assessment_reason: r.assessment_reason, errors: r.errors, comment: r.comment }
+        ? { assessment: r.assessment, assessment_reason: r.assessment_reason, errors: r.errors, comment: r.comment, criteria: r.criteria, score: r.score }
         : { error: r.error }
     }));
     if (items.length && sbReady(env)) {

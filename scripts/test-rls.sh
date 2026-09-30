@@ -121,6 +121,10 @@ echo "→ проверка текстом и админка (тоже дважд
 for f in schema-text-check.sql schema-admin.sql schema-text-check.sql schema-admin.sql; do
   run "$PSQL -d $TDB -f '$ROOT/sql/$f'" >/dev/null
 done
+echo "→ критерии оценивания (дважды)…"
+for f in schema-criteria.sql schema-criteria.sql; do
+  run "$PSQL -d $TDB -f '$ROOT/sql/$f'" >/dev/null
+done
 echo "→ тесты тарифов:"
 echo
 if run "psql -h $SOCKET_DIR -p $PGPORT -U postgres -d $TDB -q -f '$ROOT/sql/tests/tariffs-tests.sql'"; then
@@ -140,5 +144,16 @@ if run "psql -h $SOCKET_DIR -p $PGPORT -U postgres -d $TDB -q -f '$ROOT/sql/test
 else
   echo
   echo "ТЕСТЫ ТЕКСТА И АДМИНКИ НЕ ПРОШЛИ — смотрите таблицу выше." >&2
+  exit 1
+fi
+echo
+echo "→ тесты критериев оценивания:"
+echo
+if run "psql -h $SOCKET_DIR -p $PGPORT -U postgres -d $TDB -q -f '$ROOT/sql/tests/criteria-tests.sql'"; then
+  echo
+  echo "Готово: критерии оценивания пишутся как задумано."
+else
+  echo
+  echo "ТЕСТЫ КРИТЕРИЕВ НЕ ПРОШЛИ — смотрите таблицу выше." >&2
   exit 1
 fi

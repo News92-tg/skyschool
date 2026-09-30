@@ -163,6 +163,44 @@ function ok(name, cond, extra) {
   ok('«Выставить оценку» снята — оценки нет', !(await page.$('#result .grade')));
   await page.click('label:has(#optGrade)');
 
+  /* критерии: прежний Worker их не знает — текст с фото уходит в /grade-essay,
+     итог и оценку страница считает сама по формуле */
+  await page.evaluate(() => SkyCheck.setWait(0));
+  await page.click('label:has(#optCriteria)');
+  ok('критерии: редактор открыт, шаблон «Задачи» — 3 критерия', await visible(page, '#critBox') && (await page.$$('#critBox .crit-row')).length === 3);
+  await page.selectOption('#critBox .crit-preset', 'essay');
+  ok('критерии: шаблон «Сочинение» — 4 критерия', (await page.$$('#critBox .crit-row')).length === 4);
+  await page.fill('#critBox .crit-row:nth-child(1) .crit-name', 'Соответствие теме');
+  await page.fill('#critBox .crit-row:nth-child(1) .crit-weight', '1');
+  await page.fill('#critBox .crit-row:nth-child(2) .crit-name', 'Аргументация с примерами');
+  await page.fill('#critBox .crit-row:nth-child(2) .crit-weight', '0,5');
+  await page.click('#critBox .crit-row:nth-child(4) .crit-del');
+  await page.click('#critBox .crit-row:nth-child(3) .crit-del');
+  ok('критерии: удаление строк', (await page.$$('#critBox .crit-row')).length === 2);
+  const essaysBefore = calls('/grade-essay').length;
+  await page.setInputFiles('#fileIn', IMG);
+  await page.click('#checkBtn');
+  await page.waitForSelector('#result .crit-result', { timeout: 15000 });
+  const ge0 = calls('/grade-essay').pop();
+  ok('критерии: после фото — POST /grade-essay с текстом с фото и нашими критериями',
+    calls('/grade-essay').length === essaysBefore + 1 && /2\+2=5/.test(ge0.body.text) &&
+    JSON.stringify(ge0.body.criteria) === JSON.stringify(['Соответствие теме', 'Аргументация с примерами']), JSON.stringify(ge0.body));
+  /* 5 и 3 с весами 1 и 0,5: (5 + 1,5) / 1,5 = 4,33 → 4,3 → 4 */
+  ok('критерии: итог 4,3/5 и оценка 4 — по формуле', /4,3/.test(await text(page, '#result .crit-big')) && (await text(page, '#result .crit-grade .grade')) === '4',
+    await text(page, '#result .crit-total'));
+  ok('критерии: таблица — вес, балл, комментарий', (await page.$$('#result .crit-table tbody tr')).length === 2 &&
+    /0,5/.test(await page.textContent('#result .crit-table')) && /Мало примеров/.test(await page.textContent('#result .crit-table')));
+  ok('критерии: набор сохранён в браузере', await page.evaluate(() => Sky.get('gradeCriteria').length === 2 && Sky.get('gradeCriteria')[1].weight === 0.5 && Sky.get('hwOpts').criteria === true));
+  await page.evaluate(() => SkyCheck.setWait(0));
+  push('/grade-essay', 429, { error: 'Слишком много запросов подряд. Подождите минуту.' });
+  await page.setInputFiles('#fileIn', IMG);
+  await page.click('#checkBtn');
+  await page.waitForSelector('#againBtn');
+  ok('критерии: сбой /grade-essay — разбор фото есть, про критерии честная строка',
+    /Оценить по критериям не удалось/.test(await text(page, '#result .limit-note')) && (await page.$$('#result .err-item')).length > 0);
+  await page.click('label:has(#optCriteria)');
+  await page.evaluate(() => SkyCheck.setWait(0));
+
   /* режим учителя: у Worker нет этих адресов — запросов нет */
   const before = state.calls.length;
   await page.click('#roleSeg [data-role="teacher"]');
