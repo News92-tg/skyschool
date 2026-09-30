@@ -22,6 +22,7 @@ Sky.db = (function () {
  
   let sb = null;
   let profile = null;
+  let recovery = /type=recovery/.test(location.hash || '');
   let mode = hasCloud ? 'cloud' : 'local';
   let readyResolve;
   const ready = new Promise(r => { readyResolve = r; });
@@ -48,8 +49,14 @@ Sky.db = (function () {
       sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
       const { data } = await sb.auth.getSession();
       if (data && data.session) await loadProfile(data.session.user);
-      sb.auth.onAuthStateChange(async (_e, session) => {
+      sb.auth.onAuthStateChange(async (event, session) => {
         if (session) await loadProfile(session.user); else profile = null;
+        /* Пришли по ссылке «Сбросить пароль» из письма: сессия уже есть,
+           но пароль ещё нужно задать новый (auth.html это покажет). */
+        if (event === 'PASSWORD_RECOVERY') {
+          recovery = true;
+          document.dispatchEvent(new CustomEvent('passwordrecovery'));
+        }
         document.dispatchEvent(new CustomEvent('authchange'));
       });
     } catch (e) {
@@ -180,16 +187,49 @@ Sky.db = (function () {
     return { ok: true };
   }
  
-  async function signInGoogle() {
+  async function signInGoogle(redirectTo) {
     if (mode !== 'cloud' || !sb) return { error: Sky.lang === 'ru' ? 'Сначала подключите Supabase в assets/config.js' : 'Connect Supabase in assets/config.js first' };
     const { data, error } = await sb.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.href }
+      options: { redirectTo: redirectTo || window.location.href }
     });
     if (error) return { error: error.message };
     return { ok: true, url: data?.url || null };
   }
  
+  /* Письмо со ссылкой на новый пароль. Ссылка ведёт на redirectTo —
+     этот адрес должен быть в Supabase → Authentication → URL
+     Configuration → Redirect URLs, иначе Supabase отправит на Site URL. */
+  async function resetPassword(email, redirectTo) {
+    if (mode !== 'cloud' || !sb) return { error: Sky.lang === 'ru' ? 'На этом устройстве вход без пароля — восстанавливать нечего' : 'This device signs in without a password' };
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
+    if (error) return { error: error.message, status: error.status };
+    return { ok: true };
+  }
+
+  async function updatePassword(password) {
+    if (mode !== 'cloud' || !sb) return { error: 'offline' };
+    const { error } = await sb.auth.updateUser({ password });
+    if (error) return { error: error.message, status: error.status };
+    recovery = false;
+    return { ok: true };
+  }
+
+  /* Какие способы входа включены в Supabase (Authentication →
+     Providers). Нужен, чтобы не показывать «Войти через Google»,
+     когда Google не настроен: иначе кнопка ведёт на ошибку. */
+  let providersCache = null;
+  async function authProviders() {
+    if (mode !== 'cloud') return {};
+    if (providersCache) return providersCache;
+    try {
+      const r = await fetch(CFG.SUPABASE_URL.replace(/\/+$/, '') + '/auth/v1/settings', { headers: { apikey: CFG.SUPABASE_ANON_KEY } });
+      const d = await r.json();
+      providersCache = (d && d.external) || {};
+    } catch (e) { providersCache = {}; }
+    return providersCache;
+  }
+
   async function signOut() {
     if (mode === 'cloud' && sb) await sb.auth.signOut();
     profile = null;
@@ -301,6 +341,7 @@ Sky.db = (function () {
     isCloud: () => mode === 'cloud',
     list, insert, update, remove, subscribe,
     signUp, signIn, signInGoogle, signOut, becomeLocal,
+    resetPassword, updatePassword, authProviders, isRecovery: () => recovery,
     me, isTeacher, isStudent, token, rpc, upload, removeFiles, signedUrl,
     allProfiles: () => list('profiles'),
     uid
