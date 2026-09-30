@@ -837,7 +837,8 @@ function init(extra) {
      загрузке, подключает его обычным <script> — тогда второй раз он
      не грузится: к DOMContentLoaded такие скрипты уже выполнены. */
   const AUTOLOAD = [
-    ['assets/errors.js', 'SkyErrors']       /* понятные ошибки: тост с иконкой и «Повторить» */
+    ['assets/errors.js', 'SkyErrors'],      /* понятные ошибки: тост с иконкой и «Повторить» */
+    ['assets/pwa.js', 'SkyPWA']             /* «Доступно обновление» после выкладки сайта */
   ];
   function autoload() {
     AUTOLOAD.forEach(([src, name]) => {

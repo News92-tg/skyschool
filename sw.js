@@ -7,13 +7,13 @@
 */
 'use strict';
  
-const CACHE_VERSION = 'sky-v4';
+const CACHE_VERSION = 'sky-v5';
 const STATIC_CACHE = CACHE_VERSION + '-static';
  
 const PRECACHE_URLS = [
   './',
   'index.html','trainer.html','kids.html','chess.html','teachers.html','homework.html','life.html','plan.html','tools.html','photo.html','offline.html','exam.html','essay.html','parent.html','manifest.json',
-  'assets/config.js','assets/core.js','assets/streaks.js','assets/db.js','assets/auth.js','assets/errors.js',
+  'assets/config.js','assets/core.js','assets/streaks.js','assets/db.js','assets/auth.js','assets/errors.js','assets/pwa.js',
   'assets/chess-engine.js','assets/chess-ai.js','assets/chess-review.js',
   /* бот в фоновом потоке: сам поток и ядро, которое он подгружает */
   'assets/chess-ai-worker.js','assets/chess-ai-core.js','assets/chess-play-ui.js',
@@ -39,12 +39,20 @@ const PRECACHE_URLS = [
   'assets/russian-en.js','assets/russian-en.css','data/bank-russian-en.js','data/iq-test.js','data/oge-bank.js'
 ];
  
+/* Первая установка включается сразу. Обновление ждёт: страница
+   (assets/pwa.js) покажет «Доступно обновление» и по кнопке пришлёт
+   SKIP_WAITING — тогда новая версия включится и страница перезагрузится.
+   Так человек не получает новую версию посреди заполнения формы. */
 self.addEventListener('install',event=>{
   event.waitUntil(
     caches.open(STATIC_CACHE)
       .then(cache=>Promise.all(PRECACHE_URLS.map(url=>cache.add(url).catch(()=>null))))
-      .then(()=>self.skipWaiting())
+      .then(()=>{ if(!self.registration.active) return self.skipWaiting(); })
   );
+});
+
+self.addEventListener('message',event=>{
+  if(event.data&&event.data.type==='SKIP_WAITING') self.skipWaiting();
 });
  
 self.addEventListener('activate',event=>{

@@ -639,6 +639,26 @@ h3{font-size:16px;font-weight:800}
 .lm-more{font:inherit;font-size:12px;font-weight:900;color:var(--accent);background:none;border:0;padding:0;cursor:pointer}
 .lm-more:hover{text-decoration:underline}
 
+/* ---------- «Доступно обновление» (assets/pwa.js) ---------- */
+.pwa-bar{
+  position:fixed;left:18px;bottom:18px;z-index:205;width:min(420px,calc(100vw - 32px));
+  display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px 12px;align-items:center;
+  padding:12px 14px;border-radius:16px;background:var(--ink);color:var(--bg);box-shadow:var(--shadow-lg);
+  opacity:0;transform:translateY(14px);transition:opacity .2s, transform .25s cubic-bezier(.2,.9,.3,1);
+}
+.pwa-bar.in{opacity:1;transform:none}
+.pwa-ico{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:color-mix(in srgb,var(--bg) 16%,transparent)}
+.pwa-txt b{display:block;font-size:14px;font-weight:900}
+.pwa-txt span{display:block;font-size:12.5px;font-weight:600;opacity:.8;line-height:1.4}
+.pwa-acts{grid-column:1 / -1;display:flex;gap:8px;justify-content:flex-end}
+.pwa-acts button{font:inherit;font-size:13px;font-weight:800;padding:8px 14px;border-radius:10px;border:0;cursor:pointer}
+.pwa-go{background:var(--accent);color:var(--accent-ink)}
+.pwa-later{background:transparent;color:inherit;opacity:.8}
+.pwa-later:hover{opacity:1}
+.pwa-go:disabled{opacity:.7;cursor:default}
+@media (max-width:560px){ .pwa-bar{left:16px;right:16px;bottom:14px;width:auto} }
+@media (prefers-reduced-motion:reduce){ .pwa-bar{transition:none} }
+
 /* ---------- ошибки и уведомления с действием (assets/errors.js) ---------- */
 .sx-stack{
   position:fixed;right:18px;bottom:18px;z-index:210;
