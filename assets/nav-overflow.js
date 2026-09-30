@@ -456,7 +456,11 @@
     if (!measured || items.some(i => !i.__navW)) measure(root, items, more);
 
     const available = root.clientWidth;      /* именно clientWidth: без полосы прокрутки */
-    if (!available) return;
+    /* Ноль ширины у видимой строки — тоже ответ: места нет совсем, всё
+       уходит под «Ещё». Раньше здесь был выход, и на 320 px все группы
+       оставались в строке и растягивали страницу до 835 px. Выходим
+       только если шапка ещё не показана. */
+    if (!available && !root.getClientRects().length) return;
 
     const cs = getComputedStyle(root);
     const gap = parseFloat(cs.columnGap || cs.gap || '2') || 2;

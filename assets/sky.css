@@ -658,6 +658,16 @@ h3{font-size:16px;font-weight:800}
 @media (max-width:400px){
   .seg button{padding:5px 8px;font-size:11px}
 }
+/* 320 px: кнопки справа занимали всю шапку, меню доставалось 0 px —
+   кнопка-гамбургер не помещалась, и страница листалась вбок. Ужимаем
+   отступы, чтобы под меню осталось место на одну кнопку (36 px). */
+@media (max-width:380px){
+  .appbar .inner{padding:0 10px;gap:6px}
+  .appbar .tools{gap:4px}
+  .seg button{padding:5px 5px}
+  .appbar .streak-badge{padding:5px 6px 5px 5px;margin-right:0}
+  #btnSignIn{padding-left:10px;padding-right:10px}
+}
 
 /* ---------- итог партии ---------- */
 .gameover{text-align:center;padding:6px 0 2px}

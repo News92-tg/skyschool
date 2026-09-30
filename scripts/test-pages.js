@@ -208,6 +208,40 @@ const SKIP = new Set(['single.html']);   /* это собранная копия
   }
   trErrors.forEach(e => { console.log('        • exception: ' + e); bad++; });
 
+  /* ---------- шапка на узком телефоне ----------
+     На 320 px кнопки справа съедали всю ширину, меню получало 0 px,
+     скрипт «Ещё» на этом сдавался, и все группы меню оставались в
+     строке: страница растягивалась до 835 px. На 360 px кнопка меню
+     залезала на переключатель языка. Кнопка меню должна быть видна,
+     помещаться в экран и не наезжать на кнопки справа. */
+  console.log('');
+  for (const width of [320, 360]) {
+    const narrow = await browser.newContext({ viewport: { width, height: 640 }, isMobile: true, hasTouch: true });
+    await narrow.route(/\.workers\.dev\//, r => r.abort());
+    for (const file of ['index.html', 'collections.html', 'photo.html', 'chess.html']) {
+      const p = await narrow.newPage();
+      await p.goto('file://' + path.join(ROOT, file));
+      await p.waitForTimeout(400);
+      const h = await p.evaluate(() => {
+        const more = document.querySelector('#mainMenu .nav-overflow');
+        const tools = document.querySelector('#appHeader .tools');
+        const r = more && !more.hidden ? more.getBoundingClientRect() : null;
+        return {
+          header: document.getElementById('appHeader').scrollWidth,
+          more: !!r,
+          overlap: r && tools ? Math.round(r.right - tools.getBoundingClientRect().left) : 0,
+        };
+      });
+      const ok = h.header <= width && h.more && h.overlap <= 0;
+      console.log((ok ? 'ok    ' : 'ОШИБКИ') + '  шапка ' + width + ' px  ' + file.padEnd(18) +
+                  ' ширина ' + h.header + ', меню ' + (h.more ? 'видно' : 'НЕТ') +
+                  (h.overlap > 0 ? ', наезжает на кнопки на ' + h.overlap + ' px' : ''));
+      if (!ok) bad++;
+      await p.close();
+    }
+    await narrow.close();
+  }
+
   await browser.close();
   console.log('');
   console.log(bad ? 'ПРОБЛЕМ: ' + bad : 'Все страницы открываются без ошибок.');
