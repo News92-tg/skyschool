@@ -15,6 +15,8 @@ const PRECACHE_URLS = [
   'index.html','trainer.html','kids.html','chess.html','teachers.html','homework.html','life.html','plan.html','tools.html','photo.html','offline.html','exam.html','essay.html','parent.html','manifest.json',
   'assets/config.js','assets/core.js','assets/streaks.js','assets/db.js','assets/auth.js',
   'assets/chess-engine.js','assets/chess-ai.js','assets/chess-review.js',
+  /* бот в фоновом потоке: сам поток и ядро, которое он подгружает */
+  'assets/chess-ai-worker.js','assets/chess-ai-core.js','assets/chess-play-ui.js',
   'assets/chess-teacher-ui.js','assets/chess-teacher-ui-core.js',
   'assets/chess-game-modes.js','assets/chess-puzzle-coach.js','assets/chess-game-flow.js',
   'assets/chess-lessons-system.js','assets/chess-lessons-fallback.js','assets/chess-lessons-polish-v2.js','assets/chess-runtime-hardening.js',
