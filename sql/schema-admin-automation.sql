@@ -34,6 +34,9 @@
 --   admin_set_telegram(user_id, chat_id)        — chat_id пользователю
 -- Для Worker (только service_role):
 --   sky_payment_info(payment_id)                — данные для уведомления
+--   sky_is_admin(user_id)                       — админ ли тот, кто вызвал
+--                                                 /api/notify-payment
+--                                                 (вход проверен в Worker)
 -- =====================================================================
 
 begin;
@@ -534,6 +537,16 @@ language sql stable security definer set search_path = public as $$
   where p.id = p_id;
 $$;
 
+-- Админ ли пользователь — для Worker, который уже проверил его вход
+-- (JWT) в Supabase Auth. У service_role нет доступа к app_admins и
+-- is_admin() (та смотрит на auth.uid() вызвавшего), поэтому отдельная
+-- функция и только для него.
+create or replace function public.sky_is_admin(p_user uuid)
+returns boolean
+language sql stable security definer set search_path = public as $$
+  select p_user is not null and exists (select 1 from public.app_admins a where a.user_id = p_user);
+$$;
+
 -- ---------------------------------------------------------------------
 -- 7. Права
 -- ---------------------------------------------------------------------
@@ -583,17 +596,18 @@ begin
   end loop;
 
   -- для Worker
-  f := 'public.sky_payment_info(uuid)';
-  execute format('revoke all on function %s from public', f);
-  if exists (select 1 from pg_roles where rolname = 'anon') then
-    execute format('revoke all on function %s from anon', f);
-  end if;
-  if exists (select 1 from pg_roles where rolname = 'authenticated') then
-    execute format('revoke all on function %s from authenticated', f);
-  end if;
-  if exists (select 1 from pg_roles where rolname = 'service_role') then
-    execute format('grant execute on function %s to service_role', f);
-  end if;
+  foreach f in array array['public.sky_payment_info(uuid)', 'public.sky_is_admin(uuid)'] loop
+    execute format('revoke all on function %s from public', f);
+    if exists (select 1 from pg_roles where rolname = 'anon') then
+      execute format('revoke all on function %s from anon', f);
+    end if;
+    if exists (select 1 from pg_roles where rolname = 'authenticated') then
+      execute format('revoke all on function %s from authenticated', f);
+    end if;
+    if exists (select 1 from pg_roles where rolname = 'service_role') then
+      execute format('grant execute on function %s to service_role', f);
+    end if;
+  end loop;
 end $$;
 
 commit;

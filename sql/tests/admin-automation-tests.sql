@@ -196,6 +196,13 @@ select t_check('sky_payment_info: почта, тариф, срок, chat_id',
           and r ->> 'expires_at' is not null and (r ->> 'amount')::int = 209
      from sky_payment_info('88888888-0000-0000-0000-000000000001') r));
 select t_check('sky_payment_info: нет такой — null', sky_payment_info('88888888-0000-0000-0000-00000000ffff') is null);
+select t_check('sky_is_admin: админ — да', sky_is_admin('eeeeeeee-0000-0000-0000-00000000000a'));
+select t_check('sky_is_admin: ученик — нет', not sky_is_admin('ffffffff-0000-0000-0000-00000000000f'));
+select t_check('sky_is_admin: null — нет', not sky_is_admin(null));
+reset role;
+set role authenticated;
+select set_config('request.jwt.claim.sub', 'eeeeeeee-0000-0000-0000-00000000000a', false);
+select t_expect_denied('sky_is_admin: из браузера не вызвать (даже админу)', $q$ select sky_is_admin('eeeeeeee-0000-0000-0000-00000000000a') $q$);
 reset role;
 
 -- ---------------------------------------------------------------------

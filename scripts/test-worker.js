@@ -37,7 +37,7 @@ function ok(name, cond, extra) {
 /* ---------- подмена сети ---------- */
 let zaiQueue = [], zaiSent = [], sbCalls = [], windows = new Map(), storage = new Map(), rows = new Map(), payments = [];
 let groqQueue = [], groqSent = [], textLog = [];
-let tgSent = [], tgFail = false, payInfo = {};
+let tgSent = [], tgFail = false, payInfo = {}, zaiLastAuth = null;
 
 function reset() {
   zaiQueue = []; zaiSent = []; sbCalls = []; windows = new Map(); storage = new Map(); rows = new Map(); payments = [];
@@ -84,6 +84,7 @@ globalThis.fetch = async (input, init) => {
   if (url === ZAI) {
     const body = JSON.parse(init.body);
     zaiSent.push(body);
+    zaiLastAuth = (init.headers || {}).Authorization;
     const next = zaiQueue.shift();
     if (!next) throw new Error('Z.AI: нет подготовленного ответа');
     if (next.hang) return new Promise((_, rej) => init.signal.addEventListener('abort', () => rej(Object.assign(new Error('timeout'), { name: 'TimeoutError' }))));
@@ -109,11 +110,7 @@ globalThis.fetch = async (input, init) => {
       const token = (headers.Authorization || '').replace('Bearer ', '');
       return USERS[token] ? J({ id: USERS[token] }) : J({ msg: 'bad jwt' }, 401);
     }
-    /* is_admin — от имени самого пользователя (ключ anon + его JWT) */
-    if (p === '/rest/v1/rpc/is_admin') {
-      if (headers.apikey !== 'anon-key') return J({ message: 'wrong key' }, 401);
-      return J((headers.Authorization || '') === 'Bearer jwt-admin');
-    }
+
     if (headers.apikey !== 'svc-key') return J({ message: 'no apikey' }, 401);
     if (p === '/rest/v1/rpc/sky_plan') {
       const u = JSON.parse(init.body).p_user;
@@ -128,6 +125,7 @@ globalThis.fetch = async (input, init) => {
     }
     if (p === '/rest/v1/rpc/sky_log_text') { textLog.push(JSON.parse(init.body)); return J('log-id'); }
     if (p === '/rest/v1/rpc/sky_submissions_update') return J(JSON.parse(init.body).p_items.length);
+    if (p === '/rest/v1/rpc/sky_is_admin') return J(JSON.parse(init.body).p_user === 'u-admin');
     if (p === '/rest/v1/rpc/sky_payment_info') {
       const id = JSON.parse(init.body).p_id;
       if (payInfo[id]) return J(payInfo[id]);
@@ -566,7 +564,8 @@ async function main() {
   ok('notify: админ — ученику ушло «оплата подтверждена» с тарифом и сроком',
     r.status === 200 && r.body.sent === true && tgSent.length === 1 && tgSent[0].body.chat_id === '4242' &&
     /Оплата подтверждена/.test(tgSent[0].body.text) && /«Премиум» активен до 30\.10\.2026/.test(tgSent[0].body.text), r.text + ' ' + JSON.stringify(tgSent));
-  ok('notify: админ проверен функцией is_admin от его входа', sbCalls.some(c => c.path === '/rest/v1/rpc/is_admin' && c.headers.Authorization === 'Bearer jwt-admin'));
+  ok('notify: вход проверен, админ — функцией sky_is_admin по его id', sbCalls.some(c => c.path === '/auth/v1/user' && c.headers.Authorization === 'Bearer jwt-admin') &&
+    sbCalls.some(c => c.path === '/rest/v1/rpc/sky_is_admin' && JSON.parse(c.body).p_user === 'u-admin'));
   ok('notify: токен бота не утёк в ответ', !/SECRET/.test(r.text));
   tgSent = [];
   r = await notify('aaaaaaaa-1111-2222-3333-444444444444', 'jwt-premium');
@@ -592,6 +591,24 @@ async function main() {
   ok('notify: Telegram отказал — sent:false и причина', r.body.sent === false && r.body.reason === 'telegram' && /chat not found/.test(r.body.description));
   r = await call('/api/notify-payment', { jwt: 'jwt-admin' });
   ok('notify: GET — 405', r.status === 405);
+
+  /* ---------- ключ Z.AI: GLM_API_KEY прежнего Worker ---------- */
+  reset();
+  const GLM_ENV = Object.assign({}, ENV, { ZAI_API_KEY: undefined, GLM_API_KEY: 'glm-key' });
+  zaiQueue.push(zaiOk(full));
+  r = await call('/api/check-photo?img=' + q(IMG) + '&grade=true', { jwt: 'jwt-premium', env: GLM_ENV });
+  ok('без ZAI_API_KEY — ключ GLM_API_KEY прежнего Worker', r.status === 200 && zaiLastAuth === 'Bearer glm-key' && zaiSent[0].model === 'glm-4.6v-flash', r.text.slice(0, 120));
+  zaiQueue.push(zaiOk(full));
+  r = await call('/api/check-photo?img=' + q(IMG) + '&grade=true', { jwt: 'jwt-premium', env: Object.assign({}, ENV, { GLM_API_KEY: 'glm-key' }) });
+  ok('оба ключа — главный ZAI_API_KEY', r.status === 200 && zaiLastAuth === 'Bearer zai');
+  r = await call('/api/check-photo?img=' + q(IMG) + '&grade=true', { jwt: 'jwt-premium', env: Object.assign({}, ENV, { ZAI_API_KEY: undefined }) });
+  ok('ни одного ключа — 401 zai_key, без запроса к модели', r.status === 401 && r.body.code === 'zai_key' && zaiSent.length === 2);
+  zaiQueue.push({ status: 200, body: JSON.stringify({ choices: [{ message: { content: 'ок' } }] }) });
+  r = await call('/api/check-photo?img=' + q(IMG), { env: GLM_ENV });
+  ok('прежний /api/check-photo?img= — тоже с GLM_API_KEY', r.status === 200 && zaiLastAuth === 'Bearer glm-key');
+  r = await call('/api/notify-payment', { method: 'POST', jwt: 'jwt-admin', body: '{"payment_id":"aaaaaaaa-1111-2222-3333-444444444444"}',
+    env: Object.assign({}, ENV, { SUPABASE_ANON_KEY: undefined }) });
+  ok('без SUPABASE_ANON_KEY админ всё равно проверяется', r.status !== 403 && r.status !== 401, r.text);
 
   /* ---------- /api/check-text: сочинение через Groq ---------- */
   reset();

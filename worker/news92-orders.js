@@ -32,10 +32,13 @@
                                        сообщение ученику в Telegram
 
    Секреты (Cloudflare → Worker → Settings → Variables and Secrets):
-     ZAI_API_KEY           — Z.AI, фото (уже задан)
+     ZAI_API_KEY           — Z.AI, фото. Если не задан — берётся GLM_API_KEY
+                             прежнего Worker: та же площадка api.z.ai и
+                             та же модель glm-4.6v-flash
      GROQ_API_KEY          — Groq, проверка текста (уже задан)
      SUPABASE_URL          — https://gtznaybjvqwhbybhxwjq.supabase.co
      SUPABASE_ANON_KEY     — publishable/anon: проверка входа ученика
+                             (не задан — вход проверяется сервисным ключом)
      SUPABASE_SERVICE_KEY  — secret/service_role: лимиты, история,
                              хранилище. Только здесь, никогда во фронте.
      TELEGRAM_BOT_TOKEN    — бот для уведомлений (@BotFather). Без него
@@ -57,6 +60,15 @@
 
 const ZAI_URL = "https://api.z.ai/api/paas/v4/chat/completions";
 const DEFAULT_MODEL = "glm-4.6v-flash";
+
+/* Ключ и адрес Z.AI. ZAI_API_KEY — ключ этого Worker; если его нет —
+   GLM_API_KEY прежнего (worker/worker.js): площадка та же, и тогда
+   уважаем и его GLM_API_URL / GLM_MODEL. Так новый код встаёт на место
+   прежнего без новых секретов. */
+function zaiCfg(env) {
+  if (env.ZAI_API_KEY) return { key: env.ZAI_API_KEY, url: ZAI_URL, model: env.ZAI_MODEL || DEFAULT_MODEL };
+  return { key: env.GLM_API_KEY || "", url: env.GLM_API_URL || ZAI_URL, model: env.ZAI_MODEL || env.GLM_MODEL || DEFAULT_MODEL };
+}
 const DEFAULT_SITE = "https://news92-tg.github.io/skyschool/";
 const BUCKET = "homework";
 const ZAI_TIMEOUT_MS = 120000;
@@ -160,14 +172,15 @@ export default {
       }
 
       try {
-        const response = await fetch("https://api.z.ai/api/paas/v4/chat/completions", {
+        const zc = zaiCfg(env);
+        const response = await fetch(zc.url, {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${env.ZAI_API_KEY}`,
+            "Authorization": `Bearer ${zc.key}`,
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            model: "glm-4.6v-flash",
+            model: zc.model,
             messages: [
               {
                 role: "system",
@@ -535,11 +548,13 @@ async function signPath(env, path, ttl) {
 async function zai(env, state, system, userText, images) {
   const content = [{ type: "text", text: userText }]
     .concat(images.map(u => ({ type: "image_url", image_url: { url: u } })));
-  const send = withFormat => fetch(ZAI_URL, {
+  const zc = zaiCfg(env);
+  if (!zc.key) return { ok: false, status: 401, body: "ZAI_API_KEY / GLM_API_KEY не заданы" };
+  const send = withFormat => fetch(zc.url, {
     method: "POST",
-    headers: { "Authorization": `Bearer ${env.ZAI_API_KEY}`, "Content-Type": "application/json" },
+    headers: { "Authorization": `Bearer ${zc.key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: env.ZAI_MODEL || DEFAULT_MODEL,
+      model: zc.model,
       temperature: 0.2,
       ...(withFormat ? { response_format: { type: "json_object" } } : {}),
       messages: [{ role: "system", content: system }, { role: "user", content }]
@@ -1686,17 +1701,12 @@ async function notifyAdminNewPayment(env, paymentId, amount, purpose) {
 
 /* Страница админки после «Подтвердить» (admin_confirm_payment уже
    выполнена в базе) просит отправить ученику сообщение. Вызвать может
-   только админ: проверяем функцией is_admin от его же входа. */
-async function isAdminCaller(request, env) {
-  const m = (request.headers.get("Authorization") || "").match(/^Bearer\s+(\S+)$/i);
-  if (!m || !env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return false;
-  const r = await fetch(sbBase(env) + "/rest/v1/rpc/is_admin", {
-    method: "POST",
-    headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${m[1]}`, "Content-Type": "application/json" },
-    body: "{}"
-  });
-  if (!r.ok) return false;
-  return (await r.json().catch(() => false)) === true;
+   только админ: вход (JWT) проверен в identify(), а админ ли это —
+   функция sky_is_admin (только для сервисного ключа). */
+async function isAdminCaller(env, userId) {
+  if (!userId) return false;
+  try { return (await sbRpc(env, "sky_is_admin", { p_user: userId })) === true; }
+  catch (e) { console.warn("[admin check]", e.message); return false; }
 }
 
 async function handleNotifyPayment(request, env) {
@@ -1705,7 +1715,7 @@ async function handleNotifyPayment(request, env) {
   const who = await identify(request, env);
   if (who.denied) return sessionExpired();
   if (!who.userId) return json({ error: "Войдите", code: "login" }, 401);
-  if (!(await isAdminCaller(request, env))) return json({ error: "Только для администратора", code: "forbidden" }, 403);
+  if (!(await isAdminCaller(env, who.userId))) return json({ error: "Только для администратора", code: "forbidden" }, 403);
 
   let body;
   try { body = await readJsonBody(request); } catch (e) { return json({ error: e.message, code: "bad_param" }, 400); }
