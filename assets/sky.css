@@ -582,6 +582,56 @@ h3{font-size:16px;font-weight:800}
 }
 .toast.show{transform:translate(-50%,0)}
 
+/* ---------- ошибки и уведомления с действием (assets/errors.js) ---------- */
+.sx-stack{
+  position:fixed;right:18px;bottom:18px;z-index:210;
+  display:flex;flex-direction:column;gap:10px;align-items:flex-end;
+  width:min(400px,calc(100vw - 32px));pointer-events:none;
+}
+.sx{
+  --tone:var(--no);--tone-soft:var(--no-soft);
+  pointer-events:auto;width:100%;
+  display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 12px;align-items:start;
+  padding:13px 12px 13px 14px;border-radius:16px;
+  background:var(--panel);border:1px solid var(--line);
+  border-left:4px solid var(--tone);
+  box-shadow:var(--shadow-lg);
+  opacity:0;transform:translateY(12px) scale(.98);
+  transition:opacity .2s, transform .25s cubic-bezier(.2,.9,.3,1);
+}
+.sx.in{opacity:1;transform:none}
+.sx-warn{--tone:var(--warn);--tone-soft:var(--warn-soft)}
+.sx-accent{--tone:var(--accent);--tone-soft:var(--m-learn-soft)}
+.sx-muted{--tone:var(--muted);--tone-soft:var(--panel-2)}
+.sx-ok{--tone:var(--ok);--tone-soft:var(--ok-soft)}
+.sx-ico{
+  grid-row:span 2;width:36px;height:36px;border-radius:11px;
+  display:grid;place-items:center;background:var(--tone-soft);color:var(--tone);
+}
+.sx-body{display:flex;flex-direction:column;gap:2px;min-width:0;padding-top:1px}
+.sx-title{font-size:14px;font-weight:900;color:var(--ink);line-height:1.3}
+.sx-text{font-size:12.5px;font-weight:600;color:var(--muted);line-height:1.45}
+.sx-acts{grid-column:2 / 4;display:flex;gap:8px;flex-wrap:wrap}
+.sx-acts:empty{display:none}
+.sx-btn{
+  display:inline-flex;align-items:center;text-decoration:none;
+  font:inherit;font-size:12.5px;font-weight:800;cursor:pointer;
+  padding:7px 13px;border-radius:10px;border:1px solid var(--line);
+  background:var(--panel-2);color:var(--ink);transition:.15s;
+}
+.sx-btn.primary{background:var(--tone);border-color:var(--tone);color:#fff}
+.sx-btn:disabled{opacity:.45;cursor:default}
+.sx-btn:not(:disabled):hover{filter:brightness(1.06)}
+.sx-x{
+  grid-column:3;grid-row:1;width:26px;height:26px;border:0;border-radius:8px;
+  background:none;color:var(--faint);font-size:19px;line-height:1;cursor:pointer;
+}
+.sx-x:hover{background:var(--panel-2);color:var(--ink)}
+@media (max-width:560px){
+  .sx-stack{left:16px;right:16px;bottom:14px;width:auto;align-items:stretch}
+}
+@media (prefers-reduced-motion:reduce){ .sx{transition:none} }
+
 /* ---------- модальное окно ---------- */
 .modal-bg{
   position:fixed;inset:0;z-index:150;

@@ -824,6 +824,26 @@ function init(extra) {
   document.addEventListener('langchange', () => { applyI18n(); renderFooter(); });
 }
 
+  /* ---------- общие модули для каждой страницы ----------
+     Подключаются сами, чтобы не прописывать <script> в каждом из
+     трёх десятков файлов. Страница, которой модуль нужен сразу при
+     загрузке, подключает его обычным <script> — тогда второй раз он
+     не грузится: к DOMContentLoaded такие скрипты уже выполнены. */
+  const AUTOLOAD = [
+    ['assets/errors.js', 'SkyErrors']       /* понятные ошибки: тост с иконкой и «Повторить» */
+  ];
+  function autoload() {
+    AUTOLOAD.forEach(([src, name]) => {
+      if (window[name] || document.querySelector('script[src="' + src + '"]')) return;
+      const s = document.createElement('script');
+      s.src = src;
+      s.async = false;
+      document.head.appendChild(s);
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', autoload);
+  else autoload();
+
   return {
     cfg: CFG, get, set, del, storageOk,
     get lang() { return lang; }, set lang(v) { lang = v; },

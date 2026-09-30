@@ -13,7 +13,7 @@ const STATIC_CACHE = CACHE_VERSION + '-static';
 const PRECACHE_URLS = [
   './',
   'index.html','trainer.html','kids.html','chess.html','teachers.html','homework.html','life.html','plan.html','tools.html','photo.html','offline.html','exam.html','essay.html','parent.html','manifest.json',
-  'assets/config.js','assets/core.js','assets/streaks.js','assets/db.js','assets/auth.js',
+  'assets/config.js','assets/core.js','assets/streaks.js','assets/db.js','assets/auth.js','assets/errors.js',
   'assets/chess-engine.js','assets/chess-ai.js','assets/chess-review.js',
   /* бот в фоновом потоке: сам поток и ядро, которое он подгружает */
   'assets/chess-ai-worker.js','assets/chess-ai-core.js','assets/chess-play-ui.js',

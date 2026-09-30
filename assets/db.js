@@ -65,6 +65,13 @@ Sky.db = (function () {
     profile = data || { id: user.id, email: user.email, name: (user.user_metadata && user.user_metadata.full_name) || user.email.split('@')[0], role: 'student' };
   }
  
+  /* Ошибка записи — через assets/errors.js, если он уже есть: «Нет
+     доступа», «Войдите в аккаунт» вместо сырого текста Postgres. */
+  function showError(error) {
+    if (window.SkyErrors) SkyErrors.show(error);
+    else Sky.toast(error.message);
+  }
+
   function localTable(name) { return Sky.get('tbl_' + name, []); }
   function saveTable(name, rows) {
     Sky.set('tbl_' + name, rows);
@@ -91,7 +98,7 @@ Sky.db = (function () {
     const rec = Object.assign({ id: uid(), created_at: new Date().toISOString() }, row);
     if (mode === 'cloud' && sb) {
       const { data, error } = await sb.from(table).insert(rec).select().maybeSingle();
-      if (error) { Sky.toast(error.message); return null; }
+      if (error) { showError(error); return null; }
       return data;
     }
     const rows = localTable(table);
@@ -103,7 +110,7 @@ Sky.db = (function () {
   async function update(table, id, patch) {
     if (mode === 'cloud' && sb) {
       const { data, error } = await sb.from(table).update(patch).eq('id', id).select().maybeSingle();
-      if (error) { Sky.toast(error.message); return null; }
+      if (error) { showError(error); return null; }
       return data;
     }
     const rows = localTable(table);
@@ -117,7 +124,7 @@ Sky.db = (function () {
   async function remove(table, id) {
     if (mode === 'cloud' && sb) {
       const { error } = await sb.from(table).delete().eq('id', id);
-      if (error) { Sky.toast(error.message); return false; }
+      if (error) { showError(error); return false; }
       return true;
     }
     saveTable(table, localTable(table).filter(r => r.id !== id));
