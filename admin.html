@@ -89,7 +89,8 @@
   .atable .acts{display:flex;gap:6px;flex-wrap:wrap}
   .atable .btn{white-space:nowrap}
   .atable .cmt{max-width:340px;color:var(--ink-2)}
-  .atable.users{min-width:880px}
+  .atable.users{min-width:1040px}
+  .atable.users .acts{flex-wrap:nowrap}
   .atable.pays{min-width:640px}
   .atable.checks{min-width:900px}
   .empty{padding:18px 4px;color:var(--muted);font-weight:700;font-size:13.5px}
@@ -114,6 +115,35 @@
   .adm-modal h2{margin:0}
   .adm-modal p{margin:0;color:var(--muted);font-size:13px;word-break:break-all}
   .adm-modal .acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:4px}
+
+  /* фильтры, выбор строк, массовые действия */
+  .toolbar select,.toolbar input[type=date]{padding:9px 10px;border:1px solid var(--line);border-radius:12px;background:var(--panel-2);
+    color:var(--ink);font:inherit;font-size:13px}
+  .toolbar .range{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:800;color:var(--muted);flex-wrap:wrap}
+  .toolbar .grow{margin-left:auto}
+  .atable .ck{width:34px}
+  .atable input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent);margin:0;cursor:pointer}
+  .atable tr.sel td{background:color-mix(in srgb, var(--accent) 7%, transparent)}
+  .atable .link{background:none;border:0;padding:0;font:inherit;font-weight:800;color:var(--accent);cursor:pointer;text-align:left}
+  .bulk{position:sticky;top:64px;z-index:5;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding:10px 12px;
+    border:1px solid var(--accent);border-radius:12px;background:var(--panel)}
+  .bulk b{font-size:13.5px}
+  .atable.subs{min-width:720px}
+  .atable.audit{min-width:760px}
+  .seg .n{margin-left:5px;font-size:11px;opacity:.75}
+  /* карточка пользователя */
+  .modal:has(.ucard){max-width:720px}
+  .ucard{display:grid;gap:14px;width:100%}
+  .ucard h2{margin:0;word-break:break-all}
+  .ucard .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+  .ucard .fact{padding:9px 11px;border:1px solid var(--line);border-radius:12px;background:var(--panel-2)}
+  .ucard .fact span{display:block;font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .ucard .fact b{display:block;margin-top:3px;font-size:14px}
+  .ucard .row-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .ucard .row-acts input{width:78px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);color:var(--ink);font:inherit;font-size:13px}
+  .ucard .tg{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .ucard .tg input{flex:1 1 180px;min-width:0;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);color:var(--ink);font:inherit;font-size:13px}
+  .ucard h3{margin:4px 0 0;font-size:14px}
 </style>
 </head>
 <body>
@@ -168,6 +198,8 @@
       <button type="button" role="tab" data-tab="overview" aria-pressed="true"><span data-i18n="tOverview"></span></button>
       <button type="button" role="tab" data-tab="users" aria-pressed="false"><span data-i18n="tUsers"></span></button>
       <button type="button" role="tab" data-tab="payments" aria-pressed="false"><span data-i18n="tPayments"></span><span class="cnt hidden" id="payCnt"></span></button>
+      <button type="button" role="tab" data-tab="subs" aria-pressed="false"><span data-i18n="tSubs"></span></button>
+      <button type="button" role="tab" data-tab="audit" aria-pressed="false"><span data-i18n="tAudit"></span></button>
       <button type="button" role="tab" data-tab="checks" aria-pressed="false"><span data-i18n="tChecks"></span></button>
       <button type="button" role="tab" data-tab="plans" aria-pressed="false"><span data-i18n="tPlans"></span></button>
     </div>
@@ -186,6 +218,14 @@
       <div class="panel">
         <div class="toolbar">
           <input type="search" id="userSearch" data-i18n-ph="uSearch" autocomplete="off">
+          <select id="userPlan" aria-label="plan"></select>
+          <label class="range"><span data-i18n="uJoined"></span>
+            <input type="date" id="userSince" aria-label="from"> — <input type="date" id="userUntil" aria-label="to"></label>
+        </div>
+        <div class="bulk hidden" id="userBulk">
+          <b id="bulkCount"></b>
+          <button type="button" class="btn small" id="bulkGrant" data-i18n="bulkGrant"></button>
+          <button type="button" class="btn ghost small" id="bulkClear" data-i18n="bulkClear"></button>
         </div>
         <div class="table-wrap" id="usersBox"></div>
       </div>
@@ -203,11 +243,38 @@
           </div>
           <label class="days"><span data-i18n="pDays"></span><input type="number" id="payDays" min="1" max="3660" value="30" inputmode="numeric"></label>
         </div>
+        <div class="toolbar">
+          <input type="search" id="paySearch" data-i18n-ph="pSearch" autocomplete="off">
+          <label class="range"><span data-i18n="pPeriod"></span>
+            <input type="date" id="paySince" aria-label="from"> — <input type="date" id="payUntil" aria-label="to"></label>
+          <button type="button" class="btn ghost small grow" id="payCsv" data-i18n="pCsv"></button>
+        </div>
         <p class="note" data-i18n="pNote"></p>
         <div class="table-wrap" id="paysBox"></div>
       </div>
     </section>
 
+    <!-- Подписки -->
+    <section class="adm-tab hidden" id="tab-subs">
+      <div class="panel">
+        <div class="toolbar">
+          <div class="seg" id="subState" role="group">
+            <button type="button" data-state="current" aria-pressed="true"><span data-i18n="sCurrent"></span><span class="n" data-n="current"></span></button>
+            <button type="button" data-state="expiring" aria-pressed="false"><span data-i18n="sExpiring"></span><span class="n" data-n="expiring"></span></button>
+            <button type="button" data-state="expired" aria-pressed="false"><span data-i18n="sExpired"></span><span class="n" data-n="expired"></span></button>
+            <button type="button" data-state="" aria-pressed="false"><span data-i18n="pAll"></span><span class="n" data-n="all"></span></button>
+          </div>
+        </div>
+        <div class="table-wrap" id="subsBox"></div>
+      </div>
+    </section>
+    <!-- Журнал действий -->
+    <section class="adm-tab hidden" id="tab-audit">
+      <div class="panel">
+        <p class="note" data-i18n="auNote"></p>
+        <div class="table-wrap" id="auditBox"></div>
+      </div>
+    </section>
     <!-- Проверки -->
     <section class="adm-tab hidden" id="tab-checks">
       <div class="panel">

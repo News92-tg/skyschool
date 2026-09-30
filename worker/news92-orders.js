@@ -26,7 +26,10 @@
      POST /api/check-teacher-report  — класс: по фото на ученика, CSV
      POST /api/submit-homework       — ученик отправляет работу по ссылке
      GET  /api/homework/:id          — работа по ссылке
-     POST /api/payments              — заявка на оплату (заглушка)
+     POST /api/payments              — заявка на оплату (заглушка); админу
+                                       уходит сообщение в Telegram
+     POST /api/notify-payment        — только админ: оплата подтверждена →
+                                       сообщение ученику в Telegram
 
    Секреты (Cloudflare → Worker → Settings → Variables and Secrets):
      ZAI_API_KEY           — Z.AI, фото (уже задан)
@@ -35,6 +38,9 @@
      SUPABASE_ANON_KEY     — publishable/anon: проверка входа ученика
      SUPABASE_SERVICE_KEY  — secret/service_role: лимиты, история,
                              хранилище. Только здесь, никогда во фронте.
+     TELEGRAM_BOT_TOKEN    — бот для уведомлений (@BotFather). Без него
+                             уведомлений просто нет, всё остальное работает
+     ADMIN_CHAT_ID         — куда слать «новая заявка на оплату» (ваш chat_id)
    Необязательные переменные:
      ZAI_MODEL             — по умолчанию glm-4.6v-flash
      SITE_URL              — по умолчанию https://news92-tg.github.io/skyschool/
@@ -197,7 +203,8 @@ export default {
       if (url.pathname === "/fast-check" || url.pathname === "/api/fast-check") return await handleCheckTest(request, env, ctx, true);
       if (url.pathname === "/api/check-teacher-report") return await handleTeacherReport(request, env, ctx);
       if (url.pathname === "/api/submit-homework") return await handleSubmit(request, env, url);
-      if (url.pathname === "/api/payments") return await handlePayment(request, env);
+      if (url.pathname === "/api/payments") return await handlePayment(request, env, ctx);
+      if (url.pathname === "/api/notify-payment") return await handleNotifyPayment(request, env);
       const hw = url.pathname.match(/^\/api\/homework\/([^/]+)$/);
       if (hw && request.method === "GET") return await handleHomeworkGet(env, decodeURIComponent(hw[1]));
     } catch (e) {
@@ -1591,7 +1598,7 @@ const PURPOSES = {
   plagiarism:     { plan: null, amount: 40 }
 };
 
-async function handlePayment(request, env) {
+async function handlePayment(request, env, ctx) {
   if (request.method !== "POST") return json({ error: "use POST", code: "method" }, 405);
   if (!sbReady(env)) return json({ error: "Оплата не настроена", code: "storage" }, 503);
   const who = await identify(request, env);
@@ -1621,7 +1628,99 @@ async function handlePayment(request, env) {
   });
   const rows = await r.json();
   const row = Array.isArray(rows) ? rows[0] : rows;
+  // Админу — сообщение в Telegram. Не вышло — заявка всё равно создана.
+  const note = notifyAdminNewPayment(env, row && row.id, amount, body.purpose).catch(e => console.warn("[telegram]", e && e.message));
+  if (ctx && ctx.waitUntil) ctx.waitUntil(note); else await note;
   return json({ id: row && row.id, status: "pending", amount, purpose: body.purpose, message: "Оплата скоро" }, 201);
+}
+
+
+/* ============================================================
+   Telegram: уведомления об оплате
+   ------------------------------------------------------------
+   Секреты — только здесь, в Worker: TELEGRAM_BOT_TOKEN (бот) и
+   ADMIN_CHAT_ID (куда слать о новых заявках). chat_id ученика —
+   таблица user_telegram (sql/schema-admin-automation.sql), данные
+   заявки — функция sky_payment_info (только service_role).
+   Токен бота в ответы и логи не попадает.
+   ============================================================ */
+
+const TG_TIMEOUT_MS = 8000;
+const PURPOSE_TITLES = { paid_tariff: "тариф «Платный»", premium_tariff: "тариф «Премиум»", plagiarism: "проверка на списывание" };
+
+async function tgSend(env, chatId, text) {
+  if (!env.TELEGRAM_BOT_TOKEN) return { ok: false, reason: "no_bot" };
+  if (!chatId) return { ok: false, reason: "no_chat" };
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: String(chatId), text, disable_web_page_preview: true }),
+      signal: AbortSignal.timeout(TG_TIMEOUT_MS)
+    });
+    const d = await r.json().catch(() => null);
+    if (!r.ok || !d || !d.ok) return { ok: false, reason: "telegram", description: str(d && d.description).slice(0, 200) };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, reason: "telegram", description: str(e && e.message).slice(0, 200) };
+  }
+}
+
+const ruDate = v => {
+  const d = new Date(v);
+  return isNaN(d) ? "" : d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Europe/Moscow" });
+};
+
+async function notifyAdminNewPayment(env, paymentId, amount, purpose) {
+  if (!env.TELEGRAM_BOT_TOKEN || !env.ADMIN_CHAT_ID) return;
+  let info = null;
+  if (paymentId) { try { info = await sbRpc(env, "sky_payment_info", { p_id: paymentId }); } catch (e) { info = null; } }
+  const site = String(env.SITE_URL || DEFAULT_SITE).replace(/\/?$/, "/");
+  await tgSend(env, env.ADMIN_CHAT_ID, [
+    "💳 Новая заявка на оплату",
+    (info && info.email) || "без почты",
+    `${PURPOSE_TITLES[purpose] || purpose} — ${amount} ₽`,
+    `Подтвердить: ${site}admin.html`
+  ].join("\n"));
+}
+
+/* Страница админки после «Подтвердить» (admin_confirm_payment уже
+   выполнена в базе) просит отправить ученику сообщение. Вызвать может
+   только админ: проверяем функцией is_admin от его же входа. */
+async function isAdminCaller(request, env) {
+  const m = (request.headers.get("Authorization") || "").match(/^Bearer\s+(\S+)$/i);
+  if (!m || !env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return false;
+  const r = await fetch(sbBase(env) + "/rest/v1/rpc/is_admin", {
+    method: "POST",
+    headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${m[1]}`, "Content-Type": "application/json" },
+    body: "{}"
+  });
+  if (!r.ok) return false;
+  return (await r.json().catch(() => false)) === true;
+}
+
+async function handleNotifyPayment(request, env) {
+  if (request.method !== "POST") return json({ error: "use POST", code: "method" }, 405);
+  if (!sbReady(env)) return json({ error: "Хранилище не настроено", code: "storage" }, 503);
+  const who = await identify(request, env);
+  if (who.denied) return sessionExpired();
+  if (!who.userId) return json({ error: "Войдите", code: "login" }, 401);
+  if (!(await isAdminCaller(request, env))) return json({ error: "Только для администратора", code: "forbidden" }, 403);
+
+  let body;
+  try { body = await readJsonBody(request); } catch (e) { return json({ error: e.message, code: "bad_param" }, 400); }
+  if (!isUuid(body && body.payment_id)) return json({ error: "payment_id must be a uuid", code: "bad_param" }, 400);
+
+  const info = await sbRpc(env, "sky_payment_info", { p_id: body.payment_id });
+  if (!info) return json({ error: "Заявка не найдена", code: "not_found" }, 404);
+  if (info.status !== "paid") return json({ error: "Заявка ещё не подтверждена", code: "not_paid" }, 409);
+
+  const site = String(env.SITE_URL || DEFAULT_SITE).replace(/\/?$/, "/");
+  const what = info.purpose === "plagiarism"
+    ? "Проверка на списывание включена."
+    : `Тариф «${info.plan_title || info.plan}» активен${info.expires_at ? " до " + ruDate(info.expires_at) : ""}.`;
+  const res = await tgSend(env, info.chat_id, ["✅ Оплата подтверждена", what, `SkyySchool: ${site}photo.html`].join("\n"));
+  return json({ sent: res.ok, reason: res.ok ? undefined : res.reason, description: res.description });
 }
 
 

@@ -19,7 +19,8 @@ const SRC = path.join(__dirname, '..', 'worker', 'news92-orders.js');
 const SB = 'https://sb.test';
 const ZAI = 'https://api.z.ai/api/paas/v4/chat/completions';
 const GROQ = 'https://api.groq.com/openai/v1/chat/completions';
-const USERS = { 'jwt-premium': 'u-premium', 'jwt-paid': 'u-paid', 'jwt-free': 'u-free' };
+const USERS = { 'jwt-premium': 'u-premium', 'jwt-paid': 'u-paid', 'jwt-free': 'u-free', 'jwt-admin': 'u-admin' };
+const TG = 'https://api.telegram.org/bot';
 const PLANS = {
   free:    { plan: 'free', title: 'Free', price_rub: 0, requests_per_window: 1, window_seconds: 600, photos_per_request: 5, compare: false, teacher: false, plagiarism: false, expires_at: null },
   paid:    { plan: 'paid', title: 'Платный', price_rub: 59, requests_per_window: 1, window_seconds: 60, photos_per_request: 10, compare: true, teacher: false, plagiarism: false, expires_at: null },
@@ -36,10 +37,12 @@ function ok(name, cond, extra) {
 /* ---------- подмена сети ---------- */
 let zaiQueue = [], zaiSent = [], sbCalls = [], windows = new Map(), storage = new Map(), rows = new Map(), payments = [];
 let groqQueue = [], groqSent = [], textLog = [];
+let tgSent = [], tgFail = false, payInfo = {};
 
 function reset() {
   zaiQueue = []; zaiSent = []; sbCalls = []; windows = new Map(); storage = new Map(); rows = new Map(); payments = [];
   groqQueue = []; groqSent = []; textLog = [];
+  tgSent = []; tgFail = false; payInfo = {};
 }
 const zaiOk = (content, usage) => ({ status: 200, body: JSON.stringify({
   choices: [{ message: { content: typeof content === 'string' ? content : JSON.stringify(content) }, finish_reason: 'stop' }],
@@ -94,6 +97,10 @@ globalThis.fetch = async (input, init) => {
     if (!next) throw new Error('Groq: нет подготовленного ответа');
     return new Response(next.body, { status: next.status, headers: next.headers || {} });
   }
+  if (url.startsWith(TG)) {
+    tgSent.push({ url, body: JSON.parse(init.body) });
+    return tgFail ? J({ ok: false, description: 'Bad Request: chat not found' }, 400) : J({ ok: true, result: { message_id: 1 } });
+  }
   if (url.startsWith(SB)) {
     const p = url.slice(SB.length);
     const headers = init.headers || {};
@@ -101,6 +108,11 @@ globalThis.fetch = async (input, init) => {
     if (p === '/auth/v1/user') {
       const token = (headers.Authorization || '').replace('Bearer ', '');
       return USERS[token] ? J({ id: USERS[token] }) : J({ msg: 'bad jwt' }, 401);
+    }
+    /* is_admin — от имени самого пользователя (ключ anon + его JWT) */
+    if (p === '/rest/v1/rpc/is_admin') {
+      if (headers.apikey !== 'anon-key') return J({ message: 'wrong key' }, 401);
+      return J((headers.Authorization || '') === 'Bearer jwt-admin');
     }
     if (headers.apikey !== 'svc-key') return J({ message: 'no apikey' }, 401);
     if (p === '/rest/v1/rpc/sky_plan') {
@@ -116,6 +128,12 @@ globalThis.fetch = async (input, init) => {
     }
     if (p === '/rest/v1/rpc/sky_log_text') { textLog.push(JSON.parse(init.body)); return J('log-id'); }
     if (p === '/rest/v1/rpc/sky_submissions_update') return J(JSON.parse(init.body).p_items.length);
+    if (p === '/rest/v1/rpc/sky_payment_info') {
+      const id = JSON.parse(init.body).p_id;
+      if (payInfo[id]) return J(payInfo[id]);
+      const pay = payments.find(x => x.id === id);
+      return J(pay ? { id, status: pay.status, amount: pay.amount, plan: pay.plan, purpose: pay.purpose, email: 'free@test', chat_id: null } : null);
+    }
     if (p.startsWith('/storage/v1/object/sign/homework/')) {
       return J({ signedURL: '/object/sign/homework/' + p.slice('/storage/v1/object/sign/homework/'.length) + '?token=t' });
     }
@@ -519,6 +537,61 @@ async function main() {
   ok('заявка на проверку списывания +40 ₽', r.status === 201 && payments[1].amount === 40 && payments[1].plan === null);
   r = await call('/api/payments', { method: 'POST', body: '{"purpose":"gift"}', jwt: 'jwt-free' });
   ok('неизвестная покупка — 400', r.status === 400);
+
+  /* ---------- Telegram: новая заявка → админу ---------- */
+  reset();
+  const TG_ENV = Object.assign({}, ENV, { TELEGRAM_BOT_TOKEN: '123:SECRET', ADMIN_CHAT_ID: '999' });
+  r = await call('/api/payments', { method: 'POST', body: '{"purpose":"premium_tariff"}', jwt: 'jwt-free', env: TG_ENV });
+  ok('заявка → админу в Telegram: почта, что и сколько, ссылка на админку',
+    r.status === 201 && tgSent.length === 1 && tgSent[0].body.chat_id === '999' && tgSent[0].url === TG + '123:SECRET/sendMessage' &&
+    /Новая заявка/.test(tgSent[0].body.text) && /free@test/.test(tgSent[0].body.text) && /Премиум» — 209 ₽/.test(tgSent[0].body.text) && /admin\.html/.test(tgSent[0].body.text),
+    JSON.stringify(tgSent[0] && tgSent[0].body));
+  tgFail = true;
+  r = await call('/api/payments', { method: 'POST', body: '{"purpose":"plagiarism"}', jwt: 'jwt-free', env: TG_ENV });
+  ok('Telegram не ответил — заявка всё равно создана', r.status === 201 && payments.length === 2);
+  tgSent = []; tgFail = false;
+  r = await call('/api/payments', { method: 'POST', body: '{"purpose":"plagiarism"}', jwt: 'jwt-free' });
+  ok('без TELEGRAM_BOT_TOKEN — без уведомлений, заявка есть', r.status === 201 && tgSent.length === 0);
+
+  /* ---------- /api/notify-payment: оплата подтверждена → ученику ---------- */
+  reset();
+  payInfo = {
+    'aaaaaaaa-1111-2222-3333-444444444444': { status: 'paid', plan: 'premium', plan_title: 'Премиум', purpose: 'premium_tariff', amount: 209, expires_at: '2026-10-30T12:00:00Z', chat_id: '4242', email: 'u@test' },
+    'aaaaaaaa-1111-2222-3333-555555555555': { status: 'pending', plan: 'paid', purpose: 'paid_tariff', amount: 59, chat_id: '4242' },
+    'aaaaaaaa-1111-2222-3333-666666666666': { status: 'paid', plan: 'paid', plan_title: 'Платный', purpose: 'paid_tariff', amount: 59, expires_at: '2026-10-30T12:00:00Z', chat_id: null },
+    'aaaaaaaa-1111-2222-3333-777777777777': { status: 'paid', plan: null, purpose: 'plagiarism', amount: 40, chat_id: '4242' }
+  };
+  const notify = (id, jwt, env) => call('/api/notify-payment', { method: 'POST', jwt, env: env || TG_ENV, body: JSON.stringify({ payment_id: id }) });
+  r = await notify('aaaaaaaa-1111-2222-3333-444444444444', 'jwt-admin');
+  ok('notify: админ — ученику ушло «оплата подтверждена» с тарифом и сроком',
+    r.status === 200 && r.body.sent === true && tgSent.length === 1 && tgSent[0].body.chat_id === '4242' &&
+    /Оплата подтверждена/.test(tgSent[0].body.text) && /«Премиум» активен до 30\.10\.2026/.test(tgSent[0].body.text), r.text + ' ' + JSON.stringify(tgSent));
+  ok('notify: админ проверен функцией is_admin от его входа', sbCalls.some(c => c.path === '/rest/v1/rpc/is_admin' && c.headers.Authorization === 'Bearer jwt-admin'));
+  ok('notify: токен бота не утёк в ответ', !/SECRET/.test(r.text));
+  tgSent = [];
+  r = await notify('aaaaaaaa-1111-2222-3333-444444444444', 'jwt-premium');
+  ok('notify: не админ — 403, без сообщения', r.status === 403 && r.body.code === 'forbidden' && tgSent.length === 0);
+  r = await notify('aaaaaaaa-1111-2222-3333-444444444444');
+  ok('notify: без входа — 401', r.status === 401);
+  r = await notify('aaaaaaaa-1111-2222-3333-444444444444', 'expired');
+  ok('notify: истёкший вход — 401 session', r.status === 401 && r.body.code === 'session');
+  r = await notify('не-uuid', 'jwt-admin');
+  ok('notify: плохой payment_id — 400', r.status === 400);
+  r = await notify('aaaaaaaa-1111-2222-3333-555555555555', 'jwt-admin');
+  ok('notify: неподтверждённая заявка — 409, без сообщения', r.status === 409 && r.body.code === 'not_paid' && tgSent.length === 0);
+  r = await notify('aaaaaaaa-1111-2222-3333-999999999999', 'jwt-admin');
+  ok('notify: нет заявки — 404', r.status === 404);
+  r = await notify('aaaaaaaa-1111-2222-3333-666666666666', 'jwt-admin');
+  ok('notify: у ученика нет chat_id — sent:false, no_chat', r.status === 200 && r.body.sent === false && r.body.reason === 'no_chat' && tgSent.length === 0);
+  r = await notify('aaaaaaaa-1111-2222-3333-777777777777', 'jwt-admin');
+  ok('notify: покупка списывания — своё сообщение', r.body.sent === true && /Проверка на списывание включена/.test(tgSent[0].body.text));
+  r = await notify('aaaaaaaa-1111-2222-3333-444444444444', 'jwt-admin', ENV);
+  ok('notify: без бота — sent:false, no_bot', r.status === 200 && r.body.sent === false && r.body.reason === 'no_bot');
+  tgFail = true;
+  r = await notify('aaaaaaaa-1111-2222-3333-444444444444', 'jwt-admin');
+  ok('notify: Telegram отказал — sent:false и причина', r.body.sent === false && r.body.reason === 'telegram' && /chat not found/.test(r.body.description));
+  r = await call('/api/notify-payment', { jwt: 'jwt-admin' });
+  ok('notify: GET — 405', r.status === 405);
 
   /* ---------- /api/check-text: сочинение через Groq ---------- */
   reset();

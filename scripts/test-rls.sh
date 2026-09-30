@@ -121,6 +121,10 @@ echo "→ проверка текстом и админка (тоже дважд
 for f in schema-text-check.sql schema-admin.sql schema-text-check.sql schema-admin.sql; do
   run "$PSQL -d $TDB -f '$ROOT/sql/$f'" >/dev/null
 done
+echo "→ админка: журнал, подписки, Telegram (дважды; прежние тесты админки идут уже поверх неё)…"
+for f in schema-admin-automation.sql schema-admin-automation.sql; do
+  run "$PSQL -d $TDB -f '$ROOT/sql/$f'" >/dev/null
+done
 echo "→ критерии оценивания (дважды)…"
 for f in schema-criteria.sql schema-criteria.sql; do
   run "$PSQL -d $TDB -f '$ROOT/sql/$f'" >/dev/null
@@ -155,5 +159,16 @@ if run "psql -h $SOCKET_DIR -p $PGPORT -U postgres -d $TDB -q -f '$ROOT/sql/test
 else
   echo
   echo "ТЕСТЫ КРИТЕРИЕВ НЕ ПРОШЛИ — смотрите таблицу выше." >&2
+  exit 1
+fi
+echo
+echo "→ тесты админки (журнал, оплаты, подписки, Telegram):"
+echo
+if run "psql -h $SOCKET_DIR -p $PGPORT -U postgres -d $TDB -q -f '$ROOT/sql/tests/admin-automation-tests.sql'"; then
+  echo
+  echo "Готово: админка работает как задумано."
+else
+  echo
+  echo "ТЕСТЫ АДМИНКИ НЕ ПРОШЛИ — смотрите таблицу выше." >&2
   exit 1
 fi
