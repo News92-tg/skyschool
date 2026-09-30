@@ -639,6 +639,45 @@ h3{font-size:16px;font-weight:800}
 .lm-more{font:inherit;font-size:12px;font-weight:900;color:var(--accent);background:none;border:0;padding:0;cursor:pointer}
 .lm-more:hover{text-decoration:underline}
 
+/* ---------- цветовые темы (акцент) — окно «Оформление», assets/theme.js ----------
+   Меняют цвет кнопок, выделения и ссылок. Белый текст на кнопке в
+   светлой теме — не хуже 4.5:1 у каждого цвета (у прежнего неба 3.3:1). */
+:root[data-accent="violet"]{--accent:#7048e8;--m-learn-soft:#f0ebff;--shadow-pop:0 10px 30px rgba(112,72,232,.28)}
+:root[data-accent="emerald"]{--accent:#0a7f58;--m-learn-soft:#e3f6ee;--shadow-pop:0 10px 30px rgba(10,127,88,.26)}
+:root[data-accent="coral"]{--accent:#d23a47;--m-learn-soft:#ffebed;--shadow-pop:0 10px 30px rgba(210,58,71,.26)}
+:root[data-accent="ocean"]{--accent:#0e7c9a;--m-learn-soft:#e0f4f8;--shadow-pop:0 10px 30px rgba(14,124,154,.26)}
+:root[data-theme="dark"][data-accent="violet"]{--accent:#a78bfa;--accent-ink:#150a33;--m-learn-soft:#221a3d;--shadow-pop:0 10px 30px rgba(167,139,250,.22)}
+:root[data-theme="dark"][data-accent="emerald"]{--accent:#34d399;--accent-ink:#03241a;--m-learn-soft:#0d2b24;--shadow-pop:0 10px 30px rgba(52,211,153,.2)}
+:root[data-theme="dark"][data-accent="coral"]{--accent:#fb7185;--accent-ink:#2a0a10;--m-learn-soft:#331520;--shadow-pop:0 10px 30px rgba(251,113,133,.2)}
+:root[data-theme="dark"][data-accent="ocean"]{--accent:#22d3ee;--accent-ink:#032630;--m-learn-soft:#0c2a31;--shadow-pop:0 10px 30px rgba(34,211,238,.2)}
+
+/* окно «Оформление» */
+.th-pop{
+  position:fixed;z-index:220;width:280px;padding:14px;border-radius:18px;
+  background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow-lg);
+  opacity:0;transform:translateY(-6px);transition:opacity .16s, transform .2s cubic-bezier(.2,.9,.3,1);
+}
+.th-pop.in{opacity:1;transform:none}
+.th-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.th-head b{font-size:15px}
+.th-x{width:28px;height:28px;border:0;border-radius:8px;background:none;color:var(--faint);font-size:19px;cursor:pointer}
+.th-x:hover{background:var(--panel-2);color:var(--ink)}
+.th-lbl{font-size:10.5px;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:10px 0 6px}
+.th-modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.th-modes button{display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 4px;border:1.5px solid var(--line);border-radius:12px;
+  background:var(--panel-2);color:var(--ink-2);font:inherit;font-size:12px;font-weight:800;cursor:pointer;transition:.15s}
+.th-modes button[aria-checked="true"]{border-color:var(--accent);background:var(--m-learn-soft);color:var(--ink)}
+.th-accents{display:flex;gap:10px;flex-wrap:wrap}
+.th-accents button{width:34px;height:34px;border-radius:50%;border:2px solid transparent;background:none;padding:3px;cursor:pointer}
+.th-accents button span{display:block;width:100%;height:100%;border-radius:50%;background:var(--sw)}
+.th-accents button[aria-checked="true"]{border-color:var(--ink)}
+.th-pop button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (max-width:560px){
+  .th-pop{left:16px !important;right:16px;top:auto !important;bottom:16px;width:auto;transform:translateY(10px)}
+  .th-pop.in{transform:none}
+}
+@media (prefers-reduced-motion:reduce){ .th-pop{transition:none} }
+
 /* ---------- «Доступно обновление» (assets/pwa.js) ---------- */
 .pwa-bar{
   position:fixed;left:18px;bottom:18px;z-index:205;width:min(420px,calc(100vw - 32px));

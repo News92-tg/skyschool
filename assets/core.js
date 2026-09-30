@@ -173,20 +173,46 @@ window.Sky = (function () {
     document.dispatchEvent(new CustomEvent('langchange', { detail: { lang } }));
   }
 
-  /* ---------- тема ---------- */
-  let theme = get('theme') ||
-    (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  /* ---------- тема ----------
+     Режим: 'auto' — как в системе, и следим за ней (сменилась ночью —
+     сменится и сайт), 'light' или 'dark' — выбран руками. Раньше без
+     выбора бралась системная тема один раз при загрузке; сохранённые
+     'light' / 'dark' работают как прежде.
+     Акцент — цвет кнопок и выделения: 'sky' (как всегда) и цветовые
+     темы из assets/sky.css ([data-accent]). Окно выбора — assets/theme.js. */
+  const THEMES = ['auto', 'light', 'dark'];
+  const ACCENTS = ['sky', 'violet', 'emerald', 'coral', 'ocean'];
+  const darkMq = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
+  const systemTheme = () => darkMq && darkMq.matches ? 'dark' : 'light';
+  let themePref = THEMES.includes(get('theme')) ? get('theme') : 'auto';
+  let theme = themePref === 'auto' ? systemTheme() : themePref;
+  let accent = ACCENTS.includes(get('accent')) ? get('accent') : 'sky';
 
   function applyTheme() {
-    document.documentElement.dataset.theme = theme;
+    const root = document.documentElement;
+    root.dataset.theme = theme;
+    if (accent === 'sky') delete root.dataset.accent; else root.dataset.accent = accent;
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.content = theme === 'dark' ? '#080f1c' : '#f6faff';
   }
-  function toggleTheme() {
-    theme = theme === 'dark' ? 'light' : 'dark';
-    set('theme', theme);
+  const themeChanged = () => document.dispatchEvent(new CustomEvent('themechange', { detail: { theme, pref: themePref, accent } }));
+  function setTheme(pref) {
+    themePref = THEMES.includes(pref) ? pref : 'auto';
+    set('theme', themePref);
+    theme = themePref === 'auto' ? systemTheme() : themePref;
     applyTheme();
-    document.dispatchEvent(new CustomEvent('themechange', { detail: { theme } }));
+    themeChanged();
+  }
+  function setAccent(a) {
+    accent = ACCENTS.includes(a) ? a : 'sky';
+    set('accent', accent);
+    applyTheme();
+    themeChanged();
+  }
+  function toggleTheme() { setTheme(theme === 'dark' ? 'light' : 'dark'); }
+  if (darkMq) {
+    const onSystem = () => { if (themePref !== 'auto') return; theme = systemTheme(); applyTheme(); themeChanged(); };
+    if (darkMq.addEventListener) darkMq.addEventListener('change', onSystem); else if (darkMq.addListener) darkMq.addListener(onSystem);
   }
   applyTheme();
 
@@ -331,8 +357,8 @@ window.Sky = (function () {
             '<button type="button" data-lang="ru" aria-pressed="' + (lang === 'ru') + '">RU</button>' +
             '<button type="button" data-lang="en" aria-pressed="' + (lang === 'en') + '">EN</button>' +
           '</div>' +
-          '<button class="icon-btn" id="themeBtn" title="' +
-            (lang === 'ru' ? 'Светлая или тёмная тема' : 'Light or dark theme') + '">◐</button>' +
+          '<button type="button" class="icon-btn" id="themeBtn" aria-haspopup="dialog" aria-expanded="false" title="' +
+            (lang === 'ru' ? 'Оформление: тема и цвет' : 'Appearance: theme and colour') + '">◐</button>' +
           '<span id="accountSlot"></span>' +
         '</div>' +
       '</div>';
@@ -341,7 +367,11 @@ window.Sky = (function () {
       const b = e.target.closest('button[data-lang]');
       if (b) setLang(b.dataset.lang);
     });
-    host.querySelector('#themeBtn').addEventListener('click', toggleTheme);
+    /* Окно «Оформление» (assets/theme.js); пока оно не загрузилось —
+       как раньше, просто переключаем светлую и тёмную. */
+    host.querySelector('#themeBtn').addEventListener('click', e => {
+      if (window.SkyTheme && SkyTheme.toggle) SkyTheme.toggle(e.currentTarget); else toggleTheme();
+    });
 
     /* nav-overflow подключается после того, как шапка уже отрисована. */
     ensureNavOverflow();
@@ -838,7 +868,8 @@ function init(extra) {
      не грузится: к DOMContentLoaded такие скрипты уже выполнены. */
   const AUTOLOAD = [
     ['assets/errors.js', 'SkyErrors'],      /* понятные ошибки: тост с иконкой и «Повторить» */
-    ['assets/pwa.js', 'SkyPWA']             /* «Доступно обновление» после выкладки сайта */
+    ['assets/pwa.js', 'SkyPWA'],            /* «Доступно обновление» после выкладки сайта */
+    ['assets/theme.js', 'SkyTheme']         /* окно «Оформление»: тема и цвет акцента */
   ];
   function autoload() {
     AUTOLOAD.forEach(([src, name]) => {
@@ -856,7 +887,8 @@ function init(extra) {
     cfg: CFG, get, set, del, storageOk,
     get lang() { return lang; }, set lang(v) { lang = v; },
     t, L, setLang, extendDict, applyI18n, init,
-    theme: () => theme, toggleTheme,
+    theme: () => theme, toggleTheme, setTheme, setAccent,
+    themePref: () => themePref, accent: () => accent, THEMES, ACCENTS,
     logoSvg, renderHeader, renderFooter,
     toast, modal,
     pct, plural, shuffle, dayKey, daysLeft, avatar, avaClass, initials,
