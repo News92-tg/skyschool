@@ -189,6 +189,12 @@
   .part-h:first-child{margin-top:0;padding-top:0;border-top:0}
 
   /* окно тарифов и счётчик лимита — в assets/sky.css */
+  /* ?to=<учитель>: только «Отправить работу учителю» — без вкладок,
+     тарифов учителя и проверки по ссылкам (assets/photo-teacher.js) */
+  .photo-send-to .mode-bar,
+  #teacherMode.send-to #tTabs, #teacherMode.send-to #tLock, #teacherMode.send-to .js-wait,
+  #teacherMode.send-to #tab-links > .panel ~ .panel, #teacherMode.send-to #lResultSec{display:none !important}
+  .send-to-note{margin:0 0 14px;padding:11px 13px;border-radius:12px;background:var(--m-learn-soft);color:var(--ink-2);font-size:13.5px;font-weight:700;line-height:1.5}
 
   /* ---------- режим учителя ---------- */
   .roster{display:grid;gap:8px}
@@ -1541,7 +1547,11 @@ window.addEventListener('pagehide', closeCamera);
   }
   $('#roleSeg').setAttribute('aria-label', Sky.t('roleAria'));
   const params = new URLSearchParams(location.search);
-  setRole(params.get('hw') ? 'teacher' : params.get('task') ? 'student' : Sky.get('photoRole', 'student'));
+  /* ?to=<учитель> — ученик сдаёт работу учителю: форма отправки живёт
+     в режиме учителя (вкладка ссылок), но выбор режима ему не нужен. */
+  const sendTo = params.get('to');
+  if (sendTo) document.documentElement.classList.add('photo-send-to');
+  setRole(params.get('hw') || sendTo ? 'teacher' : params.get('task') ? 'student' : Sky.get('photoRole', 'student'));
   restoreOptions();
   renderSubjects();
   renderThumbs(false);

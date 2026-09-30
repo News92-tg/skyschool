@@ -5,7 +5,7 @@
   "scripts": {
     "test": "npm run test:fast && npm run test:browser",
     "test:fast": "node scripts/test-chess-engine.js && node scripts/test-chess-platform.js && node scripts/test-chess-ai.js && node scripts/test-language-banks.js && node scripts/test-offline.js && node scripts/test-worker.js && node scripts/embed-legacy-worker.js --check",
-    "test:browser": "node scripts/test-pages.js && node scripts/test-insights.js && node scripts/test-photo.js && node scripts/test-photo-orders.js && node scripts/test-admin.js && node scripts/test-collections.js && node scripts/test-fast-check.js && node scripts/test-chess-play.js && node scripts/test-errors.js && node scripts/test-auth.js && node scripts/test-onboarding.js && node scripts/test-limits.js && node scripts/test-profile.js && node scripts/test-telegram.js"
+    "test:browser": "node scripts/test-pages.js && node scripts/test-insights.js && node scripts/test-photo.js && node scripts/test-photo-orders.js && node scripts/test-admin.js && node scripts/test-collections.js && node scripts/test-fast-check.js && node scripts/test-chess-play.js && node scripts/test-errors.js && node scripts/test-auth.js && node scripts/test-onboarding.js && node scripts/test-limits.js && node scripts/test-profile.js && node scripts/test-telegram.js && node scripts/test-submissions.js"
   },
   "devDependencies": {
     "playwright": "^1.55.0"

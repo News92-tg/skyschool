@@ -25,7 +25,7 @@ const PRECACHE_URLS = [
   'admin.html','assets/admin.js',
   'collections.html','collection.html','assets/collection-common.js','assets/collections.js','assets/collection.js',
   'fast-check.html','assets/fast-check.js','assets/limits.js',
-  'auth.html','assets/auth-ui.js','onboarding.html','assets/onboarding.js','profile.html','assets/profile.js','assets/telegram.js',
+  'auth.html','assets/auth-ui.js','onboarding.html','assets/onboarding.js','profile.html','assets/profile.js','assets/telegram.js','assets/submissions.js',
   'assets/icon-192.png','assets/icon-512.png','assets/apple-touch-icon.png',
   'data/bank-math.js','data/bank-informatics.js','data/bank-russian.js','data/bank-physics.js','data/bank-biology.js','data/bank-chemistry.js',
   'data/bank-geography.js','data/bank-social.js','data/bank-history.js','data/bank-english.js','data/bank-polish.js','data/bank-spanish.js','data/bank-german.js',

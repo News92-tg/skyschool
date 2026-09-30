@@ -27,6 +27,7 @@ const PLANS = {
   premium: { plan: 'premium', title: 'Премиум', price_rub: 209, requests_per_window: 3, window_seconds: 60, photos_per_request: 20, compare: true, teacher: true, plagiarism: true, expires_at: null }
 };
 const PLAN_OF = { 'u-premium': 'premium', 'u-paid': 'paid' };
+const TEACHER_ID = 'eeeeeeee-0000-4000-8000-00000000000e';
 
 let failed = 0, passed = 0;
 function ok(name, cond, extra) {
@@ -152,6 +153,7 @@ globalThis.fetch = async (input, init) => {
       return J(n);
     }
     if (p === '/rest/v1/rpc/sky_collection_submission_info') return J(subInfo[JSON.parse(init.body).p_id] || null);
+    if (p === '/rest/v1/rpc/sky_teacher_exists') return J(JSON.parse(init.body).p_id === TEACHER_ID);
     if (p === '/rest/v1/rpc/sky_payment_info') {
       const id = JSON.parse(init.body).p_id;
       if (payInfo[id]) return J(payInfo[id]);
@@ -919,6 +921,24 @@ async function main() {
   r = await call('/api/check-photo?img=' + q(IMG) + '&mode=grade', { ip: '10.9.9.9', env: TGE });
   r = await call('/api/check-photo?img=' + q(IMG) + '&mode=grade', { ip: '10.9.9.9', env: TGE });
   ok('без входа — предупреждать некого', tgSent.length === 1);
+
+
+  /* ---------- работа по фото адресована учителю ---------- */
+  reset();
+  tgChats[TEACHER_ID] = '313131';
+  r = await call('/api/submit-homework?student_name=' + q('Петя') + '&class=7А&subject=physics&teacher_id=' + TEACHER_ID,
+    { method: 'POST', body: jpeg, headers: { 'Content-Type': 'image/jpeg' }, env: TGE });
+  const row = [...rows.values()].pop() || {};
+  ok('работа с teacher_id — записана на учителя', r.status === 201 && r.body.teacher === true && row.teacher_id === TEACHER_ID && row.student_name === 'Петя', r.text);
+  ok('учителю — сообщение со ссылкой на работу', tgSent.length === 1 && tgSent[0].body.chat_id === '313131' &&
+    /Петя, 7А прислал\(а\) работу по фото \(физика\)/.test(tgSent[0].body.text) && tgSent[0].body.text.includes('photo.html?hw=' + r.body.id), tgSent[0] && tgSent[0].body.text);
+  r = await call('/api/submit-homework?student_name=X&teacher_id=' + 'ffffffff-0000-4000-8000-00000000000f', { method: 'POST', body: jpeg, headers: { 'Content-Type': 'image/jpeg' }, env: TGE });
+  ok('не учитель (или нет такого) — 400 bad_teacher, ничего не записано', r.status === 400 && r.body.code === 'bad_teacher' && rows.size === 1 && storage.size === 1, r.text + ' rows=' + rows.size + ' files=' + storage.size);
+  r = await call('/api/submit-homework?student_name=X&teacher_id=nope', { method: 'POST', body: jpeg, headers: { 'Content-Type': 'image/jpeg' }, env: TGE });
+  ok('teacher_id не uuid — 400', r.status === 400 && r.body.code === 'bad_param');
+  tgSent = [];
+  r = await call('/api/submit-homework?student_name=' + q('Оля'), { method: 'POST', body: jpeg, headers: { 'Content-Type': 'image/jpeg' }, env: TGE });
+  ok('без teacher_id — как раньше: ссылка, без сообщений', r.status === 201 && r.body.teacher === false && !tgSent.length && ([...rows.values()].pop() || {}).teacher_id === null);
 
   /* ---------- без Supabase ---------- */
   reset();

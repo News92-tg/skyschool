@@ -211,6 +211,25 @@
     S.subs = (subs || []).filter(s => mine.has(s.collection_id)).sort(newest);
     if (S.cat !== 'all' && S.cat !== 'none' && !S.cats.some(c => c.id === S.cat)) S.cat = 'all';
     render();
+    openFromLink();
+  }
+
+  /* collections.html?review=<id работы> — из «Новых работ» в профиле:
+     раскрыть подборку и сразу открыть проверку. Один раз за загрузку. */
+  let reviewDone = false;
+  function openFromLink() {
+    if (reviewDone) return;
+    const id = new URLSearchParams(location.search).get('review');
+    if (!id) return;
+    reviewDone = true;
+    const sub = S.subs.find(x => x.id === id);
+    if (!sub) return;
+    S.cat = 'all';
+    S.open = sub.collection_id;
+    render();
+    const card = document.querySelector(`.cl-card[data-id="${CSS.escape(sub.collection_id)}"]`);
+    if (card) card.scrollIntoView({ block: 'start' });
+    review(id);
   }
 
   /* ---------- вкладки категорий и список ---------- */

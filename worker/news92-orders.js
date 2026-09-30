@@ -231,7 +231,7 @@ export default {
       if (url.pathname === "/api/check-test") return await handleCheckTest(request, env, ctx);
       if (url.pathname === "/fast-check" || url.pathname === "/api/fast-check") return await handleCheckTest(request, env, ctx, true);
       if (url.pathname === "/api/check-teacher-report") return await handleTeacherReport(request, env, ctx);
-      if (url.pathname === "/api/submit-homework") return await handleSubmit(request, env, url);
+      if (url.pathname === "/api/submit-homework") return await handleSubmit(request, env, url, ctx);
       if (url.pathname === "/api/payments") return await handlePayment(request, env, ctx);
       if (url.pathname === "/api/notify-payment") return await handleNotifyPayment(request, env);
       if (url.pathname === "/notify" || url.pathname === "/api/notify") return await handleNotify(request, env);
@@ -1531,7 +1531,7 @@ function decodeBase64(s) {
   return bytes;
 }
 
-async function handleSubmit(request, env, url) {
+async function handleSubmit(request, env, url, ctx) {
   if (request.method !== "POST") return json({ error: "use POST", code: "method" }, 405);
   if (!sbReady(env)) return json({ error: "Хранилище не настроено", code: "storage" }, 503);
 
@@ -1542,7 +1542,8 @@ async function handleSubmit(request, env, url) {
       const len = parseInt(request.headers.get("Content-Length") || "0", 10);
       if (len > MAX_UPLOAD_BYTES) throw new BadRequest("photo is larger than 1.5 MB");
       bytes = new Uint8Array(await request.arrayBuffer());
-      meta = { student_name: url.searchParams.get("student_name"), class: url.searchParams.get("class"), subject: url.searchParams.get("subject") };
+      meta = { student_name: url.searchParams.get("student_name"), class: url.searchParams.get("class"), subject: url.searchParams.get("subject"),
+               teacher_id: url.searchParams.get("teacher_id") };
     } else {
       meta = await readJsonBody(request);
       if (meta.img_base64) bytes = decodeBase64(meta.img_base64);
@@ -1559,6 +1560,10 @@ async function handleSubmit(request, env, url) {
     meta.class = str(meta.class).trim();
     if (meta.class.length > 20) throw new BadRequest("class is too long");
     meta.subject = parseSubject(meta.subject);
+    /* Работа адресована учителю (ссылка photo.html?to=<id>): тогда она
+       сразу у него в «Новых работах», без пересылки ссылки. */
+    meta.teacher_id = meta.teacher_id ? str(meta.teacher_id).trim() : null;
+    if (meta.teacher_id && !isUuid(meta.teacher_id)) throw new BadRequest("teacher_id must be a uuid");
   } catch (e) {
     if (e instanceof BadRequest) return json({ error: e.message, code: "bad_param" }, 400);
     throw e;
@@ -1572,6 +1577,9 @@ async function handleSubmit(request, env, url) {
 
   const who = await identify(request, env);
   if (who.denied) return sessionExpired();
+  if (meta.teacher_id && !(await sbRpc(env, "sky_teacher_exists", { p_id: meta.teacher_id }))) {
+    return json({ error: "Учитель по этой ссылке не найден — попросите у него новую", code: "bad_teacher" }, 400);
+  }
   const rate = await rateHit(env, who, "submit", SUBMIT_LIMIT.window, SUBMIT_LIMIT.max, 1);
   if (!rate.allowed) {
     return json({ error: `Слишком много отправок, попробуйте через ${rate.retry_after} с`, code: "rate_limit", retry_after: rate.retry_after },
@@ -1594,7 +1602,7 @@ async function handleSubmit(request, env, url) {
       headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
       body: JSON.stringify({
         id, student_id: who.userId, student_name: meta.student_name, class: meta.class || null,
-        subject: meta.subject || null, img_url: stored
+        subject: meta.subject || null, img_url: stored, teacher_id: meta.teacher_id || null
       })
     });
   } catch (e) {
@@ -1609,7 +1617,11 @@ async function handleSubmit(request, env, url) {
   }
 
   const site = String(env.SITE_URL || DEFAULT_SITE).replace(/\/?$/, "/");
-  return json({ id, url: `${site}photo.html?hw=${id}` }, 201);
+  if (meta.teacher_id) {
+    const note = notifyTeacherHomework(env, meta, id).catch(e => console.warn("[telegram]", e && e.message));
+    if (ctx && ctx.waitUntil) ctx.waitUntil(note); else await note;
+  }
+  return json({ id, url: `${site}photo.html?hw=${id}`, teacher: !!meta.teacher_id }, 201);
 }
 
 
@@ -1853,6 +1865,19 @@ async function handleNotifySubmission(request, env) {
   ].filter(Boolean);
   const res = await tgSend(env, info.chat_id, lines.join("\n"));
   return json({ sent: res.ok, reason: res.ok ? undefined : res.reason });
+}
+
+/* Работа по фото пришла учителю — сообщение, если он привязал Telegram. */
+async function notifyTeacherHomework(env, meta, id) {
+  if (!env.TELEGRAM_BOT_TOKEN) return;
+  const chat = await sbRpc(env, "sky_telegram_chat", { p_user: meta.teacher_id });
+  if (!chat) return;
+  const subj = meta.subject && SUBJECTS[meta.subject] && SUBJECTS[meta.subject].name;
+  await tgSend(env, chat, [
+    `${NOTIFY_TYPES.new_submission.icon} ${NOTIFY_TYPES.new_submission.title}`,
+    `${cleanText(meta.student_name, 100)}${meta.class ? ", " + cleanText(meta.class, 20) : ""} прислал(а) работу по фото${subj ? " (" + subj + ")" : ""}.`,
+    `Проверить: ${siteUrl(env)}photo.html?hw=${id}`
+  ].join("\n"));
 }
 
 /* Лимит проверок кончился — раз в сутки сообщение в Telegram. */

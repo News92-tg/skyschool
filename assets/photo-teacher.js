@@ -69,6 +69,11 @@
     lCopy:{ru:'Скопировать ссылку',en:'Copy link'},
     lCopied:{ru:'Ссылка скопирована',en:'Link copied'},
     lSent:{ru:'Работа отправлена. Отправьте ссылку учителю.',en:'Sent. Now send the link to your teacher.'},
+    lToH:{ru:'Отправить работу учителю',en:'Send your work to the teacher'},
+    lTo:{ru:'Работа уйдёт учителю: %1. Он увидит её у себя в профиле — ссылку пересылать не нужно.',
+         en:'Your work goes to %1. They will see it in their profile — no need to forward a link.'},
+    lToAnon:{ru:'Работа уйдёт вашему учителю — он увидит её у себя в профиле.',en:'Your work goes to your teacher — they will see it in their profile.'},
+    lSentTo:{ru:'Готово! Работа у учителя. Ссылка ниже — на всякий случай.',en:'Done! Your teacher has the work. The link below is just in case.'},
     lNeedName:{ru:'Впишите ФИО',en:'Enter your name'},
     lNeedPhoto:{ru:'Выберите фото работы',en:'Pick a photo of your work'},
     lCheckH:{ru:'Учителю: проверить работы по ссылкам',en:'Teacher: check work by links'},
@@ -94,6 +99,7 @@
   const OK_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
   const MAX_INPUT_MB = 20;
   const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+  const toTeacher = (p => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p || '') ? p.toLowerCase() : null)(new URLSearchParams(location.search).get('to'));
   let busy = false;
   const csv = {};
 
@@ -428,6 +434,7 @@
     try {
       const small = await SkyCheck.compress(sendList.items[0].blob);
       const qs = new URLSearchParams({ student_name: name, class: $('#lClass').value.trim(), subject: $('#lSubject').value });
+      if (toTeacher) qs.set('teacher_id', toTeacher);
       /* Картинка уходит как есть, без base64: так Worker не тратит
          процессор на раскодирование. */
       res = await SkyCheck.request('/api/submit-homework?' + qs, {
@@ -445,7 +452,7 @@
     $('#lUrl').value = res.data.url;
     $('#lOut').classList.remove('hidden');
     sendList.clear();
-    Sky.toast(Sky.t('lSent'), 5000);
+    Sky.toast(Sky.t(res.data.teacher ? 'lSentTo' : 'lSent'), 6000);
   }
 
   async function copyLink() {
@@ -554,6 +561,28 @@
   renderSubjects();
   setTab(tab);
   renderLock();
+
+  /* Ссылка учителя для учеников: photo.html?to=<id учителя>. Ученик
+     видит только «Отправить работу учителю», без вкладок и тарифов
+     учителя; работа сразу попадает в «Новые работы» его профиля. */
+  if (toTeacher) {
+    setTab('links');
+    $('#teacherMode').classList.add('send-to');
+    const box = $('#tab-links .panel');
+    const h = box.querySelector('h2');
+    if (h) h.textContent = Sky.t('lToH');
+    const note = document.createElement('p');
+    note.className = 'send-to-note';
+    note.id = 'lToNote';
+    note.textContent = Sky.t('lToAnon');
+    box.insertBefore(note, box.querySelector('.row'));
+    Promise.resolve(Sky.db.ready).then(() => Sky.db.list('profiles', { id: toTeacher })).then(rows => {
+      const t = (rows || [])[0];
+      if (t && t.name) note.textContent = Sky.t('lTo').replace('%1', t.name);
+    }).catch(() => {});
+    const me = Sky.db.me && Sky.db.me();
+    if (me && me.name && !$('#lName').value) $('#lName').value = me.name;
+  }
 
   /* Ссылка на работу: photo.html?hw=<id> — сразу вкладка ссылок и
      предпросмотр работы. Проверка — по кнопке, она тратит лимит. */

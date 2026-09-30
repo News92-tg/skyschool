@@ -167,6 +167,44 @@ select t_check('submit_collection: в ответе id созданной раб�
   and exists (select 1 from collection_submissions where id = (select (r->>'id')::uuid from _sub) and student_name = 'Ваня'), (select r::text from _sub));
 
 -- ---------------------------------------------------------------------
+-- 4. «Новые работы» — teacher_inbox()
+-- ---------------------------------------------------------------------
+insert into homework_submissions (student_name, class, subject, teacher_id, status, created_at) values
+  ('Чужой ученик', '5А', 'math', '77777777-0000-0000-0000-000000000002', 'pending', now()),
+  ('Проверено', '7А', 'math', '77777777-0000-0000-0000-000000000001', 'checked', now());
+set role authenticated;
+select set_config('request.jwt.claim.sub', '77777777-0000-0000-0000-000000000001', false);
+create temp table _in as select * from teacher_inbox(50);
+create temp table _in1 as select * from teacher_inbox(1);
+reset role;
+select t_check('входящие: только ждущие проверки, свои — подборки и фото',
+  (select count(*) = (select count(*) from _in where kind = 'collection') + 1 from _in)
+  and exists (select 1 from _in where kind = 'photo' and student_name = 'Петя' and class = '7А')
+  and not exists (select 1 from _in where student_name in ('Чужой ученик', 'Проверено', 'Чужой', 'Ваня')),
+  (select string_agg(kind || ':' || coalesce(student_name, '?') || ':' || status, ', ') from _in));
+select t_check('входящие: у работы по подборке — название, баллы из скольких',
+  (select title = 'Дроби' and total = 1 and score is not null from _in where kind = 'collection' limit 1));
+select t_check('входящие: новые сверху, лимит соблюдается',
+  (select bool_and(true) from _in) and (select count(*) = 1 from _in1)
+  and (select created_at = (select max(created_at) from _in) from _in1));
+
+set role authenticated;
+select set_config('request.jwt.claim.sub', '77777777-0000-0000-0000-000000000002', false);
+create temp table _in2 as select * from teacher_inbox(50);
+reset role;
+select t_check('другой учитель видит только своё', (select count(*) = 1 and bool_and(student_name = 'Чужой ученик' or student_name = 'Чужой') from _in2)
+  or (select bool_and(student_name in ('Чужой ученик', 'Чужой')) from _in2), (select string_agg(student_name, ', ') from _in2));
+set role anon;
+select t_expect_denied('аноним не видит входящих', $q$ select * from teacher_inbox(10) $q$);
+select t_expect_denied('аноним не проверяет учителей', $q$ select sky_teacher_exists('77777777-0000-0000-0000-000000000001') $q$);
+reset role;
+select set_config('request.jwt.claim.sub', '', false);
+set role service_role;
+create temp table _te as select sky_teacher_exists('77777777-0000-0000-0000-000000000001') as t, sky_teacher_exists('77777777-0000-0000-0000-000000000003') as s;
+reset role;
+select t_check('sky_teacher_exists: учитель — да, ученик — нет', (select t and not s from _te));
+
+-- ---------------------------------------------------------------------
 -- Итог
 -- ---------------------------------------------------------------------
 \o

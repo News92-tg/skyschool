@@ -193,3 +193,43 @@ end $$;
 revoke all on function public.telegram_link_start() from public, anon;
 grant execute on function public.telegram_link_start() to authenticated;
 grant select, insert, update, delete on table public.telegram_link_codes, public.telegram_notify_log to service_role;
+
+
+-- ---------------------------------------------------------------------
+-- 4. «Новые работы» в профиле учителя (assets/submissions.js)
+--    Всё, что ждёт учителя: ответы по его подборкам с развёрнутыми
+--    заданиями (status = 'pending') и работы по фото, присланные ему
+--    по ссылке photo.html?to=<id учителя> (homework_submissions).
+--    security invoker: RLS таблиц решает, что видно, — свои подборки
+--    и адресованные себе работы, ничего чужого.
+-- ---------------------------------------------------------------------
+create or replace function public.teacher_inbox(p_limit int default 50)
+returns table (kind text, id uuid, student_name text, class text, title text, subject text,
+               score int, total int, percent numeric, status text, created_at timestamptz)
+language sql stable security invoker set search_path = public as $$
+  select * from (
+    select 'collection'::text, s.id, s.student_name, null::text, c.title, c.subject,
+           s.score, jsonb_array_length(c.tasks), s.percent, s.status, s.created_at
+      from public.collection_submissions s
+      join public.task_collections c on c.id = s.collection_id
+     where c.teacher_id = (select auth.uid()) and s.status = 'pending'
+    union all
+    select 'photo'::text, h.id, h.student_name, h.class, null::text, h.subject,
+           null::int, null::int, null::numeric, h.status, h.created_at
+      from public.homework_submissions h
+     where h.teacher_id = (select auth.uid()) and h.status = 'pending'
+  ) x
+  order by created_at desc
+  limit least(greatest(coalesce(p_limit, 50), 1), 200);
+$$;
+revoke all on function public.teacher_inbox(int) from public, anon;
+grant execute on function public.teacher_inbox(int) to authenticated;
+
+-- Worker: работа по фото адресована учителю — есть ли такой учитель.
+create or replace function public.sky_teacher_exists(p_id uuid)
+returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.profiles p where p.id = p_id and p.role = 'teacher');
+$$;
+revoke all on function public.sky_teacher_exists(uuid) from public, anon, authenticated;
+grant execute on function public.sky_teacher_exists(uuid) to service_role;

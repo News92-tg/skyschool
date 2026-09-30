@@ -76,6 +76,27 @@
   .tg-note.admin{padding:10px 12px;border-radius:11px;background:var(--warn-soft);color:var(--ink-2)}
   .tg-note + .tg-acts{margin-top:12px}
 
+  /* «Новые работы» (assets/submissions.js) */
+  .ib-badge{display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 7px;border-radius:99px;background:var(--no);color:#fff;font-size:12px;font-weight:900}
+  .ib-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+  .ib-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
+  .ib-txt{min-width:0}
+  .ib-txt b{display:block;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ib-txt span{display:block;font-size:12.5px;color:var(--muted);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ib-when{font-size:12px;color:var(--faint);font-weight:700;white-space:nowrap}
+  .ib-empty{margin:0;padding:14px;border:1px dashed var(--line-2);border-radius:var(--r);color:var(--muted);font-weight:700;font-size:13.5px}
+  .ib-more{margin-top:10px;font:inherit;font-size:13px;font-weight:800;color:var(--accent);background:none;border:0;cursor:pointer;padding:0}
+  .ib-link{margin-top:14px;padding:12px 14px;border-radius:var(--r);background:var(--panel-2);border:1px solid var(--line);display:grid;gap:8px}
+  .ib-link b{display:block;font-size:13.5px}
+  .ib-link span{display:block;font-size:12.5px;color:var(--muted);font-weight:600}
+  .ib-link-row{display:flex;gap:8px;min-width:0}
+  .ib-link-row input{flex:1;min-width:0;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--muted);font:inherit;font-size:12.5px}
+  @media (max-width:640px){
+    .ib-row{grid-template-columns:auto minmax(0,1fr) auto;row-gap:6px}
+    .ib-when{grid-column:2;grid-row:2;margin-top:-4px}
+    .ib-row .btn{grid-column:3;grid-row:1 / span 2}
+  }
+
   .pf-quick{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
   .pf-q{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);transition:.15s}
   .pf-q:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--shadow-sm)}
@@ -123,6 +144,7 @@
 <script src="assets/errors.js"></script>
 <script src="assets/photo-api.js"></script>
 <script src="assets/profile.js"></script>
+<script src="assets/submissions.js"></script>
 <script src="assets/telegram.js"></script>
 </body>
 </html>
