@@ -49,6 +49,50 @@ select t_check('чужой профиль не меняется (RLS)',
 select set_config('request.jwt.claim.sub', '', false);
 
 -- ---------------------------------------------------------------------
+-- 2. Статистика профиля — my_stats()
+-- ---------------------------------------------------------------------
+insert into task_collections (id, teacher_id, title, share_code, tasks) values
+  ('77777777-1111-0000-0000-000000000001', '77777777-0000-0000-0000-000000000001', 'Дроби', 'TTAAAA', '[{"id":"t1","type":"text","text":"1+1","accept":["2"]}]'),
+  ('77777777-1111-0000-0000-000000000002', '77777777-0000-0000-0000-000000000002', 'Чужая', 'TTBBBB', '[{"id":"t1","type":"text","text":"2+2","accept":["4"]}]');
+insert into collection_submissions (collection_id, student_id, student_name, answers, score, percent, status, created_at) values
+  ('77777777-1111-0000-0000-000000000001', '77777777-0000-0000-0000-000000000003', 'Ваня', '{}', 9, 95, 'checked', now() - interval '3 days'),
+  ('77777777-1111-0000-0000-000000000001', null, 'Маша', '{}', 7, 70, 'pending', now() - interval '1 day'),
+  ('77777777-1111-0000-0000-000000000001', null, ' маша ', '{}', 5, 50, 'pending', now() - interval '2 hours'),
+  ('77777777-1111-0000-0000-000000000002', null, 'Чужой', '{}', 1, 10, 'pending', now());
+insert into photo_checks (user_id, subject, grade, created_at) values
+  ('77777777-0000-0000-0000-000000000001', 'math', 4, now() - interval '5 days'),
+  ('77777777-0000-0000-0000-000000000001', 'math', null, now() - interval '4 days');
+insert into homework_submissions (student_name, class, subject, teacher_id, status, created_at) values
+  ('Петя', '7А', 'math', '77777777-0000-0000-0000-000000000001', 'pending', now() - interval '30 minutes');
+
+set role authenticated;
+select set_config('request.jwt.claim.sub', '77777777-0000-0000-0000-000000000001', false);
+create temp table _st as select my_stats() as s;
+reset role;
+select t_check('проверок всего: 2 по фото + 3 по подборке + 1 по ссылке = 6',
+  (select (s->>'checks_total')::int = 6 from _st), (select s::text from _st));
+select t_check('ждут проверки: 2 по подборке + 1 по ссылке, чужие не в счёт',
+  (select (s->>'pending')::int = 3 from _st));
+select t_check('учеников: Ваня, Маша (без регистра и пробелов), Петя = 3',
+  (select (s->>'students')::int = 3 from _st));
+select t_check('средний балл: 5, 3, 2 по подборке и 4 по фото = 3.5',
+  (select (s->>'avg_grade')::numeric = 3.5 from _st));
+select t_check('последняя проверка — самая свежая работа (30 мин назад)',
+  (select (s->>'last_check_at')::timestamptz > now() - interval '31 minutes' from _st));
+
+set role authenticated;
+select set_config('request.jwt.claim.sub', '77777777-0000-0000-0000-000000000003', false);
+create temp table _st2 as select my_stats() as s;
+reset role;
+select t_check('ученик не видит цифр учителя: у него 0 проверок',
+  (select (s->>'checks_total')::int = 0 and (s->>'avg_grade') is null from _st2), (select s::text from _st2));
+
+set role anon;
+select t_expect_denied('аноним не вызывает my_stats', $q$ select my_stats() $q$);
+reset role;
+select set_config('request.jwt.claim.sub', '', false);
+
+-- ---------------------------------------------------------------------
 -- Итог
 -- ---------------------------------------------------------------------
 \o

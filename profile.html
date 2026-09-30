@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Профиль — SkyySchool</title>
+<meta name="theme-color" content="#f6faff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon-512.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/sky.css">
+<!-- Профиль: кто я, тариф, статистика, разделы (Telegram, новые работы).
+     Логика — assets/profile.js, статистика — my_stats() в
+     sql/schema-teacher-tools.sql. -->
+<style>
+  .pf-wrap{max-width:900px}
+  /* тариф меняется кнопкой в профиле — дублировать её в шапке незачем */
+  .tariffs-hdr{display:none}
+  .pf-head{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;padding:24px 26px}
+  .pf-id{display:flex;align-items:center;gap:16px;min-width:0}
+  .pf-id .ava.lg{flex:none}
+  .pf-who{min-width:0}
+  .pf-name-row{display:flex;align-items:center;gap:8px;min-width:0}
+  .pf-name-row h1{font-size:clamp(22px,3.2vw,30px);margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pf-icon{flex:none;width:30px;height:30px;border-radius:9px;border:1px solid transparent;background:none;color:var(--muted);cursor:pointer;display:grid;place-items:center}
+  .pf-icon:hover{border-color:var(--line);background:var(--panel-2);color:var(--ink)}
+  .pf-name-form{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .pf-name-form input{padding:9px 12px;border:1px solid var(--line-2);border-radius:11px;background:var(--panel);color:var(--ink);font:inherit;font-size:16px;font-weight:800;min-width:0;width:min(280px,60vw)}
+  .pf-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px}
+  .pf-mail{font-size:13px;color:var(--muted);font-weight:700;word-break:break-all}
+  .pf-plan{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:12px 14px 12px 16px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel-2)}
+  .pf-lbl{display:block;font-size:10.5px;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+  .pf-plan-name{font-size:17px}
+  .pf-plan-name.plan-premium{color:var(--m-chess)}
+  .pf-plan-name.plan-paid{color:var(--accent)}
+  .pf-until{display:block;font-size:12px;color:var(--muted);font-weight:700}
+  .pf-plan-acts{display:flex;flex-direction:column;gap:6px}
+  .pf-plan-acts .btn{width:100%}
+
+  .pf-tour{display:flex;align-items:center;gap:10px;margin-top:14px;padding:12px 16px;border-radius:var(--r);background:var(--m-learn-soft);color:var(--accent);font-weight:800;font-size:14px}
+  .pf-tour:hover{filter:brightness(.98)}
+  .pf-tour[hidden]{display:none}
+
+  .pf-section-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:26px 0 12px}
+  .pf-section-h h2{font-size:18px;margin:0}
+  #pfStats{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+  #pfStats .stat small{display:block;margin-top:4px;font-size:11.5px;color:var(--muted);font-weight:700}
+  #pfStats .stat.pf-text b{font-size:20px;line-height:1.35}
+  .pf-skel b,.pf-skel span{display:block;border-radius:8px;background:linear-gradient(90deg,var(--panel-2),var(--line),var(--panel-2));background-size:200% 100%;animation:pfsk 1.2s infinite;color:transparent}
+  .pf-skel b{width:60%;height:30px;margin-bottom:6px}.pf-skel span{width:80%;height:12px}
+  @keyframes pfsk{to{background-position:-200% 0}}
+  .pf-err{grid-column:1/-1;padding:14px;border:1px dashed var(--line-2);border-radius:var(--r);color:var(--muted);font-weight:700;font-size:13px;text-align:center}
+
+  #pfSections{display:grid;gap:14px;margin-top:14px}
+  #pfSections:empty{display:none}
+  .pf-sec{padding:20px 22px}
+  .pf-sec h2{font-size:17px;margin:0 0 4px;display:flex;align-items:center;gap:8px}
+  .pf-sec > p{margin:0 0 14px;color:var(--muted);font-size:13.5px;font-weight:600}
+
+  .pf-quick{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+  .pf-q{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);transition:.15s}
+  .pf-q:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+  .pf-q .ico{flex:none;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-size:20px;background:var(--panel-2)}
+  .pf-q b{display:block;font-size:14px}
+  .pf-q small{display:block;font-size:12px;color:var(--muted);font-weight:700}
+  .pf-q.admin .ico{background:var(--warn-soft)}
+
+  @media (max-width:640px){
+    .pf-head{padding:18px}
+    .pf-plan{width:100%;justify-content:space-between}
+    .pf-plan-acts{width:100%;flex-direction:row}
+    .pf-plan-acts .btn{flex:1;width:auto}
+    .pf-name-row h1{white-space:normal;overflow-wrap:anywhere}
+    #pfStats{grid-template-columns:1fr 1fr}
+    .pf-sec{padding:16px}
+  }
+</style>
+</head>
+<body>
+<header id="appHeader"></header>
+
+<main class="wrap pf-wrap">
+  <p class="note" id="pfLocal" hidden data-i18n="pfLocal"></p>
+  <div id="pfMain" hidden>
+    <section class="panel pf-head" id="pfHead" aria-live="polite"></section>
+    <a class="pf-tour" id="pfTour" href="onboarding.html" hidden><span aria-hidden="true">🚀</span><span data-i18n="pfOnboard"></span></a>
+
+    <div id="pfSections"></div>
+
+    <div class="pf-section-h"><h2 data-i18n="pfStatsH"></h2></div>
+    <div class="stats" id="pfStats"></div>
+
+    <div class="pf-section-h"><h2 data-i18n="pfQuick"></h2></div>
+    <div class="pf-quick" id="pfQuick"></div>
+  </div>
+</main>
+
+<footer id="appFooter"></footer>
+
+<script src="assets/config.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/db.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/errors.js"></script>
+<script src="assets/photo-api.js"></script>
+<script src="assets/profile.js"></script>
+</body>
+</html>

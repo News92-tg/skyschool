@@ -44,9 +44,10 @@ Sky.auth = (function () {
       return;
     }
 
+    /* Аккаунт в шапке ведёт на страницу профиля (profile.html): там
+       тариф, статистика, Telegram и «Выйти». */
     slot.innerHTML =
-      `<button class="me" id="btnMe"><span class="who"><b>${esc(me.name || '')}</b><span>${Sky.t(me.role || 'student')}</span></span>${Sky.avatar(me.name, '', me.emoji)}</button>`;
-    slot.querySelector('#btnMe').addEventListener('click', openProfile);
+      `<a class="me" id="btnMe" href="profile.html" aria-label="${esc(me.name || '')} — ${Sky.t(me.role || 'student')}"><span class="who"><b>${esc(me.name || '')}</b><span>${Sky.t(me.role || 'student')}</span></span>${Sky.avatar(me.name, '', me.emoji)}</a>`;
   }
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>\"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '\"':'&quot;' }[c]));

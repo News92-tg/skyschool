@@ -608,6 +608,11 @@ h3{font-size:16px;font-weight:800}
 .tf-card ul{margin:0;padding-left:18px;font-size:12.5px;line-height:1.6}
 .tf-card .btn,.tf-card .tag{justify-self:start}
 
+/* кнопка «Тарифы» / счётчик лимита в шапке (photo-api.js, limits.js):
+   на узком экране места нет — тот же счётчик есть на самой странице */
+.tariffs-hdr{white-space:nowrap}
+@media (max-width:760px){.tariffs-hdr{display:none}}
+
 /* ---------- лимит проверок (assets/limits.js) ---------- */
 .lm-chip,.lm-meter{--lm:var(--ok);--lm-soft:var(--ok-soft)}
 .lm-chip.low,.lm-meter.low{--lm:var(--warn);--lm-soft:var(--warn-soft)}
