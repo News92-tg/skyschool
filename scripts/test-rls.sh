@@ -129,6 +129,10 @@ echo "→ критерии оценивания (дважды)…"
 for f in schema-criteria.sql schema-criteria.sql; do
   run "$PSQL -d $TDB -f '$ROOT/sql/$f'" >/dev/null
 done
+echo "→ подборки и инструменты учителя (дважды): профиль, онбординг, Telegram, аналитика…"
+for f in schema-collections.sql schema-teacher-tools.sql schema-collections.sql schema-teacher-tools.sql; do
+  run "$PSQL -d $TDB -f '$ROOT/sql/$f'" >/dev/null
+done
 echo "→ тесты тарифов:"
 echo
 if run "psql -h $SOCKET_DIR -p $PGPORT -U postgres -d $TDB -q -f '$ROOT/sql/tests/tariffs-tests.sql'"; then
@@ -170,5 +174,16 @@ if run "psql -h $SOCKET_DIR -p $PGPORT -U postgres -d $TDB -q -f '$ROOT/sql/test
 else
   echo
   echo "ТЕСТЫ АДМИНКИ НЕ ПРОШЛИ — смотрите таблицу выше." >&2
+  exit 1
+fi
+echo
+echo "→ тесты инструментов учителя (онбординг, профиль, Telegram, работы, аналитика):"
+echo
+if run "psql -h $SOCKET_DIR -p $PGPORT -U postgres -d $TDB -q -f '$ROOT/sql/tests/teacher-tools-tests.sql'"; then
+  echo
+  echo "Готово: инструменты учителя работают как задумано."
+else
+  echo
+  echo "ТЕСТЫ ИНСТРУМЕНТОВ УЧИТЕЛЯ НЕ ПРОШЛИ — смотрите таблицу выше." >&2
   exit 1
 fi

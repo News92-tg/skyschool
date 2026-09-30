@@ -299,7 +299,9 @@
       if (res.error) return setErr(authError(res.error), 'aEmail');
       if (res.needsConfirm) { view = 'confirm'; return render(false); }
       Sky.toast(t('auWelcome').replace('%1', name), 2500);
-      location.replace(home());
+      /* Учителю — сразу короткое знакомство (onboarding.html), если он
+         не шёл на конкретную страницу. */
+      location.replace(role === 'teacher' && !next ? 'onboarding.html' : home());
       return;
     }
 

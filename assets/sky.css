@@ -582,6 +582,10 @@ h3{font-size:16px;font-weight:800}
 }
 .toast.show{transform:translate(-50%,0)}
 
+/* ссылка-действие акцентным цветом (пустые состояния и т. п.) */
+.link-accent{color:var(--accent);font-weight:800}
+.link-accent:hover{text-decoration:underline}
+
 /* «Забыли пароль?» в окне входа (assets/auth.js) */
 .au-modal-forgot{display:block;margin-top:12px;text-align:center;font-size:13px;font-weight:800;color:var(--accent)}
 

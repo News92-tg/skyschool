@@ -43,6 +43,7 @@
     catIn:{ru:'Категория: %1',en:'Category: %1'},
     empty:{ru:'Подборок пока нет',en:'No collections yet'},
     emptyD:{ru:'Нажмите «Создать подборку», добавьте задания — и отправьте ученикам ссылку.',en:'Press “New collection”, add tasks and send students the link.'},
+    emptyTour:{ru:'Впервые здесь? Быстрый старт за 2 минуты →',en:'New here? A 2-minute quick start →'},
     tasksN:{ru:'Заданий: %1',en:'Tasks: %1'},
     codeL:{ru:'Код',en:'Code'},
     until:{ru:'до %1',en:'until %1'},
@@ -231,7 +232,8 @@
 
     const list = S.colls.filter(c => S.cat === 'all' ? true : S.cat === 'none' ? !c.category_id : c.category_id === S.cat);
     $('#colls').innerHTML = list.length ? list.map(card).join('') :
-      `<div class="panel"><div class="empty"><div class="big">🗂️</div><b>${esc(Sky.t('empty'))}</b><p>${esc(Sky.t('emptyD'))}</p></div></div>`;
+      `<div class="panel"><div class="empty"><div class="big">🗂️</div><b>${esc(Sky.t('empty'))}</b><p>${esc(Sky.t('emptyD'))}</p>` +
+      (S.colls.length ? '' : `<p><a class="link-accent" href="onboarding.html">${esc(Sky.t('emptyTour'))}</a></p>`) + `</div></div>`;
     if (S.open) renderResults(S.open);
   }
 

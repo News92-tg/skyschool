@@ -53,8 +53,9 @@ function createBackend(opts) {
     const rows = table(m.table);
     const where = r => m.filters.every(f => match(r, f));
     if (m.op === 'insert' || m.op === 'upsert') {
-      const list = (Array.isArray(m.payload) ? m.payload : [m.payload]).map(r => Object.assign({ id: uuid(), created_at: new Date().toISOString() }, clone(r)));
+      /* guard — как RLS и триггеры базы: может отказать или дописать строку */
       if (opts.guard) { const err = opts.guard(m, state.session); if (err) return { data: null, error: err }; }
+      const list = (Array.isArray(m.payload) ? m.payload : [m.payload]).map(r => Object.assign({ id: uuid(), created_at: new Date().toISOString() }, clone(r)));
       const out = [];
       for (const r of list) {
         const key = m.onConflict || 'id';
