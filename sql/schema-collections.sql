@@ -268,6 +268,7 @@ declare
   v_auto    int := 0;
   v_open    int := 0;
   v_total   int;
+  v_id      uuid;
 begin
   select * into v_coll from public.task_collections
    where share_code = upper(btrim(coalesce(p_code, '')));
@@ -331,9 +332,13 @@ begin
   values
     (v_coll.id, v_uid, v_name, v_results, v_correct,
      round(v_correct * 100.0 / greatest(v_total, 1), 1),
-     case when v_open > 0 then 'pending' else 'checked' end);
+     case when v_open > 0 then 'pending' else 'checked' end)
+  returning id into v_id;
 
-  return jsonb_build_object('ok', true, 'correct', v_correct, 'auto', v_auto, 'open', v_open, 'total', v_total);
+  -- id — чтобы страница попросила Worker сообщить учителю в Telegram
+  -- (/api/notify-submission): тот найдёт работу по id и отправит одно
+  -- сообщение. Прежние поля ответа — как были.
+  return jsonb_build_object('ok', true, 'id', v_id, 'correct', v_correct, 'auto', v_auto, 'open', v_open, 'total', v_total);
 end $$;
 
 

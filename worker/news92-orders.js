@@ -30,6 +30,15 @@
                                        уходит сообщение в Telegram
      POST /api/notify-payment        — только админ: оплата подтверждена →
                                        сообщение ученику в Telegram
+     POST /notify                    — сообщение в Telegram {user_id, type,
+                                       message}: себе, админом — кому угодно,
+                                       или сервером с заголовком X-Notify-Key
+     POST /api/notify-submission     — ученик сдал подборку: учителю одно
+                                       сообщение в Telegram (только свежие)
+     POST /telegram/webhook          — бот: /start <код> привязывает чат,
+                                       /stop отвязывает
+     GET  /api/telegram/bot          — имя бота для ссылки t.me/<бот>?start=
+     POST /api/telegram/setup        — только админ: подключить вебхук бота
 
    Секреты (Cloudflare → Worker → Settings → Variables and Secrets):
      ZAI_API_KEY           — Z.AI, фото. Если не задан — берётся GLM_API_KEY
@@ -44,9 +53,16 @@
      TELEGRAM_BOT_TOKEN    — бот для уведомлений (@BotFather). Без него
                              уведомлений просто нет, всё остальное работает
      ADMIN_CHAT_ID         — куда слать «новая заявка на оплату» (ваш chat_id)
+     TELEGRAM_WEBHOOK_SECRET — любая длинная строка (A-Z, a-z, 0-9, _ и -):
+                             Telegram присылает её в каждом запросе на
+                             /telegram/webhook, чужие запросы отбрасываются.
+                             Без неё вебхук не принимает ничего
+     NOTIFY_KEY            — необязательно: ключ для /notify с сервера
+                             (заголовок X-Notify-Key)
    Необязательные переменные:
      ZAI_MODEL             — по умолчанию glm-4.6v-flash
      SITE_URL              — по умолчанию https://news92-tg.github.io/skyschool/
+     TELEGRAM_BOT_USERNAME — имя бота без @; не задано — спросим у Telegram (getMe)
 
    Без SUPABASE_* Worker тоже работает: все считаются бесплатными,
    лимиты — в памяти по IP, история не пишется.
@@ -149,7 +165,7 @@ export default {
       return new Response(JSON.stringify({
         ok: true,
         service: "skyschool-ai",
-        endpoints: ["/api/check-text", "/api/check-photo", "/fast-check", ...LEGACY_PATHS]
+        endpoints: ["/api/check-text", "/api/check-photo", "/fast-check", "/notify", "/api/telegram/bot", ...LEGACY_PATHS]
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
@@ -218,6 +234,11 @@ export default {
       if (url.pathname === "/api/submit-homework") return await handleSubmit(request, env, url);
       if (url.pathname === "/api/payments") return await handlePayment(request, env, ctx);
       if (url.pathname === "/api/notify-payment") return await handleNotifyPayment(request, env);
+      if (url.pathname === "/notify" || url.pathname === "/api/notify") return await handleNotify(request, env);
+      if (url.pathname === "/api/notify-submission") return await handleNotifySubmission(request, env);
+      if (url.pathname === "/telegram/webhook") return await handleTelegramWebhook(request, env);
+      if (url.pathname === "/api/telegram/bot" && request.method === "GET") return await handleTelegramBot(env);
+      if (url.pathname === "/api/telegram/setup") return await handleTelegramSetup(request, env, url);
       const hw = url.pathname.match(/^\/api\/homework\/([^/]+)$/);
       if (hw && request.method === "GET") return await handleHomeworkGet(env, decodeURIComponent(hw[1]));
     } catch (e) {
@@ -755,7 +776,13 @@ async function handleCheckPhoto(request, env, ctx, url) {
   if (o.accuracy && !plan.plagiarism) return needPlan("plagiarism", "Проверка на списывание — в тарифе Премиум или отдельной покупкой");
 
   const rate = await rateHit(env, who, "check", plan.window_seconds, plan.requests_per_window, 1);
-  if (!rate.allowed) return tooMany(rate, plan);
+  if (!rate.allowed) {
+    /* Вошёл и привязал Telegram — раз в сутки напомним там, что лимит
+       кончился и когда будет следующая проверка. */
+    const warn = warnLimit(env, who, rate, plan).catch(e => console.warn("[limit warn]", e && e.message));
+    if (ctx && ctx.waitUntil) ctx.waitUntil(warn);
+    return tooMany(rate, plan);
+  }
 
   const z = await zai(env, {}, checkPrompt(o), "Проверь эту работу. Ответ — только JSON.", imgs);
   const { raw, parsed } = z.ok ? parseModelJson(z.content) : { raw: "" };
@@ -1731,6 +1758,205 @@ async function handleNotifyPayment(request, env) {
     : `Тариф «${info.plan_title || info.plan}» активен${info.expires_at ? " до " + ruDate(info.expires_at) : ""}.`;
   const res = await tgSend(env, info.chat_id, ["✅ Оплата подтверждена", what, `SkyySchool: ${site}photo.html`].join("\n"));
   return json({ sent: res.ok, reason: res.ok ? undefined : res.reason, description: res.description });
+}
+
+
+/* ============================================================
+   Telegram: уведомления и бот
+   ------------------------------------------------------------
+   Привязка: профиль просит у базы одноразовый код (telegram_link_start),
+   человек открывает t.me/<бот>?start=<код>, Telegram присылает сюда
+   /start <код> — sky_telegram_link сохраняет chat_id в user_telegram.
+   Вебхук принимает только запросы с секретом TELEGRAM_WEBHOOK_SECRET
+   (заголовок X-Telegram-Bot-Api-Secret-Token). Сообщения — обычный
+   текст: parse_mode не включаем, чтобы имя ученика вида «<b>» не
+   превращалось в разметку.
+   ============================================================ */
+
+const NOTIFY_TYPES = {
+  new_submission:    { icon: "📥", title: "Новая работа" },
+  payment_confirmed: { icon: "✅", title: "Оплата подтверждена" },
+  limit_warning:     { icon: "⏳", title: "Лимит проверок" },
+  test:              { icon: "👋", title: "Проверка связи" }
+};
+const NOTIFY_MAX_CHARS = 1000;
+const NOTIFY_SUB_LIMIT = { window: 600, max: 30 };   // /api/notify-submission с одного адреса
+
+const siteUrl = env => String(env.SITE_URL || DEFAULT_SITE).replace(/\/?$/, "/");
+
+/* Сравнение секретов за постоянное время: по времени ответа их не подобрать. */
+function safeEqual(a, b) {
+  a = String(a || ""); b = String(b || "");
+  if (!a || !b || a.length !== b.length) return false;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+}
+
+/* Текст от людей: без управляющих символов и не длиннее предела. */
+const cleanText = (v, max) => str(v).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").trim().slice(0, max);
+
+async function handleNotify(request, env) {
+  if (request.method !== "POST") return json({ error: "use POST", code: "method" }, 405);
+  if (!sbReady(env)) return json({ error: "Хранилище не настроено", code: "storage" }, 503);
+  let body;
+  try { body = await readJsonBody(request); } catch (e) { return json({ error: e.message, code: "bad_param" }, 400); }
+  body = body || {};
+  if (!isUuid(body.user_id)) return json({ error: "user_id must be a uuid", code: "bad_param" }, 400);
+  const kind = NOTIFY_TYPES[body.type];
+  if (!kind) return json({ error: "type must be one of: " + Object.keys(NOTIFY_TYPES).join(", "), code: "bad_param" }, 400);
+  const message = cleanText(body.message, NOTIFY_MAX_CHARS);
+
+  /* Кто может: сервер с ключом NOTIFY_KEY, админ — кому угодно,
+     остальные — только себе (кнопка «Проверить» в профиле). */
+  const byKey = env.NOTIFY_KEY && safeEqual(request.headers.get("X-Notify-Key"), env.NOTIFY_KEY);
+  if (!byKey) {
+    const who = await identify(request, env);
+    if (who.denied) return sessionExpired();
+    if (!who.userId) return json({ error: "Войдите в аккаунт", code: "login" }, 401);
+    if (who.userId !== body.user_id && !(await isAdminCaller(env, who.userId))) {
+      return json({ error: "Можно писать только себе", code: "forbidden" }, 403);
+    }
+  }
+
+  const chat = await sbRpc(env, "sky_telegram_chat", { p_user: body.user_id });
+  if (!chat) return json({ sent: false, reason: "no_chat" });
+  const res = await tgSend(env, chat, `${kind.icon} ${kind.title}` + (message ? "\n" + message : ""));
+  return json({ sent: res.ok, reason: res.ok ? undefined : res.reason, description: res.description });
+}
+
+/* Ученик сдал подборку — учителю одно сообщение. Входить не нужно
+   (сдают и без аккаунта), поэтому доверяем только базе: работа должна
+   существовать и быть свежей (15 минут), а sky_notify_once не даёт
+   отправить о ней второй раз. */
+async function handleNotifySubmission(request, env) {
+  if (request.method !== "POST") return json({ error: "use POST", code: "method" }, 405);
+  if (!sbReady(env)) return json({ error: "Хранилище не настроено", code: "storage" }, 503);
+  let body;
+  try { body = await readJsonBody(request); } catch (e) { return json({ error: e.message, code: "bad_param" }, 400); }
+  if (!body || body.kind !== "collection" || !isUuid(body.id)) return json({ error: "kind must be collection, id a uuid", code: "bad_param" }, 400);
+  const who = { userId: null, ip: request.headers.get("CF-Connecting-IP") || "" };
+  const rate = await rateHit(env, who, "notify-sub", NOTIFY_SUB_LIMIT.window, NOTIFY_SUB_LIMIT.max, 1);
+  if (!rate.allowed) return json({ error: "Слишком часто", code: "rate_limit", retry_after: rate.retry_after }, 429);
+
+  const info = await sbRpc(env, "sky_collection_submission_info", { p_id: body.id });
+  if (!info) return json({ sent: false, reason: "not_found" }, 404);
+  if (!info.chat_id) return json({ sent: false, reason: "no_chat" });
+  if (!(await sbRpc(env, "sky_notify_once", { p_key: "sub:" + body.id }))) return json({ sent: false, reason: "already" });
+
+  const pct = info.percent != null ? ` (${String(info.percent).replace(".", ",")}%)` : "";
+  const lines = [
+    `${NOTIFY_TYPES.new_submission.icon} ${NOTIFY_TYPES.new_submission.title}`,
+    `${cleanText(info.student_name, 100) || "Ученик"} сдал(а) «${cleanText(info.title, 200)}»: ${info.score} из ${info.total}${pct}`,
+    info.status === "pending" ? "Есть задания с развёрнутым ответом — ждут вашей проверки." : "",
+    `Открыть: ${siteUrl(env)}profile.html#inbox`
+  ].filter(Boolean);
+  const res = await tgSend(env, info.chat_id, lines.join("\n"));
+  return json({ sent: res.ok, reason: res.ok ? undefined : res.reason });
+}
+
+/* Лимит проверок кончился — раз в сутки сообщение в Telegram. */
+async function warnLimit(env, who, rate, plan) {
+  if (!who.userId || !sbReady(env) || !env.TELEGRAM_BOT_TOKEN) return;
+  const chat = await sbRpc(env, "sky_telegram_chat", { p_user: who.userId });
+  if (!chat) return;
+  const day = new Date().toISOString().slice(0, 10);
+  if (!(await sbRpc(env, "sky_notify_once", { p_key: `limit:${who.userId}:${day}` }))) return;
+  const mins = Math.max(1, Math.ceil((rate.retry_after || 60) / 60));
+  await tgSend(env, chat, [
+    `${NOTIFY_TYPES.limit_warning.icon} ${NOTIFY_TYPES.limit_warning.title}`,
+    `На тарифе «${planTitle(plan)}» проверки на это время закончились. Следующая — через ${mins} мин.`,
+    `Больше проверок: ${siteUrl(env)}profile.html#plan`
+  ].join("\n"));
+}
+
+async function handleTelegramWebhook(request, env) {
+  if (request.method !== "POST") return json({ error: "use POST", code: "method" }, 405);
+  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_WEBHOOK_SECRET) return json({ error: "Бот не настроен", code: "no_bot" }, 503);
+  if (!safeEqual(request.headers.get("X-Telegram-Bot-Api-Secret-Token"), env.TELEGRAM_WEBHOOK_SECRET)) {
+    return json({ error: "forbidden", code: "forbidden" }, 403);
+  }
+  let upd = null;
+  try { upd = await request.json(); } catch (e) { return json({ ok: true }); }
+  const msg = upd && (upd.message || upd.edited_message);
+  /* Только личные чаты: в группе /start с кодом увидели бы все. */
+  if (!msg || !msg.chat || msg.chat.type !== "private") return json({ ok: true });
+  const chatId = String(msg.chat.id);
+  const text = str(msg.text).trim();
+  const site = siteUrl(env);
+
+  let reply;
+  const start = text.match(/^\/start(?:@\w+)?(?:\s+([A-Za-z0-9_-]{16,64}))?\s*$/);
+  if (start && start[1] && sbReady(env)) {
+    const r = await sbRpc(env, "sky_telegram_link", { p_code: start[1], p_chat_id: chatId });
+    reply = r && r.ok
+      ? [`✅ Готово${r.name ? ", " + cleanText(r.name, 80) : ""}! Уведомления SkyySchool включены.`,
+         "Напишу, когда ученик сдаст работу, когда подтвердится оплата и когда закончится лимит проверок.",
+         "Отключить — команда /stop."].join("\n")
+      : ["Ссылка устарела или уже использована.",
+         `Откройте профиль и нажмите «Привязать Telegram» ещё раз: ${site}profile.html#telegram`].join("\n");
+  } else if (/^\/stop(?:@\w+)?\s*$/.test(text) && sbReady(env)) {
+    const n = await sbRpc(env, "sky_telegram_unlink", { p_chat_id: chatId });
+    reply = n ? "Уведомления выключены. Включить снова — в профиле на сайте." : "Этот чат и так не привязан к SkyySchool.";
+  } else {
+    reply = ["Это бот уведомлений SkyySchool.",
+             `Чтобы получать сообщения, откройте профиль и нажмите «Привязать Telegram»: ${site}profile.html#telegram`,
+             "/stop — отключить уведомления."].join("\n");
+  }
+  await tgSend(env, chatId, reply);
+  return json({ ok: true });
+}
+
+/* Имя бота — для ссылки t.me/<бот>?start=<код>. getMe спрашиваем
+   один раз на экземпляр Worker. */
+let botNameCache = null;
+async function botUsername(env) {
+  if (env.TELEGRAM_BOT_USERNAME) return String(env.TELEGRAM_BOT_USERNAME).replace(/^@/, "");
+  if (!env.TELEGRAM_BOT_TOKEN) return null;
+  if (botNameCache) return botNameCache;
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getMe`, { signal: AbortSignal.timeout(TG_TIMEOUT_MS) });
+    const d = await r.json();
+    botNameCache = d && d.ok && d.result && d.result.username || null;
+  } catch (e) { botNameCache = null; }
+  return botNameCache;
+}
+
+async function handleTelegramBot(env) {
+  const username = await botUsername(env);
+  return json({
+    ready: !!(env.TELEGRAM_BOT_TOKEN && username && env.TELEGRAM_WEBHOOK_SECRET && sbReady(env)),
+    username: username || null,
+    webhook_secret: !!env.TELEGRAM_WEBHOOK_SECRET
+  });
+}
+
+/* Один раз после развёртывания: сказать Telegram, куда слать сообщения
+   боту. Только админ. Адрес — этот же Worker. */
+async function handleTelegramSetup(request, env, url) {
+  if (request.method !== "POST") return json({ error: "use POST", code: "method" }, 405);
+  if (!sbReady(env)) return json({ error: "Хранилище не настроено", code: "storage" }, 503);
+  const who = await identify(request, env);
+  if (who.denied) return sessionExpired();
+  if (!who.userId) return json({ error: "Войдите", code: "login" }, 401);
+  if (!(await isAdminCaller(env, who.userId))) return json({ error: "Только для администратора", code: "forbidden" }, 403);
+  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_WEBHOOK_SECRET) {
+    return json({ error: "Задайте секреты TELEGRAM_BOT_TOKEN и TELEGRAM_WEBHOOK_SECRET", code: "no_bot" }, 503);
+  }
+  const hook = `${url.origin}/telegram/webhook`;
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/setWebhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: hook, secret_token: env.TELEGRAM_WEBHOOK_SECRET, allowed_updates: ["message"], drop_pending_updates: true }),
+      signal: AbortSignal.timeout(TG_TIMEOUT_MS)
+    });
+    const d = await r.json().catch(() => null);
+    if (!d || !d.ok) return json({ ok: false, error: str(d && d.description).slice(0, 200) || "Telegram не принял вебхук", code: "telegram" }, 502);
+    return json({ ok: true, webhook: hook, username: await botUsername(env) });
+  } catch (e) {
+    return json({ ok: false, error: "Telegram не ответил", code: "telegram" }, 502);
+  }
 }
 
 

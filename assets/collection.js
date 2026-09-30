@@ -197,7 +197,19 @@
       return;
     }
     try { sessionStorage.removeItem(DRAFT); } catch (err) {}
+    notifyTeacher(res.id);
     done_(res);
+  }
+
+  /* Учителю — сообщение в Telegram, если он его привязал. Отправляем
+     «в фоне» (sendBeacon): ученику ждать нечего и ошибка ему не
+     интересна. Worker сам проверит, что работа настоящая и свежая, и
+     не отправит о ней дважды. Прежний Worker такого адреса не знает —
+     ничего не случится. */
+  function notifyTeacher(id) {
+    const base = String(Sky.cfg.AI_BASE_ORDERS || Sky.cfg.AI_BASE || '').trim().replace(/\/+$/, '');
+    if (!id || !/^https?:\/\//.test(base) || !navigator.sendBeacon) return;
+    try { navigator.sendBeacon(base + '/api/notify-submission', JSON.stringify({ kind: 'collection', id })); } catch (e) {}
   }
 
   function done_(r) {

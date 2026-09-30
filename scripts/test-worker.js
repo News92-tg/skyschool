@@ -38,11 +38,13 @@ function ok(name, cond, extra) {
 let zaiQueue = [], zaiSent = [], sbCalls = [], windows = new Map(), storage = new Map(), rows = new Map(), payments = [];
 let groqQueue = [], groqSent = [], textLog = [];
 let tgSent = [], tgFail = false, payInfo = {}, zaiLastAuth = null;
+let tgChats = {}, tgCodes = {}, notifyLog = new Set(), subInfo = {}, tgHook = null;
 
 function reset() {
   zaiQueue = []; zaiSent = []; sbCalls = []; windows = new Map(); storage = new Map(); rows = new Map(); payments = [];
   groqQueue = []; groqSent = []; textLog = [];
   tgSent = []; tgFail = false; payInfo = {};
+  tgChats = {}; tgCodes = {}; notifyLog = new Set(); subInfo = {}; tgHook = null;
 }
 const zaiOk = (content, usage) => ({ status: 200, body: JSON.stringify({
   choices: [{ message: { content: typeof content === 'string' ? content : JSON.stringify(content) }, finish_reason: 'stop' }],
@@ -98,6 +100,8 @@ globalThis.fetch = async (input, init) => {
     if (!next) throw new Error('Groq: нет подготовленного ответа');
     return new Response(next.body, { status: next.status, headers: next.headers || {} });
   }
+  if (url.startsWith(TG) && /\/getMe$/.test(url)) return J({ ok: true, result: { username: 'SkyySchoolBot' } });
+  if (url.startsWith(TG) && /\/setWebhook$/.test(url)) { tgHook = JSON.parse(init.body); return J({ ok: true, result: true }); }
   if (url.startsWith(TG)) {
     tgSent.push({ url, body: JSON.parse(init.body) });
     return tgFail ? J({ ok: false, description: 'Bad Request: chat not found' }, 400) : J({ ok: true, result: { message_id: 1 } });
@@ -126,6 +130,28 @@ globalThis.fetch = async (input, init) => {
     if (p === '/rest/v1/rpc/sky_log_text') { textLog.push(JSON.parse(init.body)); return J('log-id'); }
     if (p === '/rest/v1/rpc/sky_submissions_update') return J(JSON.parse(init.body).p_items.length);
     if (p === '/rest/v1/rpc/sky_is_admin') return J(JSON.parse(init.body).p_user === 'u-admin');
+    /* Telegram — как функции из sql/schema-teacher-tools.sql */
+    if (p === '/rest/v1/rpc/sky_telegram_chat') return J(tgChats[JSON.parse(init.body).p_user] || null);
+    if (p === '/rest/v1/rpc/sky_notify_once') {
+      const k = JSON.parse(init.body).p_key;
+      if (notifyLog.has(k)) return J(false);
+      notifyLog.add(k); return J(true);
+    }
+    if (p === '/rest/v1/rpc/sky_telegram_link') {
+      const a = JSON.parse(init.body);
+      const u = tgCodes[a.p_code];
+      if (!u) return J({ ok: false, reason: 'bad_code' });
+      delete tgCodes[a.p_code];
+      tgChats[u] = a.p_chat_id;
+      return J({ ok: true, user_id: u, name: 'Ольга' });
+    }
+    if (p === '/rest/v1/rpc/sky_telegram_unlink') {
+      const c = JSON.parse(init.body).p_chat_id;
+      let n = 0;
+      for (const k of Object.keys(tgChats)) if (tgChats[k] === c) { delete tgChats[k]; n++; }
+      return J(n);
+    }
+    if (p === '/rest/v1/rpc/sky_collection_submission_info') return J(subInfo[JSON.parse(init.body).p_id] || null);
     if (p === '/rest/v1/rpc/sky_payment_info') {
       const id = JSON.parse(init.body).p_id;
       if (payInfo[id]) return J(payInfo[id]);
@@ -782,6 +808,117 @@ async function main() {
   r = await call('/explain', { method: 'POST', headers: { Origin: 'https://evil.test', 'Content-Type': 'application/json' }, body: '{"task":"x"}' });
   ok('чужой сайт — 403, как в прежнем коде', r.status === 403);
   ok('прежние адреса не трогают тарифы и Supabase', !sbCalls.length && !windows.size);
+
+
+  /* ---------- Telegram: /notify, вебхук, подборки, лимит ---------- */
+  reset();
+  const TGE = Object.assign({}, ENV, { TELEGRAM_BOT_TOKEN: 'bot-token', TELEGRAM_WEBHOOK_SECRET: 'hook_secret_123', NOTIFY_KEY: 'notify-key-1' });
+  const UA = 'aaaaaaaa-0000-4000-8000-000000000001';   // «u-free» в тестах — не uuid, берём настоящие
+  const post = (path, body, o) => call(path, Object.assign({ method: 'POST', env: TGE, body: JSON.stringify(body) }, o || {}));
+  r = await call('/health', { env: TGE });
+  ok('/health: в списке /notify и /api/telegram/bot', r.body.endpoints.includes('/notify') && r.body.endpoints.includes('/api/telegram/bot'));
+
+  r = await post('/notify', { user_id: UA, type: 'test', message: 'hi' });
+  ok('/notify без входа — 401', r.status === 401 && r.body.code === 'login');
+  r = await post('/notify', { user_id: UA, type: 'spam', message: 'x' }, { jwt: 'jwt-free' });
+  ok('/notify: неизвестный тип — 400', r.status === 400 && /new_submission/.test(r.body.error));
+  r = await post('/notify', { user_id: 'nope', type: 'test' }, { jwt: 'jwt-free' });
+  ok('/notify: user_id не uuid — 400', r.status === 400);
+  r = await post('/notify', { user_id: UA, type: 'test', message: 'x' }, { jwt: 'jwt-free' });
+  ok('/notify: чужому — 403', r.status === 403 && r.body.code === 'forbidden');
+
+  USERS['jwt-ua'] = UA;
+  r = await post('/notify', { user_id: UA, type: 'test', message: 'Уведомления работают.' }, { jwt: 'jwt-ua' });
+  ok('/notify себе без привязанного чата — sent:false, no_chat', r.status === 200 && r.body.sent === false && r.body.reason === 'no_chat' && !tgSent.length);
+  tgChats[UA] = '424242';
+  r = await post('/notify', { user_id: UA, type: 'test', message: 'Уведомления\u0007 работают.' }, { jwt: 'jwt-ua' });
+  ok('/notify себе — отправлено, текст с заголовком, без управляющих символов',
+    r.body.sent === true && tgSent[0].body.chat_id === '424242' && tgSent[0].body.text === '👋 Проверка связи\nУведомления работают.' && !tgSent[0].body.parse_mode, JSON.stringify(tgSent[0]));
+  r = await post('/notify', { user_id: UA, type: 'payment_confirmed', message: 'Премиум до 01.11' }, { jwt: 'jwt-admin' });
+  ok('/notify: админ — кому угодно', r.body.sent === true && /^✅ Оплата подтверждена\nПремиум/.test(tgSent[1].body.text));
+  r = await post('/notify', { user_id: UA, type: 'new_submission', message: 'x' }, { headers: { 'X-Notify-Key': 'notify-key-1' } });
+  ok('/notify: сервер с X-Notify-Key — без входа', r.body.sent === true && /^📥 Новая работа/.test(tgSent[2].body.text));
+  r = await post('/notify', { user_id: UA, type: 'test' }, { headers: { 'X-Notify-Key': 'notify-key-2' } });
+  ok('/notify: неверный ключ — как без входа', r.status === 401);
+  r = await post('/notify', { user_id: UA, type: 'test', message: 'x'.repeat(5000) }, { jwt: 'jwt-ua' });
+  ok('/notify: длинное сообщение обрезано до 1000', tgSent[3].body.text.length === '👋 Проверка связи\n'.length + 1000);
+  r = await call('/notify', { env: TGE, jwt: 'jwt-ua' });
+  ok('/notify GET — 405', r.status === 405);
+
+  /* вебхук бота */
+  tgSent = [];
+  const hook = (body, secret) => call('/telegram/webhook', { method: 'POST', env: TGE, body: JSON.stringify(body),
+    headers: secret === null ? {} : { 'X-Telegram-Bot-Api-Secret-Token': secret || 'hook_secret_123' } });
+  const msg = (text, type) => ({ update_id: 1, message: { message_id: 5, chat: { id: 777000111, type: type || 'private' }, text } });
+  r = await hook(msg('/start LCODE0000000000000000'), null);
+  ok('вебхук без секрета — 403, ничего не делает', r.status === 403 && !tgSent.length);
+  r = await hook(msg('/start LCODE0000000000000000'), 'hook_secret_124');
+  ok('вебхук с чужим секретом — 403', r.status === 403);
+  r = await call('/telegram/webhook', { method: 'POST', env: ENV, body: '{}', headers: { 'X-Telegram-Bot-Api-Secret-Token': 'x' } });
+  ok('вебхук без TELEGRAM_WEBHOOK_SECRET в Worker — 503', r.status === 503);
+  tgCodes['LCODE0000000000000000'] = UA;
+  delete tgChats[UA];
+  r = await hook(msg('/start LCODE0000000000000000'));
+  ok('/start <код> — чат привязан, ответ «Готово, Ольга»', r.status === 200 && tgChats[UA] === '777000111' &&
+    /^✅ Готово, Ольга!/.test(tgSent[0].body.text) && tgSent[0].body.chat_id === '777000111', JSON.stringify(tgSent[0]));
+  r = await hook(msg('/start LCODE0000000000000000'));
+  ok('тот же код второй раз — «Ссылка устарела»', /устарела/.test(tgSent[1].body.text) && /profile\.html#telegram/.test(tgSent[1].body.text));
+  tgCodes['LGROUP000000000000000'] = UA;
+  r = await hook(msg('/start LGROUP000000000000000', 'group'));
+  ok('в группе /start не привязывает и молчит', tgCodes['LGROUP000000000000000'] === UA && tgSent.length === 2);
+  r = await hook(msg('привет'));
+  ok('любой другой текст — подсказка со ссылкой на профиль', /Привязать Telegram/.test(tgSent[2].body.text));
+  r = await hook(msg('/stop'));
+  ok('/stop — чат отвязан', !tgChats[UA] && /выключены/.test(tgSent[3].body.text));
+  r = await hook({ update_id: 2, callback_query: {} });
+  ok('непонятное обновление — 200 и тишина', r.status === 200 && tgSent.length === 4);
+
+  /* имя бота и вебхук */
+  r = await call('/api/telegram/bot', { env: TGE });
+  ok('/api/telegram/bot: готов, имя из getMe', r.body.ready === true && r.body.username === 'SkyySchoolBot');
+  r = await call('/api/telegram/bot', { env: Object.assign({}, TGE, { TELEGRAM_BOT_USERNAME: '@MyBot' }) });
+  ok('/api/telegram/bot: имя из TELEGRAM_BOT_USERNAME без @', r.body.username === 'MyBot');
+  r = await call('/api/telegram/bot', { env: ENV });
+  ok('/api/telegram/bot без токена — ready:false', r.body.ready === false && r.body.username === null);
+  r = await call('/api/telegram/setup', { method: 'POST', env: TGE, jwt: 'jwt-free' });
+  ok('/api/telegram/setup — не админу 403', r.status === 403 && !tgHook);
+  r = await call('/api/telegram/setup', { method: 'POST', env: TGE, jwt: 'jwt-admin' });
+  ok('/api/telegram/setup — админ: вебхук на этот Worker с секретом', r.body.ok === true && tgHook.url === 'https://w.test/telegram/webhook' &&
+    tgHook.secret_token === 'hook_secret_123' && JSON.stringify(tgHook.allowed_updates) === '["message"]', JSON.stringify(tgHook));
+
+  /* работа по подборке — учителю */
+  tgSent = [];
+  const SUB = 'bbbbbbbb-0000-4000-8000-000000000009';
+  subInfo[SUB] = { id: SUB, teacher_id: UA, title: 'Дроби', student_name: 'Маша', score: 7, total: 10, percent: 70, status: 'pending', chat_id: '555111' };
+  r = await post('/api/notify-submission', { kind: 'collection', id: SUB });
+  ok('новая работа по подборке — учителю в Telegram', r.body.sent === true && tgSent[0].body.chat_id === '555111' &&
+    /Маша сдал\(а\) «Дроби»: 7 из 10 \(70%\)/.test(tgSent[0].body.text) && /ждут вашей проверки/.test(tgSent[0].body.text) && /profile\.html#inbox/.test(tgSent[0].body.text), tgSent[0] && tgSent[0].body.text);
+  r = await post('/api/notify-submission', { kind: 'collection', id: SUB });
+  ok('о той же работе второй раз — нет', r.body.sent === false && r.body.reason === 'already' && tgSent.length === 1);
+  r = await post('/api/notify-submission', { kind: 'collection', id: 'cccccccc-0000-4000-8000-000000000001' });
+  ok('несуществующая или старая работа — 404', r.status === 404);
+  subInfo['dddddddd-0000-4000-8000-000000000001'] = Object.assign({}, subInfo[SUB], { chat_id: null });
+  r = await post('/api/notify-submission', { kind: 'collection', id: 'dddddddd-0000-4000-8000-000000000001' });
+  ok('учитель без Telegram — no_chat', r.body.reason === 'no_chat');
+  r = await post('/api/notify-submission', { kind: 'homework', id: SUB });
+  ok('другой kind — 400', r.status === 400);
+  r = await call('/api/notify-submission', { method: 'POST', env: TGE, body: SUB });
+  ok('тело не JSON — 400', r.status === 400);
+
+  /* лимит кончился — предупреждение раз в сутки */
+  tgSent = [];
+  tgChats['u-free'] = '999888';
+  zaiQueue.push(zaiOk(full));
+  r = await call('/api/check-photo?img=' + q(IMG) + '&mode=grade', { jwt: 'jwt-free', env: TGE });
+  ok('проверка по лимиту прошла — предупреждения нет', r.status === 200 && !tgSent.length);
+  r = await call('/api/check-photo?img=' + q(IMG) + '&mode=grade', { jwt: 'jwt-free', env: TGE });
+  ok('лимит кончился — 429 и сообщение в Telegram', r.status === 429 && tgSent.length === 1 &&
+    /^⏳ Лимит проверок\nНа тарифе «Бесплатный» проверки на это время закончились\. Следующая — через 10 мин\./.test(tgSent[0].body.text), tgSent[0] && tgSent[0].body.text);
+  r = await call('/api/check-photo?img=' + q(IMG) + '&mode=grade', { jwt: 'jwt-free', env: TGE });
+  ok('второй раз за сутки — без сообщения', r.status === 429 && tgSent.length === 1);
+  r = await call('/api/check-photo?img=' + q(IMG) + '&mode=grade', { ip: '10.9.9.9', env: TGE });
+  r = await call('/api/check-photo?img=' + q(IMG) + '&mode=grade', { ip: '10.9.9.9', env: TGE });
+  ok('без входа — предупреждать некого', tgSent.length === 1);
 
   /* ---------- без Supabase ---------- */
   reset();

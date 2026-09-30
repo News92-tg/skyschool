@@ -93,6 +93,80 @@ reset role;
 select set_config('request.jwt.claim.sub', '', false);
 
 -- ---------------------------------------------------------------------
+-- 3. Telegram: привязка по коду, уведомления один раз
+-- ---------------------------------------------------------------------
+set role authenticated;
+select set_config('request.jwt.claim.sub', '77777777-0000-0000-0000-000000000001', false);
+create temp table _c1 as select telegram_link_start() as r;
+create temp table _c2 as select telegram_link_start() as r;
+reset role;
+select t_check('код привязки: 33 символа, начинается с L, живёт 15 минут',
+  (select r->>'code' ~ '^L[0-9a-f]{32}$' and (r->>'expires_at')::timestamptz between now() + interval '14 minutes' and now() + interval '16 minutes' from _c2));
+select t_check('новый код гасит прежний: у человека один код',
+  (select count(*) = 1 from telegram_link_codes where user_id = '77777777-0000-0000-0000-000000000001')
+  and not exists (select 1 from telegram_link_codes where code = (select r->>'code' from _c1)));
+
+set role authenticated;
+select t_expect_denied('код не прочитать из таблицы напрямую', $q$ select count(*) from telegram_link_codes $q$);
+select t_expect_denied('пользователь не привязывает чат сам', $q$ select sky_telegram_link('Lx', '123456') $q$);
+select t_expect_denied('пользователь не узнаёт чужой chat_id', $q$ select sky_telegram_chat('77777777-0000-0000-0000-000000000002') $q$);
+select t_expect_denied('пользователь не пишет журнал уведомлений', $q$ select sky_notify_once('x') $q$);
+reset role;
+set role anon;
+select t_expect_denied('аноним не получает код', $q$ select telegram_link_start() $q$);
+reset role;
+select set_config('request.jwt.claim.sub', '', false);
+
+-- временные таблицы выше принадлежат authenticated — код берём в переменную psql
+select r->>'code' as code2 from _c2 \gset
+insert into collection_submissions (collection_id, student_name, answers, score, percent, status)
+  values ('77777777-1111-0000-0000-000000000001', 'Лена', '{}', 1, 50, 'pending');
+select (select id from collection_submissions where student_name = 'Лена') as sub_fresh,
+       (select id from collection_submissions where student_name = 'Ваня') as sub_old \gset
+set role service_role;
+create temp table _l0 as select sky_telegram_link('Lnope000000000000000000000000000', '123456') as r;
+create temp table _l1 as select sky_telegram_link(:'code2', '987654321') as r;
+create temp table _l2 as select sky_telegram_link(:'code2', '987654321') as r;
+reset role;
+select t_check('чужой код — не привязывает', (select r->>'ok' = 'false' and r->>'reason' = 'bad_code' from _l0));
+select t_check('верный код — чат привязан, имя в ответе',
+  (select r->>'ok' = 'true' and r->>'name' = 'Ольга Сергеевна' from _l1)
+  and (select chat_id = '987654321' from user_telegram where user_id = '77777777-0000-0000-0000-000000000001'));
+select t_check('код одноразовый', (select r->>'reason' = 'bad_code' from _l2));
+
+insert into telegram_link_codes (code, user_id, expires_at)
+  values ('Lexpired00000000000000000000000000', '77777777-0000-0000-0000-000000000002', now() - interval '1 minute');
+set role service_role;
+create temp table _l3 as select sky_telegram_link('Lexpired00000000000000000000000000', '555555') as r;
+create temp table _l4 as select sky_telegram_link('Lwhatever0000000000000000000000000', 'not-a-chat') as r;
+create temp table _n as select sky_notify_once('sub:abc') as a, null::boolean as b;
+update _n set b = sky_notify_once('sub:abc');
+create temp table _ci as select sky_collection_submission_info(:'sub_fresh') as fresh, sky_collection_submission_info(:'sub_old') as old;
+create temp table _chat as select sky_telegram_chat('77777777-0000-0000-0000-000000000001') as c;
+create temp table _un as select sky_telegram_unlink('987654321') as n;
+reset role;
+select t_check('просроченный код не работает', (select r->>'reason' = 'bad_code' from _l3));
+select t_check('не номер чата — отказ', (select r->>'reason' = 'bad_chat' from _l4));
+select t_check('уведомление один раз: true, потом false', (select a and not b from _n));
+select t_check('свежая работа: учитель, чат, подборка, баллы',
+  (select fresh->>'teacher_id' = '77777777-0000-0000-0000-000000000001' and fresh->>'chat_id' = '987654321'
+          and fresh->>'title' = 'Дроби' and (fresh->>'total')::int = 1 and (fresh->>'percent')::numeric = 50 from _ci), (select fresh::text from _ci));
+select t_check('работа трёхдневной давности — не для уведомления', (select old is null from _ci));
+select t_check('chat_id по пользователю — Worker', (select c = '987654321' from _chat));
+select t_check('/stop — чат отвязан', (select n = 1 from _un) and not exists (select 1 from user_telegram where chat_id = '987654321'));
+
+-- submit_collection отдаёт id работы — по нему Worker находит, кому писать
+select share_code as drobi_code from task_collections where id = '77777777-1111-0000-0000-000000000001' \gset
+set role authenticated;
+select set_config('request.jwt.claim.sub', '77777777-0000-0000-0000-000000000003', false);
+create temp table _sub as select submit_collection(:'drobi_code', null, '[{"task_id":"t1","answer":"2"}]'::jsonb) as r;
+reset role;
+select set_config('request.jwt.claim.sub', '', false);
+select t_check('submit_collection: в ответе id созданной работы, прежние поля на месте',
+  (select r->>'ok' = 'true' and (r->>'correct')::int = 1 and (r->>'total')::int = 1 from _sub)
+  and exists (select 1 from collection_submissions where id = (select (r->>'id')::uuid from _sub) and student_name = 'Ваня'), (select r::text from _sub));
+
+-- ---------------------------------------------------------------------
 -- Итог
 -- ---------------------------------------------------------------------
 \o

@@ -138,6 +138,21 @@ Sky.db = (function () {
     return true;
   }
  
+  /* Удалить строки по условию — для таблиц, где ключ не id
+     (user_telegram: user_id). RLS решает, что из этого можно. */
+  async function removeWhere(table, filter) {
+    if (mode === 'cloud' && sb) {
+      let q = sb.from(table).delete();
+      for (const [k, v] of Object.entries(filter || {})) q = q.eq(k, v);
+      const { error } = await q;
+      if (error) { showError(error); return false; }
+      return true;
+    }
+    const match = r => Object.entries(filter || {}).every(([k, v]) => r[k] === v);
+    saveTable(table, localTable(table).filter(r => !match(r)));
+    return true;
+  }
+
   async function signUp(email, password, meta) {
     if (mode === 'cloud' && sb) {
       const { data, error } = await sb.auth.signUp({
@@ -339,7 +354,7 @@ Sky.db = (function () {
     ready, TABLES,
     get mode() { return mode; },
     isCloud: () => mode === 'cloud',
-    list, insert, update, remove, subscribe,
+    list, insert, update, remove, removeWhere, subscribe,
     signUp, signIn, signInGoogle, signOut, becomeLocal,
     resetPassword, updatePassword, authProviders, isRecovery: () => recovery,
     me, isTeacher, isStudent, token, rpc, upload, removeFiles, signedUrl,
