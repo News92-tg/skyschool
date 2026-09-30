@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Быстрая проверка теста — SkyySchool</title>
+<meta name="theme-color" content="#f6faff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon-512.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/sky.css">
+<!-- Быстрая проверка теста: эталон + до 30 работ → таблица «верно/всего,
+     %, оценка» и CSV. Логика — assets/fast-check.js, проверяет
+     POST /fast-check в Worker news92-orders (worker/news92-orders.js). -->
+<style>
+  .fc-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin-top:18px}
+  @media (max-width:760px){.fc-grid{grid-template-columns:1fr}}
+  .fc-step{display:grid;gap:12px;align-content:start}
+  .fc-step h2{margin:0;font-size:16px;display:flex;align-items:center;gap:9px}
+  .fc-step h2 .n{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:#fff;font-size:13px}
+  .fc-step p{margin:0;font-size:12.5px;line-height:1.5;color:var(--muted)}
+  .fc-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .fc-row{display:grid;grid-template-columns:minmax(0,1fr) 120px 110px;gap:10px}
+  @media (max-width:520px){.fc-row{grid-template-columns:1fr 1fr}.fc-row .field:first-child{grid-column:1/-1}}
+  .fc-scale{font-size:12.5px;color:var(--muted);line-height:1.6}
+  .fc-scale b{color:var(--ink)}
+
+  .cap-note{margin-top:8px;font-size:12px;color:var(--muted)}
+  .limit-note{margin-top:10px;padding:11px 13px;border-radius:12px;background:var(--warn-soft);
+    color:var(--warn);font-size:13px;font-weight:700;line-height:1.5}
+  .progress{margin-top:12px;height:auto;overflow:visible;background:none;border:0;border-radius:0}
+  .progress-text{font-size:13px;font-weight:800;margin-bottom:6px}
+  .progress-bar{height:8px;border-radius:99px;background:var(--panel-2);overflow:hidden}
+  .progress-bar i{display:block;height:100%;width:0;background:var(--accent);border-radius:99px;transition:width .25s}
+  .progress-bar.indef i{width:35%;animation:pgrun 1.2s ease-in-out infinite}
+  @keyframes pgrun{from{transform:translateX(-100%)}to{transform:translateX(290%)}}
+  @media (prefers-reduced-motion:reduce){.progress-bar.indef i{animation:none;width:100%;opacity:.5}}
+
+  .roster{display:grid;gap:8px}
+  .roster:empty{display:none}
+  .roster-row{display:grid;grid-template-columns:48px minmax(0,1fr) 84px 32px;gap:8px;align-items:center}
+  .roster-row.ref{grid-template-columns:48px minmax(0,1fr) 32px}
+  .roster-row img{width:48px;height:48px;object-fit:cover;border-radius:10px;border:1px solid var(--line);display:block}
+  .roster-row input{width:100%;min-width:0;padding:9px 10px;border:1px solid var(--line);border-radius:10px;
+    background:var(--panel);color:var(--ink);font:inherit;font-size:13px}
+  .roster-row .rm{width:32px;height:32px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);
+    color:var(--muted);font-size:16px;line-height:1;cursor:pointer}
+  .roster-row .who-line{font-size:13px;font-weight:700;min-width:0}
+  @media (max-width:480px){.roster-row{grid-template-columns:44px minmax(0,1fr) 64px 30px}}
+
+  .table-wrap{overflow-x:auto;margin-top:14px;-webkit-overflow-scrolling:touch}
+  .rtable{width:100%;border-collapse:collapse;font-size:13px;min-width:480px}
+  .rtable th{text-align:left;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);
+    padding:8px;border-bottom:1px solid var(--line);white-space:nowrap}
+  .rtable td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.5}
+  .rtable .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .rtable tr.failed td{color:var(--muted)}
+  .rtable details summary{cursor:pointer;font-size:12px;color:var(--accent);font-weight:700}
+  .rtable details ul{margin:6px 0 0;padding-left:16px;font-size:12px}
+  /* телефон: главное — ученик, верно, %, оценка; № и класс прячем */
+  @media (max-width:560px){.rtable{min-width:0}.rtable .c-n,.rtable .c-cls{display:none}.rtable td,.rtable th{padding:8px 5px}}
+  .gr{display:inline-grid;place-items:center;min-width:30px;height:30px;padding:0 6px;border-radius:9px;color:#fff;font-weight:900;grid-template-columns:none}
+  .gr.g5{background:var(--ok)} .gr.g4{background:#4c9f4c} .gr.g3{background:var(--warn)}
+  .gr.g2{background:#e07a3f} .gr.g1{background:var(--no)} .gr.gx{background:var(--faint)}
+  .fc-dist{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+  .fc-dist span{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid var(--line);border-radius:99px;font-size:12.5px;font-weight:800;background:var(--panel)}
+
+  /* кнопка «Тарифы» в шапке (её ставит photo-api.js) — как в photo.html:
+     на телефоне шапка узкая, кнопку прячем */
+  .tariffs-hdr{white-space:nowrap}
+  @media (max-width:760px){.tariffs-hdr{display:none}}
+  /* окно «Тарифы» (SkyCheck.openTariffs) — как в photo.html */
+  .tf-list{display:grid;gap:10px}
+  .tf-card{border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;gap:8px}
+  .tf-card.current{border-color:var(--ok)}
+  .tf-card.focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)}
+  .tf-card.addon{margin-top:10px}
+  .tf-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+  .tf-price{font-weight:900;font-size:17px;white-space:nowrap}
+  .tf-card ul{margin:0;padding-left:18px;font-size:12.5px;line-height:1.6}
+  .tf-card .btn,.tf-card .tag{justify-self:start}
+</style>
+</head>
+<body>
+<header id="appHeader"></header>
+
+<main class="wrap">
+  <h1 data-i18n="fcH1"></h1>
+  <p class="lead" data-i18n="fcLead"></p>
+  <p class="note hidden" id="fcNote" style="border-left-color:var(--warn)"></p>
+
+  <div class="fc-grid">
+    <div class="panel fc-step">
+      <h2><span class="n">1</span><span data-i18n="fcRefH"></span></h2>
+      <p data-i18n="fcRefP"></p>
+      <div class="fc-acts"><button type="button" class="btn ghost" id="fcRefPick" data-i18n="fcRefPick"></button></div>
+      <input type="file" id="fcRefFile" accept="image/jpeg,image/png,image/webp" hidden>
+      <div class="roster" id="fcRef"></div>
+      <div class="fc-row">
+        <div class="field"><label data-i18n="fcSubject"></label><select id="fcSubject"></select></div>
+        <div class="field"><label data-i18n="fcTotal"></label><input type="number" id="fcTotal" min="1" max="200" inputmode="numeric" placeholder="20"></div>
+        <div class="field"><label data-i18n="fcClass"></label><input type="text" id="fcClass" maxlength="20" placeholder="7Б"></div>
+      </div>
+      <div class="fc-scale" id="fcScale"></div>
+    </div>
+
+    <div class="panel fc-step">
+      <h2><span class="n">2</span><span data-i18n="fcWorksH"></span></h2>
+      <p data-i18n="fcWorksP"></p>
+      <div class="fc-acts">
+        <button type="button" class="btn ghost" id="fcPick" data-i18n="fcPick"></button>
+        <button type="button" class="btn ghost small hidden" id="fcClear" data-i18n="fcClear"></button>
+        <span class="cap-note" id="fcCount" style="margin:0"></span>
+      </div>
+      <input type="file" id="fcFiles" accept="image/jpeg,image/png,image/webp" multiple hidden>
+      <div class="roster" id="fcRoster"></div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:16px">
+    <button type="button" class="btn full big" id="fcRun" disabled data-i18n="fcRun"></button>
+    <div class="progress hidden" id="fcProgress" aria-live="polite">
+      <div class="progress-text"></div>
+      <div class="progress-bar"><i></i></div>
+    </div>
+  </div>
+
+  <div class="section hidden" id="fcResultSec">
+    <div class="section-head"><h2 data-i18n="fcResults"></h2><button type="button" class="btn ghost small" id="fcCsv" data-i18n="fcCsv"></button></div>
+    <div class="panel" id="fcResult"></div>
+  </div>
+</main>
+
+<footer id="appFooter"></footer>
+
+<script src="assets/config.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/db.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/photo-api.js"></script>
+<script src="assets/fast-check.js"></script>
+</body>
+</html>

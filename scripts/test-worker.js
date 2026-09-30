@@ -392,6 +392,45 @@ async function main() {
   r = await call('/api/check-test', { jwt: 'jwt-premium' });
   ok('тест GET — 405', r.status === 405);
 
+  /* ---------- /fast-check ---------- */
+  reset();
+  /* 4 работы — один запрос (эталон + 4 фото); верных 10, 8, 7, 5 из 10 */
+  const fastScores = [10, 8, 7, 5];
+  zaiQueue.push(zaiOk({ reference: { answers: [{ n: 1, answer: 'А' }] },
+    students: fastScores.map((c, i) => ({ index: i + 1, name: 'Ученик ' + (i + 1), class: '7Б', correct: c, total: 10 })) }));
+  const fastBody = JSON.stringify({ reference_img: IMG, student_imgs: fastScores.map((_, i) => IMG + '&f=' + i), total: 10 });
+  r = await call('/fast-check', { method: 'POST', body: fastBody, jwt: 'jwt-premium', headers: { 'Content-Type': 'application/json' } });
+  const fs1 = (r.body && r.body.students) || [];
+  ok('/fast-check: 200, одним запросом (эталон + 4 работы), ссылки строками', r.status === 200 && zaiSent.length === 1 && zaiSent[0].messages[1].content.length === 6, r.text.slice(0, 200));
+  ok('/fast-check: оценки 100% → 5, 80% → 4, 70% → 3, 50% → 2', fs1.map(s => s.grade).join() === '5,4,3,2' && fs1.map(s => s.percent).join() === '100,80,70,50');
+  ok('/fast-check: name, correct, total, percent, grade', fs1[1].name === 'Ученик 2' && fs1[1].correct === 8 && fs1[1].total === 10);
+  ok('/fast-check: итог — средняя оценка и распределение', r.body.summary.avg_grade === 3.5 && r.body.summary.grades[5] === 1 && r.body.summary.grades[2] === 1);
+  const fcsv = decodeURIComponent((r.body.csv_url || '').split(',').slice(1).join(','));
+  ok('/fast-check: CSV «ФИО,Класс,Верно,Всего,%,Оценка»', fcsv.startsWith('﻿ФИО,Класс,Верно,Всего,%,Оценка\r\nУченик 1,7Б,10,10,100,5\r\n'), fcsv.slice(0, 80));
+  const flog = sbCalls.find(c => c.path === '/rest/v1/rpc/sky_log_check');
+  ok('/fast-check: в историю с mode=fast-check', flog && JSON.parse(flog.body).p_mode === 'fast-check');
+
+  /* границы порогов: 90 → 5, 89 → 4, 75 → 4, 74 → 3, 60 → 3, 59 → 2 */
+  reset();
+  const edge = [[90, 100, 5], [89, 100, 4], [75, 100, 4], [74, 100, 3], [60, 100, 3], [59, 100, 2]];
+  zaiQueue.push(zaiOk({ students: edge.slice(0, 5).map(([c, t], i) => ({ index: i + 1, correct: c, total: t })) }),
+    zaiOk({ students: [{ index: 1, correct: 59, total: 100 }] }));
+  r = await call('/api/fast-check', { method: 'POST', jwt: 'jwt-premium',
+    body: JSON.stringify({ reference_img: IMG, student_imgs: edge.map((_, i) => ({ img: IMG + '&e=' + i })), total: 100 }) });
+  ok('/api/fast-check: границы 90/75/60', r.status === 200 && r.body.students.map(s => s.grade).join() === edge.map(e => e[2]).join(), r.body && JSON.stringify(r.body.students.map(s => [s.percent, s.grade])));
+
+  r = await call('/fast-check', { method: 'POST', body: fastBody, jwt: 'jwt-paid' });
+  ok('/fast-check на Платном — 402 (как проверка теста)', r.status === 402);
+  r = await call('/fast-check', { method: 'POST', body: JSON.stringify({ student_imgs: [IMG] }), jwt: 'jwt-premium' });
+  ok('/fast-check без эталона — 400', r.status === 400);
+  r = await call('/health');
+  ok('/health: /fast-check в списке', r.body.endpoints.includes('/fast-check') && r.body.endpoints.includes('/api/check-photo'));
+  reset();
+  zaiQueue.push(zaiOk({ students: fastScores.map((c, i) => ({ index: i + 1, correct: c, total: 10 })) }));
+  r = await call('/api/check-test', { method: 'POST', body: fastBody, jwt: 'jwt-premium' });
+  ok('/api/check-test как раньше: без оценки, прежний CSV', r.status === 200 && !('grade' in r.body.students[0]) && !('avg_grade' in r.body.summary) &&
+    decodeURIComponent(r.body.csv_url.split(',').slice(1).join(',')).startsWith('﻿ФИО,Класс,Верно,Всего,Процент,Ошибки'));
+
   /* ---------- /api/check-teacher-report ---------- */
   reset();
   const sid = '11111111-2222-3333-4444-555555555555';

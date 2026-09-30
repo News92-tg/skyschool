@@ -62,6 +62,7 @@ window.Sky = (function () {
     navPhoto:{ru:'Домашка по фото',en:'Photo homework'},
     navHomework:{ru:'Задания',en:'Homework'},
     navCollections:{ru:'Подборки',en:'Collections'},
+    navFastCheck:{ru:'Быстрая проверка теста',en:'Quick test check'},
 
     /* общее */
     save:{ru:'Сохранить',en:'Save'},
@@ -219,6 +220,7 @@ window.Sky = (function () {
     { href:'classroom.html',    key:'navClassroom', group:'class' },
     { href:'headteacher.html',  key:'navDean',      group:'class' },
     { href:'pe.html',           key:'navPe',        group:'class' },
+    { href:'fast-check.html',   key:'navFastCheck', group:'class' },
     { href:'psychologist.html', key:'navPsy',       group:'development' },
     { href:'life.html',         key:'navLife',      group:'development' },
     { href:'trackers.html',     key:'navTrack',     group:'development' },

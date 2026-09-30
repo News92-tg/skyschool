@@ -202,7 +202,7 @@ window.SkyCheck = (function () {
     /* У прежнего Worker адресов /api/… нет (режим учителя, отправка
        работ по ссылке, заявки на оплату): такие запросы не отправляем
        вовсе и сразу отдаём понятную ошибку вместо 404. */
-    if (m === 'legacy' && /^\/api\//.test(path)) return { ok: false, status: 0, data: { code: 'unsupported' } };
+    if (m === 'legacy' && /^\/(api\/|fast-check)/.test(path)) return { ok: false, status: 0, data: { code: 'unsupported' } };
     const ctl = new AbortController();
     let timer = null;
     const arm = () => { clearTimeout(timer); if (o.timeout) timer = setTimeout(() => ctl.abort(), o.timeout); };

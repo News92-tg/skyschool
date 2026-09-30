@@ -20,6 +20,9 @@
                                        параметров — прежнее поведение.
      GET  /api/limits                — тариф и остаток запросов
      POST /api/check-test            — тест: эталон + работы учеников
+     POST /fast-check                — быстрая проверка теста: то же +
+                                       оценка по проценту (90/75/60), CSV
+                                       «ФИО, класс, верно, всего, %, оценка»
      POST /api/check-teacher-report  — класс: по фото на ученика, CSV
      POST /api/submit-homework       — ученик отправляет работу по ссылке
      GET  /api/homework/:id          — работа по ссылке
@@ -128,7 +131,7 @@ export default {
       return new Response(JSON.stringify({
         ok: true,
         service: "skyschool-ai",
-        endpoints: ["/api/check-text", "/api/check-photo", ...LEGACY_PATHS]
+        endpoints: ["/api/check-text", "/api/check-photo", "/fast-check", ...LEGACY_PATHS]
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
@@ -191,6 +194,7 @@ export default {
       if (url.pathname === "/api/check-text") return await handleCheckText(request, env, ctx, url);
       if (url.pathname === "/api/limits" && request.method === "GET") return await handleLimits(request, env);
       if (url.pathname === "/api/check-test") return await handleCheckTest(request, env, ctx);
+      if (url.pathname === "/fast-check" || url.pathname === "/api/fast-check") return await handleCheckTest(request, env, ctx, true);
       if (url.pathname === "/api/check-teacher-report") return await handleTeacherReport(request, env, ctx);
       if (url.pathname === "/api/submit-homework") return await handleSubmit(request, env, url);
       if (url.pathname === "/api/payments") return await handlePayment(request, env);
@@ -1217,7 +1221,15 @@ function testPrompt(subject, total, people) {
   ].filter(l => l !== null).join("\n");
 }
 
-async function handleCheckTest(request, env, ctx) {
+/* Быстрая проверка (/fast-check): оценка по доле верных ответов. */
+const gradeByPercent = p => p >= 90 ? 5 : p >= 75 ? 4 : p >= 60 ? 3 : 2;
+
+/* /api/check-test и /fast-check — один и тот же разбор: 1-е фото —
+   эталон, дальше работы, по TEST_BATCH работ на запрос к модели
+   (больше картинок за раз glm-4.6v-flash читает хуже). fast — ещё
+   оценка у каждого ученика и CSV «ФИО, класс, верно, всего, %,
+   оценка». */
+async function handleCheckTest(request, env, ctx, fast) {
   if (request.method !== "POST") return json({ error: "use POST", code: "method" }, 405);
   let body, people, subject, total;
   try {
@@ -1285,6 +1297,7 @@ async function handleCheckTest(request, env, ctx) {
         correct: right,
         total: all,
         percent: all ? Math.round(right / all * 100) : 0,
+        grade: fast ? gradeByPercent(all ? Math.round(right / all * 100) : 0) : undefined,
         errors: (Array.isArray(s.errors) ? s.errors : []).filter(e => e && typeof e === "object")
           .map(e => ({ n: clampInt(e.n, 1, 1000), student: str(e.student), correct: str(e.correct) })),
         comment: str(s.comment),
@@ -1305,12 +1318,22 @@ async function handleCheckTest(request, env, ctx) {
       total: total || (reference ? reference.answers.length : null),
       avg_percent: ok.length ? Math.round(ok.reduce((a, s) => a + s.percent, 0) / ok.length) : null
     };
-    const csv_url = csvDataUrl(["ФИО", "Класс", "Верно", "Всего", "Процент", "Ошибки"],
-      students.map(s => [s.name, s.class, s.status === "ok" ? s.correct : "", s.status === "ok" ? s.total : "",
-        s.status === "ok" ? s.percent : "", s.status === "ok" ? s.errors.map(e => `№${e.n}: ${e.student} → ${e.correct}`).join("; ") : s.error]));
+    if (fast) {
+      summary.avg_grade = ok.length ? Math.round(ok.reduce((a, s) => a + s.grade, 0) / ok.length * 10) / 10 : null;
+      summary.grades = { 5: 0, 4: 0, 3: 0, 2: 0 };
+      ok.forEach(s => { summary.grades[s.grade]++; });
+    }
+    const csv_url = fast
+      ? csvDataUrl(["ФИО", "Класс", "Верно", "Всего", "%", "Оценка"],
+          students.map(s => s.status === "ok"
+            ? [s.name, s.class, s.correct, s.total, s.percent, s.grade]
+            : [s.name, s.class, "", "", "", "Не проверено: " + s.error]))
+      : csvDataUrl(["ФИО", "Класс", "Верно", "Всего", "Процент", "Ошибки"],
+          students.map(s => [s.name, s.class, s.status === "ok" ? s.correct : "", s.status === "ok" ? s.total : "",
+            s.status === "ok" ? s.percent : "", s.status === "ok" ? s.errors.map(e => `№${e.n}: ${e.student} → ${e.correct}`).join("; ") : s.error]));
 
     const out = { reference, students, summary, tokens_used: usage, csv_url };
-    await logCheck(env, who, body.reference_img, { subject, mode: "test", length: null },
+    await logCheck(env, who, body.reference_img, { subject, mode: fast ? "fast-check" : "test", length: null },
       { reference, students, summary }, usage.total);
     return { status: 200, body: out };
   });
