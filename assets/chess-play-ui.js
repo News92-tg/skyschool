@@ -251,6 +251,10 @@
   function newGame() {
     const start = () => {
       best = null; bestWaiting = null; peekSq = -1;
+      /* после «Сдаться» — через кнопку панели режимов (chess-game-modes.js):
+         она же снимает у себя отметку «сдался» */
+      const proxy = $('gNewProxy');
+      if (boardEl.classList.contains('game-board-locked') && proxy) { proxy.click(); return; }
       boardEl.classList.remove('game-board-locked');
       if (typeof window.newGame === 'function') window.newGame();
       else { const b = $('gNew'); if (b) b.click(); }
@@ -286,7 +290,36 @@
     syncDock();
   }
 
-  document.addEventListener('langchange', () => setTimeout(paint, 0));
+  /* ---------- «Сдаться» ----------
+     Кнопка есть в панели режимов (chess-game-modes.js), но при
+     пошаговом запуске партии (chess-game-flow.js) эта панель скрыта —
+     сдаться было нельзя. Ставим такую же рядом с «Перевернуть доску»:
+     нажатие и доступность — как у исходной. */
+  const actions = document.querySelector('#tab-game .side .actions');
+  let resignBtn = null;
+  function syncResign() {
+    if (!resignBtn) return;
+    const src = $('gSurrender');
+    resignBtn.textContent = tx('Сдаться', 'Resign');
+    resignBtn.hidden = !src;
+    resignBtn.disabled = !src || src.disabled;
+  }
+  if (actions) {
+    resignBtn = document.createElement('button');
+    resignBtn.type = 'button';
+    resignBtn.id = 'gResign';
+    resignBtn.className = 'btn ghost small g-resign';
+    resignBtn.hidden = true;
+    actions.appendChild(resignBtn);
+    resignBtn.addEventListener('click', () => { const src = $('gSurrender'); if (src && !src.disabled) src.click(); setTimeout(syncResign, 0); });
+    const status = $('gStatus');
+    /* панель режимов обновляет свою кнопку по тем же изменениям — читаем после неё */
+    if (status) new MutationObserver(() => setTimeout(syncResign, 0)).observe(status, { childList: true, subtree: true, characterData: true });
+    document.addEventListener('DOMContentLoaded', () => setTimeout(syncResign, 50));
+    setTimeout(syncResign, 50);
+  }
+
+  document.addEventListener('langchange', () => setTimeout(() => { paint(); syncResign(); }, 0));
   paint();
 
   window.SkyChessPlayUI = { describe, toggleBest, isTouch: TOUCH };

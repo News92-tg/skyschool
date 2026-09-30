@@ -56,7 +56,11 @@
       if(section) section.remove();
       else picker.remove();
     }
-    document.querySelectorAll('[data-tab="trainer"],#tab-teacher').forEach(el=>el.remove());
+    /* #tab-teacher здесь раньше тоже удалялся, но кнопка «С учителем»
+       в строке вкладок остаётся — и следующий клик по любой вкладке
+       падал на пустом месте (обработчик в chess.html перебирает все
+       разделы). Раздел оставляем на месте. */
+    document.querySelectorAll('[data-tab="trainer"]').forEach(el=>el.remove());
   }
  
   function hideLegacy(){

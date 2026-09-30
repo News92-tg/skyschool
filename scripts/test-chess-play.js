@@ -66,10 +66,7 @@ async function open(browser, base, opts) {
 }
 
 async function startGame(page, mode) {
-  /* вкладку открываем один раз: повторный клик по вкладкам сейчас
-     бросает ошибку (chess-game-flow.js удаляет #tab-teacher) — это
-     отдельная старая проблема, не этой проверки */
-  if (await page.$eval('#tab-game', e => e.classList.contains('hidden'))) await page.click('.tabs button[data-tab="game"]');
+  await page.click('.tabs button[data-tab="game"]');
   await page.click(`[data-flow-mode="${mode}"]`);
   await page.click('.game-flow-start');
   await page.waitForFunction(() => document.getElementById('tab-game').classList.contains('game-flow-started'));
@@ -181,6 +178,36 @@ const hintText = page => page.$eval('#gHint', e => e.textContent.trim());
     if (await page.$('#gDockNewYes')) await page.click('#gDockNewYes');
     await page.waitForTimeout(200);
     ok(await page.evaluate(() => SkyChessGame.moves) === 0, 'новая партия началась');
+
+    /* «Сдаться» при пошаговом запуске: кнопка рядом с «Перевернуть доску» */
+    await tap('e2'); await tap('e4');
+    await page.waitForFunction(() => SkyChessGame.moves === 2 && !SkyChessGame.busy, null, { timeout: 8000 }).catch(() => {});
+    await page.waitForFunction(() => { const b = document.getElementById('gResign'); return b && !b.hidden && !b.disabled; }, null, { timeout: 3000 }).catch(() => {});
+    ok(await page.evaluate(() => { const b = document.getElementById('gResign'); return !!b && !b.hidden && !b.disabled && b.offsetParent !== null; }), '«Сдаться» видна и доступна в свой ход');
+    await page.tap('#gResign');
+    await page.waitForSelector('.modal #experienceClose', { timeout: 3000 }).catch(() => {});
+    ok(/Вы сдались/.test(await page.$eval('#gStatus', e => e.textContent)) && await page.$eval('#gBoard', b => b.classList.contains('game-board-locked')), 'сдался: статус и доска заблокирована');
+    if (await page.$('.modal #experienceClose')) await page.click('.modal #experienceClose');
+    ok(await page.$eval('#gResign', b => b.disabled), 'после сдачи «Сдаться» неактивна');
+    await page.tap('#gDockNew');
+    await page.waitForSelector('#gDockNewYes', { timeout: 3000 }).catch(() => {});
+    if (await page.$('#gDockNewYes')) await page.click('#gDockNewYes');
+    await page.waitForTimeout(300);
+    ok(await page.evaluate(() => SkyChessGame.moves === 0 && !document.getElementById('gBoard').classList.contains('game-board-locked')), 'после сдачи «Новая партия» снимает блокировку');
+    await tap('d2'); await tap('d4');
+    await page.waitForFunction(() => SkyChessGame.moves === 2 && !SkyChessGame.busy, null, { timeout: 8000 }).catch(() => {});
+    await page.waitForTimeout(100);
+    ok(await page.evaluate(() => SkyChessGame.moves === 2) && !(await page.$eval('#gResign', b => b.disabled)), 'новая партия после сдачи: бот ходит, сдаться снова можно');
+
+    /* вкладки: повторные клики и смена языка больше не ломают переключение */
+    for (const t of ['lessons', 'puzzles', 'teacher', 'live', 'game', 'lessons', 'game']) await page.click(`.tabs button[data-tab="${t}"]`);
+    await page.evaluate(() => Sky.setLang('en'));
+    await page.waitForTimeout(100);
+    await page.click('.tabs button[data-tab="puzzles"]');
+    ok(await page.evaluate(() => !document.getElementById('tab-puzzles').classList.contains('hidden') && document.getElementById('tab-game').classList.contains('hidden')), 'после смены языка вкладки переключаются');
+    await page.click('.tabs button[data-tab="teacher"]');
+    ok(await page.evaluate(() => { const t = document.getElementById('tab-teacher'); return !!t && !t.classList.contains('hidden') && t.querySelectorAll('#tGate, #tBody').length === 2; }), 'вкладка «С учителем» на месте и открывается');
+    await page.evaluate(() => Sky.setLang('ru'));
 
     ok(!errors.length, 'телефон: без ошибок на странице', errors);
     await ctx.close();
