@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Подборки заданий — SkyySchool</title>
+<meta name="theme-color" content="#f6faff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon-512.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/sky.css">
+<!-- Подборки заданий: учитель собирает задания и раздаёт ссылку.
+     Логика — assets/collections.js, страница ученика — collection.html,
+     база — sql/schema-collections.sql. -->
+<style>
+  .cl-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:18px}
+  .cl-bar .grow{margin-left:auto}
+  .cl-tabs{display:flex;gap:6px;flex-wrap:wrap}
+  .cl-tab{padding:8px 13px;border:1px solid var(--line);border-radius:99px;background:var(--panel);
+    font:inherit;font-size:13px;font-weight:800;color:var(--muted);cursor:pointer;transition:.15s}
+  .cl-tab:hover{border-color:var(--line-2)}
+  .cl-tab[aria-pressed="true"]{border-color:var(--accent);background:var(--m-learn-soft);color:var(--accent)}
+  .cl-tab.add{border-style:dashed}
+  .cl-tab .n{margin-left:5px;font-size:11px;opacity:.75}
+  .cl-catline{margin-top:10px;font-size:12.5px;color:var(--muted);font-weight:700;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .cl-catline button{font:inherit;font-size:12.5px;font-weight:800;color:var(--no);background:none;border:0;cursor:pointer;padding:0}
+
+  /* minmax(0,1fr): иначе широкая таблица ответов растягивает карточку
+     за край экрана вместо того, чтобы листаться внутри */
+  .cl-card{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;padding:16px 18px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
+  .cl-card.open{border-color:var(--accent)}
+  .cl-card h3{margin:0;font-size:16px;line-height:1.35}
+  .cl-meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);font-weight:700}
+  .cl-code{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--ink);letter-spacing:.08em}
+  .cl-acts{display:flex;gap:8px;flex-wrap:wrap}
+  .cl-head{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+
+  .cl-results{margin-top:6px;border-top:1px solid var(--line);padding-top:12px}
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .ctable{width:100%;border-collapse:collapse;font-size:13px;min-width:520px}
+  .ctable th{text-align:left;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);
+    padding:8px;border-bottom:1px solid var(--line);white-space:nowrap}
+  .ctable td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+  .ctable tr:last-child td{border-bottom:none}
+  .ctable .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+
+  /* окно «Создать подборку» шире обычного: в нём выбор заданий */
+  .modal:has(.cl-new){max-width:780px}
+  .modal:has(.cl-review){max-width:640px}
+  .cl-new,.cl-review{display:grid;gap:14px}
+  .cl-new h2,.cl-review h2{margin:0}
+  .cl-pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:600px){.cl-pair{grid-template-columns:1fr}}
+  .cl-check{display:flex;align-items:center;gap:9px;font-size:13.5px;font-weight:700;cursor:pointer}
+  .cl-check input{width:18px;height:18px;accent-color:var(--accent);margin:0}
+  .cl-sec{border:1px solid var(--line);border-radius:var(--r);padding:12px;background:var(--panel-2);display:grid;gap:10px}
+  .cl-sec h3{margin:0;font-size:14px;display:flex;align-items:center;gap:8px}
+  .cl-picked{display:grid;gap:6px}
+  .cl-picked:empty::before{content:attr(data-empty);font-size:12.5px;color:var(--muted);font-weight:600}
+  .cl-pk{display:flex;gap:9px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);font-size:13px;line-height:1.45}
+  .cl-pk b{flex:none;min-width:22px;color:var(--muted)}
+  .cl-pk .t{flex:1;min-width:0;white-space:pre-wrap;word-break:break-word}
+  .cl-pk .k{flex:none;font-size:11px;font-weight:800;color:var(--muted)}
+  .cl-pk button{flex:none;width:26px;height:26px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);cursor:pointer;color:var(--muted)}
+  .cl-bank{max-height:300px;overflow:auto;display:grid;gap:6px}
+  .cl-bt{display:flex;gap:9px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);
+    font:inherit;font-size:13px;line-height:1.45;text-align:left;cursor:pointer;width:100%;color:inherit}
+  .cl-bt:hover{border-color:var(--line-2)}
+  .cl-bt.on{border-color:var(--accent);background:var(--m-learn-soft)}
+  .cl-bt .box{flex:none;width:18px;height:18px;border-radius:6px;border:2px solid var(--line-2);display:grid;place-items:center;font-size:11px;color:#fff;margin-top:1px}
+  .cl-bt.on .box{background:var(--accent);border-color:var(--accent)}
+  .cl-bt .t{flex:1;min-width:0}
+  .cl-bt .t small{display:block;color:var(--muted);font-weight:700;font-size:11.5px;margin-top:2px}
+  .cl-opts{display:grid;gap:6px}
+  .cl-opt{display:flex;gap:8px;align-items:center}
+  .cl-opt input[type=text]{flex:1;min-width:0;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);font:inherit;font-size:13px}
+  .cl-opt input[type=radio]{width:18px;height:18px;accent-color:var(--ok);margin:0}
+  .cl-acts-end{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+
+  .cl-rv{display:grid;gap:10px}
+  .cl-rv-item{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:6px;font-size:13.5px;line-height:1.5}
+  .cl-rv-item .q{white-space:pre-wrap;font-weight:700}
+  .cl-rv-item .a{white-space:pre-wrap;background:var(--panel-2);border-radius:8px;padding:7px 9px}
+  .cl-rv-item .a.empty{color:var(--faint);font-style:italic}
+  .cl-rv-marks{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .cl-rv-marks button[aria-pressed="true"].yes{background:var(--ok);border-color:var(--ok);color:#fff}
+  .cl-rv-marks button[aria-pressed="true"].no{background:var(--no);border-color:var(--no);color:#fff}
+  .cl-code-form{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .cl-code-form input{width:130px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);
+    font-family:'JetBrains Mono',monospace;font-size:14px;letter-spacing:.12em;text-transform:uppercase}
+</style>
+</head>
+<body>
+<header id="appHeader"></header>
+
+<main class="wrap">
+  <h1 data-i18n="h1"></h1>
+  <p class="lead" data-i18n="lead"></p>
+
+  <div class="panel pad-sm" style="margin-top:16px">
+    <form class="cl-code-form" id="codeForm">
+      <b data-i18n="haveCode" style="font-size:13.5px"></b>
+      <input type="text" id="codeIn" maxlength="6" autocomplete="off" spellcheck="false" placeholder="A3K7MN" aria-label="code">
+      <button type="submit" class="btn small" data-i18n="openCode"></button>
+    </form>
+  </div>
+
+  <div id="gate" class="section"></div>
+
+  <div id="app" class="hidden">
+    <div class="cl-bar">
+      <div class="cl-tabs" id="catTabs" role="tablist"></div>
+      <button type="button" class="btn grow" id="newBtn" data-i18n="newColl"></button>
+    </div>
+    <div class="cl-catline hidden" id="catLine"></div>
+    <div class="section" style="margin-top:16px">
+      <div class="list" id="colls"></div>
+    </div>
+  </div>
+</main>
+
+<footer id="appFooter"></footer>
+
+<script src="assets/config.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/db.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/collection-common.js"></script>
+<script src="assets/collections.js"></script>
+</body>
+</html>

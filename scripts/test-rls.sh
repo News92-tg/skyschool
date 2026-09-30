@@ -76,6 +76,10 @@ run "$PSQL -d $DB -f '$ROOT/sql/schema-classes.sql'" >/dev/null
 echo "→ AI-учителя, отзывы, шахматные партии…"
 run "$PSQL -d $DB -f '$ROOT/sql/schema-ai-teachers.sql'" >/dev/null
 
+echo "→ подборки заданий по ссылке (дважды — файл должен переживать повторный запуск)…"
+run "$PSQL -d $DB -f '$ROOT/sql/schema-collections.sql'" >/dev/null
+run "$PSQL -d $DB -f '$ROOT/sql/schema-collections.sql'" >/dev/null
+
 # права на таблицы, созданные после заглушки
 run "$PSQL -d $DB -c 'grant select, insert, update, delete on all tables in schema public to authenticated'" >/dev/null
 
@@ -87,6 +91,17 @@ if run "psql -h $SOCKET_DIR -p $PGPORT -U postgres -d $DB -q -f '$ROOT/sql/tests
 else
   echo
   echo "ТЕСТЫ НЕ ПРОШЛИ — смотрите таблицу выше." >&2
+  exit 1
+fi
+echo
+echo "→ тесты подборок:"
+echo
+if run "psql -h $SOCKET_DIR -p $PGPORT -U postgres -d $DB -q -f '$ROOT/sql/tests/collections-tests.sql'"; then
+  echo
+  echo "Готово: подборки работают как задумано."
+else
+  echo
+  echo "ТЕСТЫ ПОДБОРОК НЕ ПРОШЛИ — смотрите таблицу выше." >&2
   exit 1
 fi
 

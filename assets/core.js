@@ -61,6 +61,7 @@ window.Sky = (function () {
     navTools:{ru:'Инструменты',en:'Tools'},
     navPhoto:{ru:'Домашка по фото',en:'Photo homework'},
     navHomework:{ru:'Задания',en:'Homework'},
+    navCollections:{ru:'Подборки',en:'Collections'},
 
     /* общее */
     save:{ru:'Сохранить',en:'Save'},
@@ -240,13 +241,15 @@ window.Sky = (function () {
     { id:'teachers',    label:{ ru:'Учителя',   en:'Teachers' } }
   ];
 
-  /* «Задания» показываем только тем, кто вошёл, и относим к «Учёбе». */
+  /* «Задания» и «Подборки» показываем только тем, кто вошёл, и относим к
+     «Учёбе». Подборку по ссылке ученик открывает и без входа. */
   function navItems() {
     const signedIn = !!(window.Sky && Sky.db && Sky.db.me && Sky.db.me());
     if (!signedIn) return NAV;
     const idx = NAV.findIndex(n => n.key === 'navTeachers') + 1;
     return NAV.slice(0, idx).concat([
-      { href:'homework.html', key:'navHomework', group:'study' }
+      { href:'homework.html', key:'navHomework', group:'study' },
+      { href:'collections.html', key:'navCollections', group:'study' }
     ], NAV.slice(idx));
   }
 

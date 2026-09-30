@@ -21,6 +21,7 @@ const PRECACHE_URLS = [
   'assets/match3.js','assets/python-editor.js','assets/ai-teachers.js','data/ai-teachers.js','assets/sky.css',
   'assets/photo-api.js','assets/photo-teacher.js','assets/photo-text.js',
   'admin.html','assets/admin.js',
+  'collections.html','collection.html','assets/collection-common.js','assets/collections.js','assets/collection.js',
   'assets/icon-192.png','assets/icon-512.png','assets/apple-touch-icon.png',
   'data/bank-math.js','data/bank-informatics.js','data/bank-russian.js','data/bank-physics.js','data/bank-biology.js','data/bank-chemistry.js',
   'data/bank-geography.js','data/bank-social.js','data/bank-history.js','data/bank-english.js','data/bank-polish.js','data/bank-spanish.js','data/bank-german.js',

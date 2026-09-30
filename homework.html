@@ -38,11 +38,21 @@
       <h2 data-i18n="given"></h2>
       <button class="btn teach small" id="btnNew" data-i18n="newHw"></button>
       <button class="btn ghost small" id="btnPhotoTask" data-i18n="newPhotoTask"></button>
+      <a class="btn ghost small" href="collections.html" data-i18n="navCollections"></a>
     </div>
     <div class="list" id="hwTeacher"></div>
   </div>
 
   <div id="studentView" class="section hidden">
+    <!-- код подборки от учителя: ведёт на collection.html?code=… -->
+    <div class="panel pad-sm" style="margin-bottom:16px">
+      <form id="collCodeForm" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <b data-i18n="haveCode" style="font-size:13.5px"></b>
+        <input type="text" id="collCodeIn" maxlength="6" autocomplete="off" spellcheck="false" placeholder="A3K7MN" aria-label="code"
+          style="width:130px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);font-family:'JetBrains Mono',monospace;font-size:14px;letter-spacing:.12em;text-transform:uppercase">
+        <button type="submit" class="btn small" data-i18n="openCode"></button>
+      </form>
+    </div>
     <div class="section-head"><h2 data-i18n="mine"></h2></div>
     <div class="list" id="hwStudent"></div>
   </div>
@@ -54,6 +64,7 @@
 <script src="assets/core.js"></script>
 <script src="assets/db.js"></script>
 <script src="assets/auth.js"></script>
+<script src="assets/collection-common.js"></script>
 <script src="data/bank-math.js"></script>
 <script src="data/bank-informatics.js"></script>
 <script src="data/bank-russian.js"></script>
@@ -547,6 +558,7 @@ function openReview(h, s) {
   );
 }
 
+SkyCollections.bindCodeForm($('#collCodeForm'), $('#collCodeIn'));
 document.addEventListener('authchange', load);
 document.addEventListener('langchange', load);
 Sky.db.ready.then(load);
