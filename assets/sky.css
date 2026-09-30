@@ -30,6 +30,9 @@
   /* смысловые */
   --accent:var(--sky-500);
   --accent-ink:#ffffff;
+  /* марки графиков (analytics.html): проверено валидатором палитры
+     против поверхности панели — светлая и тёмная тема отдельно */
+  --chart:#2f8dfa;
   --ok:#16a34a;      --ok-soft:#e7f8ed;
   --no:#e11d48;      --no-soft:#ffeef2;
   --warn:#d97706;    --warn-soft:#fff5e6;
@@ -79,6 +82,7 @@
   --faint:#63799a;
 
   --accent:#5ba7ff;
+  --chart:#3f93f0;
   --accent-ink:#04162c;
   --ok:#34d399;      --ok-soft:#0e2b23;
   --no:#fb7185;      --no-soft:#331420;
@@ -128,6 +132,7 @@
   --faint:#63799a;
 
   --accent:#5ba7ff;
+  --chart:#3f93f0;
   --accent-ink:#04162c;
   --ok:#34d399;      --ok-soft:#0e2b23;
   --no:#fb7185;      --no-soft:#331420;

@@ -233,3 +233,151 @@ language sql stable security definer set search_path = public as $$
 $$;
 revoke all on function public.sky_teacher_exists(uuid) from public, anon, authenticated;
 grant execute on function public.sky_teacher_exists(uuid) to service_role;
+
+
+-- ---------------------------------------------------------------------
+-- 5. Аналитика учителя (analytics.html) — одним запросом
+--    Работы учеников за период из того, что уже есть:
+--      • ответы по подборкам учителя — оценка из процента (90/75/60);
+--      • его проверки по фото (photo_checks): класс (mode teacher-report,
+--        result.reports[]), тест (fast-check/test, result.students[]) и
+--        одиночные проверки (grade, errors).
+--    Работы по ссылкам (homework_submissions) отдельно не считаем: их
+--    проверка — тот же отчёт класса, он уже среди photo_checks.
+--    Ошибки: тип из разбора фото, номер вопроса теста, задание подборки,
+--    на которое ответили неверно. security invoker: RLS решает, что видно.
+-- ---------------------------------------------------------------------
+create or replace function public.teacher_analytics(p_days int default 30, p_tz text default 'Europe/Moscow')
+returns jsonb
+language plpgsql stable security invoker set search_path = public as $$
+declare
+  v_uid  uuid := (select auth.uid());
+  v_days int := least(greatest(coalesce(p_days, 30), 7), 365);
+  v_tz   text := coalesce((select name from pg_timezone_names where name = p_tz limit 1), 'Europe/Moscow');
+  v_from timestamptz;
+  v_res  jsonb;
+begin
+  if v_uid is null then raise exception 'Войдите в аккаунт' using errcode = '28000'; end if;
+  v_from := (date_trunc('day', now() at time zone v_tz) - make_interval(days => v_days - 1)) at time zone v_tz;
+
+  with
+  pc as (
+    select p.* from public.photo_checks p
+     where p.user_id = v_uid and p.created_at >= v_from and coalesce(p.status, 'ok') <> 'failed'
+  ),
+  cs as (
+    select s.*, c.title, c.subject, c.tasks
+      from public.collection_submissions s
+      join public.task_collections c on c.id = s.collection_id
+     where c.teacher_id = v_uid and s.created_at >= v_from
+  ),
+  reports as (
+    select p.id as pid, p.subject, p.created_at, r
+      from pc p, jsonb_array_elements(case when p.mode = 'teacher-report' and jsonb_typeof(p.result -> 'reports') = 'array'
+                                           then p.result -> 'reports' else '[]'::jsonb end) r
+     where coalesce(r ->> 'status', 'ok') = 'ok'
+  ),
+  tests as (
+    select p.id as pid, p.subject, p.created_at, st
+      from pc p, jsonb_array_elements(case when p.mode in ('fast-check', 'test') and jsonb_typeof(p.result -> 'students') = 'array'
+                                           then p.result -> 'students' else '[]'::jsonb end) st
+     where coalesce(st ->> 'status', 'ok') = 'ok'
+  ),
+  singles as (
+    select p.* from pc p where coalesce(p.mode, 'check') not in ('teacher-report', 'fast-check', 'test')
+  ),
+  works as (
+    select 'collection'::text as src, s.student_name as name, s.subject, s.created_at,
+           case when s.percent >= 90 then 5 when s.percent >= 75 then 4 when s.percent >= 60 then 3
+                when s.percent is not null then 2 end as grade,
+           s.percent
+      from cs s
+    union all
+    select 'photo', r.r ->> 'name', r.subject, r.created_at,
+           case when (r.r ->> 'assessment') ~ '^[1-5]$' then (r.r ->> 'assessment')::int end, null
+      from reports r
+    union all
+    select 'test', t.st ->> 'name', t.subject, t.created_at,
+           case when (t.st ->> 'grade') ~ '^[1-5]$' then (t.st ->> 'grade')::int end,
+           case when jsonb_typeof(t.st -> 'percent') = 'number' then (t.st ->> 'percent')::numeric end
+      from tests t
+    union all
+    select 'photo', nullif(btrim(s.result ->> 'student_name'), ''), s.subject, s.created_at,
+           case when s.grade between 1 and 5 then s.grade end, null
+      from singles s
+  ),
+  errs as (
+    -- тип ошибки из разбора фото (класс и одиночные проверки)
+    select 'type:' || lower(btrim(e ->> 'type')) as k, 'type' as kind, btrim(e ->> 'type') as label,
+           null::text as title, null::text as subject, null::int as n, null::date as day
+      from reports r, jsonb_array_elements(case when jsonb_typeof(r.r -> 'errors') = 'array' then r.r -> 'errors' else '[]'::jsonb end) e
+     where nullif(btrim(e ->> 'type'), '') is not null
+    union all
+    select 'type:' || lower(btrim(e ->> 'type')), 'type', btrim(e ->> 'type'), null, null, null, null
+      from singles s, jsonb_array_elements(case when jsonb_typeof(s.errors) = 'array' then s.errors else '[]'::jsonb end) e
+     where nullif(btrim(e ->> 'type'), '') is not null
+    -- вопрос теста: один и тот же тест (одна проверка) — один ключ
+    union all
+    select 'test:' || t.pid || ':' || (e ->> 'n'), 'test', null, null, t.subject, (e ->> 'n')::int, (t.created_at at time zone v_tz)::date
+      from tests t, jsonb_array_elements(case when jsonb_typeof(t.st -> 'errors') = 'array' then t.st -> 'errors' else '[]'::jsonb end) e
+     where (e ->> 'n') ~ '^[0-9]{1,4}$'
+    -- задание подборки, на которое ответили неверно
+    union all
+    select 'task:' || s.collection_id || ':' || (a ->> 'task_id'), 'task', left(task.t ->> 'text', 120), s.title, s.subject,
+           task.i::int, null
+      from cs s
+      cross join lateral jsonb_array_elements(case when jsonb_typeof(s.answers) = 'array' then s.answers else '[]'::jsonb end) a
+      join lateral (select t, i from jsonb_array_elements(s.tasks) with ordinality as x(t, i) where x.t ->> 'id' = a ->> 'task_id') task on true
+     where a ->> 'correct' = 'false'
+  ),
+  top_errs as (
+    select (array_agg(label order by label))[1] as label, min(kind) as kind, min(title) as title, min(subject) as subject,
+           min(n) as n, min(day) as day, count(*) as cnt
+      from errs group by k order by count(*) desc, min(label) limit 5
+  ),
+  named as (
+    select lower(btrim(name)) as k, btrim(name) as name, grade, percent, created_at
+      from works where nullif(btrim(name), '') is not null
+  ),
+  students as (
+    select (array_agg(name order by created_at desc))[1] as name, count(*) as works, count(grade) as graded,
+           round(avg(grade), 1) as avg_grade, round(avg(percent)) as avg_percent, max(created_at) as last_at
+      from named group by k
+  ),
+  subjects as (
+    select coalesce(subject, 'other') as subject, count(*) as works, count(grade) as graded, round(avg(grade), 1) as avg_grade
+      from works group by 1
+  ),
+  days as (
+    select d::date as day
+      from generate_series((v_from at time zone v_tz)::date, (now() at time zone v_tz)::date, interval '1 day') d
+  ),
+  per_day as (
+    select (created_at at time zone v_tz)::date as day, src, count(*) as n from works group by 1, 2
+  )
+  select jsonb_build_object(
+    'days', v_days,
+    'from', (v_from at time zone v_tz)::date,
+    'totals', jsonb_build_object(
+      'works', (select count(*) from works),
+      'graded', (select count(grade) from works),
+      'avg_grade', (select round(avg(grade), 1) from works),
+      'students', (select count(*) from students),
+      'pending', (select count(*) from public.collection_submissions s join public.task_collections c on c.id = s.collection_id
+                   where c.teacher_id = v_uid and s.status = 'pending')
+                 + (select count(*) from public.homework_submissions h where h.teacher_id = v_uid and h.status = 'pending')),
+    'series', (select jsonb_agg(jsonb_build_object(
+                 'day', d.day,
+                 'photo', coalesce((select sum(n) from per_day p where p.day = d.day and p.src = 'photo'), 0),
+                 'test', coalesce((select sum(n) from per_day p where p.day = d.day and p.src = 'test'), 0),
+                 'collection', coalesce((select sum(n) from per_day p where p.day = d.day and p.src = 'collection'), 0))
+               order by d.day) from days d),
+    'subjects', coalesce((select jsonb_agg(to_jsonb(s) order by s.avg_grade nulls last, s.works desc) from subjects s), '[]'::jsonb),
+    'errors', coalesce((select jsonb_agg(to_jsonb(e) order by e.cnt desc, e.label) from top_errs e), '[]'::jsonb),
+    'students', coalesce((select jsonb_agg(to_jsonb(s) order by s.avg_grade nulls last, s.works desc, s.name)
+                            from (select * from students order by avg_grade nulls last, works desc limit 500) s), '[]'::jsonb)
+  ) into v_res;
+  return v_res;
+end $$;
+revoke all on function public.teacher_analytics(int, text) from public, anon;
+grant execute on function public.teacher_analytics(int, text) to authenticated;

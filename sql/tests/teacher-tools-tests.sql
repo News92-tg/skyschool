@@ -205,6 +205,64 @@ reset role;
 select t_check('sky_teacher_exists: учитель — да, ученик — нет', (select t and not s from _te));
 
 -- ---------------------------------------------------------------------
+-- 5. Аналитика — teacher_analytics()
+-- ---------------------------------------------------------------------
+insert into photo_checks (user_id, subject, mode, status, result, created_at) values
+  ('77777777-0000-0000-0000-000000000001', 'physics', 'teacher-report', 'ok',
+   '{"reports":[{"name":"Петя","assessment":"3","status":"ok","errors":[{"type":"вычислительная"},{"type":" Вычислительная "}]},
+                {"name":"Коля","assessment":"5","status":"ok","errors":[]},
+                {"name":"Сбой","status":"error"}]}', now() - interval '2 days'),
+  ('77777777-0000-0000-0000-000000000001', 'math', 'fast-check', 'ok',
+   '{"students":[{"name":"петя ","grade":2,"percent":40,"status":"ok","errors":[{"n":3},{"n":5}]},
+                 {"name":"Оля","grade":5,"percent":100,"status":"ok","errors":[]}]}', now() - interval '1 day'),
+  ('77777777-0000-0000-0000-000000000001', 'math', 'check', 'failed', '{}', now()),
+  ('77777777-0000-0000-0000-000000000001', 'math', 'teacher-report', 'ok',
+   '{"reports":[{"name":"Давно","assessment":"2","status":"ok"}]}', now() - interval '40 days');
+insert into collection_submissions (collection_id, student_name, answers, score, percent, status, created_at)
+  values ('77777777-1111-0000-0000-000000000001', 'Лена', '[{"task_id":"t1","answer":"3","correct":false}]', 0, 0, 'checked', now() - interval '3 hours');
+
+set role authenticated;
+select set_config('request.jwt.claim.sub', '77777777-0000-0000-0000-000000000001', false);
+create temp table _an as select teacher_analytics(30, 'Europe/Moscow') as a;
+create temp table _an7 as select teacher_analytics(3, 'Нет/Такой') as a;
+select set_config('request.jwt.claim.sub', '77777777-0000-0000-0000-000000000002', false);
+create temp table _an2 as select teacher_analytics(30) as a;
+reset role;
+select set_config('request.jwt.claim.sub', '', false);
+
+select t_check('аналитика: 30 дней в ряду, сумма по дням = всего работ',
+  (select jsonb_array_length(a->'series') = 30
+          and (select sum((d->>'photo')::int + (d->>'test')::int + (d->>'collection')::int) from jsonb_array_elements(a->'series') d) = (a->'totals'->>'works')::int
+     from _an), (select a->'totals' from _an)::text);
+select t_check('аналитика: класс, тест и подборки — по своим столбцам',
+  (select sum((d->>'test')::int) = 2 and sum((d->>'photo')::int) = 4 from _an, jsonb_array_elements(a->'series') d));
+select t_check('аналитика: неудачная проверка и работы старше периода не считаются',
+  (select not exists (select 1 from jsonb_array_elements(a->'students') s where s->>'name' in ('Давно', 'Сбой')) from _an));
+select t_check('аналитика: ошибка №1 — «вычислительная», 2 раза (регистр и пробелы не мешают)',
+  (select a->'errors'->0->>'kind' = 'type' and lower(btrim(a->'errors'->0->>'label')) = 'вычислительная' and (a->'errors'->0->>'cnt')::int = 2 from _an),
+  (select (a->'errors')::text from _an));
+select t_check('аналитика: неверный ответ по подборке — задание «1+1» из «Дроби»',
+  (select exists (select 1 from jsonb_array_elements(a->'errors') e where e->>'kind' = 'task' and e->>'title' = 'Дроби' and e->>'label' = '1+1' and (e->>'n')::int = 1) from _an));
+select t_check('аналитика: вопрос теста №3 — с предметом и датой',
+  (select exists (select 1 from jsonb_array_elements(a->'errors') e where e->>'kind' = 'test' and (e->>'n')::int = 3 and e->>'subject' = 'math' and e->>'day' is not null) from _an));
+select t_check('аналитика: ошибок — не больше пяти', (select jsonb_array_length(a->'errors') <= 5 from _an));
+select t_check('аналитика: слабее всех — Лена (2,0), Петя — 2 работы, средний 2,5',
+  (select a->'students'->0->>'name' = 'Лена' and (a->'students'->0->>'avg_grade')::numeric = 2.0 from _an)
+  and (select (s->>'works')::int = 2 and (s->>'avg_grade')::numeric = 2.5 from _an, jsonb_array_elements(a->'students') s where lower(s->>'name') like 'петя%'),
+  (select (a->'students')::text from _an));
+select t_check('аналитика: средний балл по предметам — физика 4,0 (3 и 5)',
+  (select (s->>'avg_grade')::numeric = 4.0 and (s->>'graded')::int = 2 from _an, jsonb_array_elements(a->'subjects') s where s->>'subject' = 'physics'));
+select t_check('аналитика: ждут проверки — как во входящих',
+  (select (a->'totals'->>'pending')::int = (select count(*) from _in) from _an));
+select t_check('аналитика: период не меньше 7 дней, чужой часовой пояс — Москва',
+  (select (a->>'days')::int = 7 and jsonb_array_length(a->'series') = 7 from _an7));
+select t_check('аналитика: другой учитель видит только своё',
+  (select (a->'totals'->>'works')::int = 1 and a->'students'->0->>'name' = 'Чужой' from _an2), (select (a->'totals')::text from _an2));
+set role anon;
+select t_expect_denied('аноним не видит аналитику', $q$ select teacher_analytics(30) $q$);
+reset role;
+
+-- ---------------------------------------------------------------------
 -- Итог
 -- ---------------------------------------------------------------------
 \o

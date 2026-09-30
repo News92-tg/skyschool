@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Аналитика класса — SkyySchool</title>
+<meta name="theme-color" content="#f6faff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon-512.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/sky.css">
+<!-- Аналитика учителя. Логика — assets/analytics.js, данные —
+     teacher_analytics() в sql/schema-teacher-tools.sql. -->
+<style>
+  .an-wrap{max-width:1000px}
+  .an-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .an-head h1{margin:0}
+  .an-head .lead{margin:6px 0 0}
+  .an-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:20px 0 16px}
+  .an-tools .grow{margin-left:auto}
+  .an-period{display:inline-grid;grid-auto-flow:column;gap:4px;padding:4px;border-radius:13px;background:var(--panel-2);border:1px solid var(--line)}
+  .an-period button{font:inherit;font-size:13px;font-weight:800;padding:7px 13px;border:0;border-radius:9px;background:none;color:var(--muted);cursor:pointer;white-space:nowrap}
+  .an-period button[aria-pressed="true"]{background:var(--panel);color:var(--ink);box-shadow:var(--shadow-sm)}
+  /* minmax(0,1fr): иначе широкая таблица растягивает страницу вместо того,
+     чтобы листаться внутри своей карточки */
+  #anBody{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;transition:opacity .2s}
+  .an-card{min-width:0}
+  #anBody.refetch{opacity:.55;pointer-events:none}
+
+  .an-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+  .an-kpi small{display:block;margin-top:4px;font-size:11.5px;color:var(--muted);font-weight:700}
+  .an-kpi small a{color:var(--accent)}
+  .an-kpi[data-kpi="pending"] b{color:var(--ink)}
+
+  .an-card{padding:18px 20px}
+  .an-card h2{font-size:16px;margin:0 0 12px}
+  .an-card-h{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .an-card-h h2{margin:0}
+  .an-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
+  .an-none{margin:0;padding:18px;border:1px dashed var(--line-2);border-radius:var(--r);color:var(--muted);font-weight:700;font-size:13px;text-align:center}
+
+  /* график: одна серия, линии сетки — волосок, тише данных */
+  .an-chart{position:relative;margin-top:10px}
+  .an-chart svg{display:block;width:100%;height:auto;overflow:visible}
+  .an-grid-l line{stroke:var(--line);stroke-width:1}
+  .an-ytick text,.an-xtick text{fill:var(--muted);font-size:11px;font-weight:700;font-variant-numeric:tabular-nums}
+  .an-bars path{fill:var(--chart)}
+  .an-hits rect{fill:transparent;cursor:default;outline:none}
+  .an-hits rect.on,.an-hits rect:focus-visible{fill:color-mix(in srgb,var(--chart) 10%,transparent)}
+  .an-tip{position:absolute;z-index:3;pointer-events:none;min-width:120px;padding:9px 11px;border-radius:12px;background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow-lg);font-size:12.5px}
+  .an-tip-h{color:var(--muted);font-weight:700;margin-bottom:2px}
+  .an-tip b{display:block;font-size:15px;color:var(--ink)}
+  .an-tip-r{display:flex;gap:6px;color:var(--ink-2);font-weight:700}
+  .an-tip-r span:first-child{min-width:18px;text-align:right;font-variant-numeric:tabular-nums}
+  .an-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:6px}
+  .ctable{width:100%;border-collapse:collapse;font-size:13px;min-width:420px}
+  .ctable th{text-align:left;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding:8px;border-bottom:1px solid var(--line);white-space:nowrap}
+  .ctable td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+  .ctable tr:last-child td{border-bottom:none}
+  .ctable .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+
+  /* горизонтальные полосы: шкала 0–5, значение у конца */
+  .an-bars-h{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+  .an-bars-h li{display:grid;grid-template-columns:minmax(80px,34%) minmax(0,1fr) 34px;align-items:center;gap:10px}
+  .an-lab{font-size:13px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .an-track{position:relative;display:block;height:12px;border-radius:0 4px 4px 0;background:var(--panel-2)}
+  .an-track i{position:absolute;left:0;top:0;bottom:0;border-radius:0 4px 4px 0;background:var(--chart)}
+  .an-track.thin{height:6px;margin-top:6px}
+  .an-val{font-size:13.5px;text-align:right;font-variant-numeric:tabular-nums}
+
+  .an-errs{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+  .an-errs li{display:grid;grid-template-columns:24px minmax(0,1fr) auto;align-items:start;gap:10px}
+  .an-rank{width:24px;height:24px;border-radius:8px;display:grid;place-items:center;background:var(--panel-2);font-size:12px;font-weight:900;color:var(--muted)}
+  .an-err-txt b{display:block;font-size:13.5px;line-height:1.35}
+  .an-err-txt > span:not(.an-track){display:block;font-size:12px;color:var(--muted);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .an-cnt{font-size:12.5px;font-weight:800;color:var(--ink-2);white-space:nowrap;padding-top:2px}
+  .an-more{margin-top:10px;font:inherit;font-size:13px;font-weight:800;color:var(--accent);background:none;border:0;cursor:pointer;padding:0}
+
+  @media (max-width:760px){
+    .an-kpis{grid-template-columns:1fr 1fr}
+    .an-grid{grid-template-columns:minmax(0,1fr)}
+  }
+  @media (max-width:480px){
+    .an-card{padding:14px}
+    .an-tools .grow{margin-left:0}
+    .an-period{width:100%;grid-auto-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<header id="appHeader"></header>
+
+<main class="wrap an-wrap">
+  <div class="an-head">
+    <div>
+      <h1 data-i18n="anH1"></h1>
+      <p class="lead" data-i18n="anLead"></p>
+    </div>
+  </div>
+  <div class="an-tools" id="anTools">
+    <div class="an-period" id="anPeriod" role="group" aria-label="Период"></div>
+    <button type="button" class="btn ghost small grow" id="anCsv" data-i18n="anCsv" disabled></button>
+  </div>
+  <div id="anBody" aria-live="polite"></div>
+</main>
+
+<footer id="appFooter"></footer>
+
+<script src="assets/config.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/db.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/errors.js"></script>
+<script src="assets/analytics.js"></script>
+</body>
+</html>

@@ -63,6 +63,7 @@ window.Sky = (function () {
     navHomework:{ru:'Задания',en:'Homework'},
     navCollections:{ru:'Подборки',en:'Collections'},
     navFastCheck:{ru:'Быстрая проверка теста',en:'Quick test check'},
+    navAnalytics:{ru:'Аналитика класса',en:'Class analytics'},
 
     /* общее */
     save:{ru:'Сохранить',en:'Save'},
@@ -246,13 +247,19 @@ window.Sky = (function () {
   /* «Задания» и «Подборки» показываем только тем, кто вошёл, и относим к
      «Учёбе». Подборку по ссылке ученик открывает и без входа. */
   function navItems() {
-    const signedIn = !!(window.Sky && Sky.db && Sky.db.me && Sky.db.me());
-    if (!signedIn) return NAV;
+    const me = window.Sky && Sky.db && Sky.db.me && Sky.db.me();
+    if (!me) return NAV;
     const idx = NAV.findIndex(n => n.key === 'navTeachers') + 1;
-    return NAV.slice(0, idx).concat([
+    const out = NAV.slice(0, idx).concat([
       { href:'homework.html', key:'navHomework', group:'study' },
       { href:'collections.html', key:'navCollections', group:'study' }
     ], NAV.slice(idx));
+    /* Учителю — аналитика класса, рядом с быстрой проверкой. */
+    if (me.role === 'teacher') {
+      const at = out.findIndex(n => n.key === 'navFastCheck') + 1;
+      out.splice(at, 0, { href:'analytics.html', key:'navAnalytics', group:'class' });
+    }
+    return out;
   }
 
   let navOverflowLoading = false;
