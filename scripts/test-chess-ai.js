@@ -74,9 +74,21 @@ check('потолок времени: прерывается и всё равн�
 });
 
 check('мягкий лимит: следующая глубина не начинается, если не успеть', () => {
-  const r = AI.bestMoveTimed(E.create(MIDGAME), { level: 4, maxDepth: 8, minDepth: 1, softMs: 1, hardMs: 5000 });
-  assert.strictEqual(r.depth, 1);
-  assert.strictEqual(r.timedOut, false);
+  /* Часы подменяем: на быстрой машине первая глубина укладывается в ту
+     же миллисекунду, Date.now() даёт 0 мс, и бот вправе считать дальше.
+     Так тест зависел от скорости раннера. Здесь каждый взгляд на часы —
+     плюс 2 мс: первая глубина «стоит» несколько мс, прогноз на вторую
+     больше softMs, до hardMs далеко. */
+  const realNow = Date.now;
+  let fake = 0;
+  Date.now = () => (fake += 2);
+  try {
+    const r = AI.bestMoveTimed(E.create(MIDGAME), { level: 4, maxDepth: 8, minDepth: 1, softMs: 1, hardMs: 5000 });
+    assert.strictEqual(r.depth, 1);
+    assert.strictEqual(r.timedOut, false);
+  } finally {
+    Date.now = realNow;
+  }
 });
 
 check('ходов нет — null', () => {
