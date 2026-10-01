@@ -189,7 +189,8 @@
       #mainMenu .nav-overflow{
         position:relative;
       }
-      #mainMenu .nav-overflow-menu{
+      #mainMenu .nav-overflow-menu,
+      #mainMenu .nav-group[data-nav-group="more"] > .nav-group-menu{
         left:auto;
         right:0;
         min-width:220px;
@@ -271,14 +272,42 @@
     const menu = more.querySelector('.nav-overflow-menu');
     if (!menu) return;
 
+    const divide = () => {
+      const divider = document.createElement('div');
+      divider.className = 'nav-overflow-divider';
+      menu.appendChild(divider);
+    };
+    /* Спрятанный из строки пункт копируется вместе с hidden — снимаем,
+       иначе в «Ещё» его тоже не видно (так пропадал «Обзор» на телефоне). */
+    const copy = node => {
+      const c = node.cloneNode(true);
+      c.hidden = false;
+      c.removeAttribute('aria-hidden');
+      c.classList.remove('nav-enter');
+      return c;
+    };
+
     menu.innerHTML = '';
     hiddenItems.forEach(item => {
       if (item.matches('a')) {
-        menu.appendChild(item.cloneNode(true));
+        /* ссылка после раздела с заголовком — отбиваем чертой, иначе
+           она читается как последний пункт этого раздела */
+        if (menu.lastElementChild && menu.lastElementChild.classList.contains('nav-overflow-section')) divide();
+        menu.appendChild(copy(item));
         return;
       }
 
       if (!item.classList.contains('nav-group')) return;
+
+      /* «Ещё» из шапки уже разложена по разделам — переносим как есть,
+         без заголовка «Ещё» внутри «Ещё». */
+      if (item.dataset.navGroup === 'more') {
+        if (menu.children.length) divide();
+        item.querySelectorAll(':scope > .nav-group-menu > *').forEach(node => {
+          menu.appendChild(copy(node));
+        });
+        return;
+      }
 
       const section = document.createElement('div');
       section.className = 'nav-overflow-section';
@@ -290,7 +319,7 @@
       section.appendChild(title);
 
       item.querySelectorAll(':scope > .nav-group-menu a').forEach(link => {
-        section.appendChild(link.cloneNode(true));
+        section.appendChild(copy(link));
       });
 
       if (menu.children.length) {

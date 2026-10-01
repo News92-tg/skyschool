@@ -50,7 +50,7 @@ window.Sky = (function () {
     navKids:{ru:'Детям',en:'Kids'},
     navChess:{ru:'Шахматы',en:'Chess'},
     navTeachers:{ru:'Учителя',en:'Teachers'},
-    navClassroom:{ru:'Класс',en:'Homeroom'},
+    navClassroom:{ru:'Классный руководитель',en:'Homeroom teacher'},
     navDean:{ru:'Завуч',en:'Dean'},
     navPe:{ru:'Физрук',en:'P.E.'},
     navPsy:{ru:'Психолог',en:'Psychologist'},
@@ -235,55 +235,62 @@ window.Sky = (function () {
     </svg>`;
   }
 
-  /* ---------- шапка и подвал ---------- */
+  /* ---------- шапка и подвал ----------
+     Главное меню — пять пунктов: «Обзор», «Учёба», «Шахматы», «Класс»,
+     «План». Остальные разделы — в «Ещё»: страницы на месте и открываются
+     как раньше, просто не на виду. group — куда пункт попадает; группы
+     с link:true — одна ссылка прямо в строке меню, без выпадающего списка. */
   const NAV = [
-    { href:'index.html',        key:'navHome',      group:null },
+    { href:'index.html',        key:'navHome',      group:'home' },
     { href:'trainer.html',      key:'navLearn',     group:'study' },
     { href:'test.html',         key:'navTest',      group:'study' },
     { href:'exam.html',         key:'navExam',      group:'study' },
-    { href:'kids.html',         key:'navKids',      group:'kids' },
-    { href:'chess.html',        key:'navChess',     group:'kids' },
-    { href:'teachers.html',     key:'navTeachers',  group:'teachers' },
+    { href:'photo.html',        key:'navPhoto',     group:'study' },
+    { href:'essay.html',        key:'navEssay',     group:'study' },
+    { href:'russian-for-en.html', key:'navRuEn',    group:'study' },
+    { href:'chess.html',        key:'navChess',     group:'chess' },
+    { href:'homework.html',     key:'navHomework',  group:'class' },
+    { href:'fast-check.html',   key:'navFastCheck', group:'class' },
     { href:'classroom.html',    key:'navClassroom', group:'class' },
     { href:'headteacher.html',  key:'navDean',      group:'class' },
     { href:'pe.html',           key:'navPe',        group:'class' },
-    { href:'fast-check.html',   key:'navFastCheck', group:'class' },
+    { href:'plan.html',         key:'navPlan',      group:'plan' },
+    { href:'kids.html',         key:'navKids',      group:'kids' },
+    { href:'parent.html',       key:'navParent',    group:'parents' },
+    { href:'teachers.html',     key:'navTeachers',  group:'teachers' },
     { href:'psychologist.html', key:'navPsy',       group:'development' },
     { href:'life.html',         key:'navLife',      group:'development' },
     { href:'trackers.html',     key:'navTrack',     group:'development' },
     { href:'body.html',         key:'navBody',      group:'development' },
-    { href:'plan.html',         key:'navPlan',      group:'plan' },
-    { href:'photo.html',        key:'navPhoto',     group:'study' },
-    { href:'essay.html',        key:'navEssay',     group:'study' },
-    { href:'russian-for-en.html', key:'navRuEn',    group:'study' },
-    { href:'parent.html',       key:'navParent',    group:'parents' },
-    { href:'tools.html',        key:'navTools',     group:'plan' }
+    { href:'tools.html',        key:'navTools',     group:'development' }
   ];
 
   const NAV_GROUPS = [
-    { id:'study',       label:{ ru:'Учёба',     en:'Study' } },
-    { id:'kids',        label:{ ru:'Детям',     en:'Kids' } },
-    { id:'class',       label:{ ru:'Класс',     en:'Class' } },
-    { id:'development', label:{ ru:'Развитие',  en:'Growth' } },
-    { id:'plan',        label:{ ru:'План',      en:'Plan' } },
-    { id:'parents',     label:{ ru:'Родителям', en:'Parents' } },
-    { id:'teachers',    label:{ ru:'Учителя',   en:'Teachers' } }
+    { id:'home',  link:true },
+    { id:'study', label:{ ru:'Учёба',     en:'Study' } },
+    { id:'chess', link:true },
+    { id:'class', label:{ ru:'Класс',     en:'Class' } },
+    { id:'plan',  link:true },
+    /* Раздел из одной страницы — просто ссылка, из нескольких — с заголовком. */
+    { id:'more',  label:{ ru:'Ещё',       en:'More' }, sections:[
+      { id:'kids',        label:{ ru:'Детям',     en:'Kids' } },
+      { id:'parents',     label:{ ru:'Родителям', en:'Parents' } },
+      { id:'teachers',    label:{ ru:'Учителя',   en:'Teachers' } },
+      { id:'development', label:{ ru:'Развитие',  en:'Growth' } }
+    ] }
   ];
 
-  /* «Задания» и «Подборки» показываем только тем, кто вошёл, и относим к
-     «Учёбе». Подборку по ссылке ученик открывает и без входа. */
+  /* «Подборки» — тем, кто вошёл (подборку по ссылке ученик открывает и
+     без входа), учителю — ещё и аналитика класса. */
   function navItems() {
     const me = window.Sky && Sky.db && Sky.db.me && Sky.db.me();
     if (!me) return NAV;
-    const idx = NAV.findIndex(n => n.key === 'navTeachers') + 1;
-    const out = NAV.slice(0, idx).concat([
-      { href:'homework.html', key:'navHomework', group:'study' },
-      { href:'collections.html', key:'navCollections', group:'study' }
-    ], NAV.slice(idx));
-    /* Учителю — аналитика класса, рядом с быстрой проверкой. */
+    const out = NAV.slice();
+    out.splice(out.findIndex(n => n.key === 'navHomework') + 1, 0,
+      { href:'collections.html', key:'navCollections', group:'class' });
     if (me.role === 'teacher') {
-      const at = out.findIndex(n => n.key === 'navFastCheck') + 1;
-      out.splice(at, 0, { href:'analytics.html', key:'navAnalytics', group:'class' });
+      out.splice(out.findIndex(n => n.key === 'navFastCheck') + 1, 0,
+        { href:'analytics.html', key:'navAnalytics', group:'class' });
     }
     return out;
   }
@@ -326,11 +333,27 @@ window.Sky = (function () {
         t(n.key) + '</a>';
     }
 
-    let navMarkup = navLink(items.find(n => n.group === null) || NAV[0]);
+    function sectionsMarkup(group, groupItems) {
+      let out = '';
+      group.sections.forEach(sec => {
+        const list = groupItems.filter(n => n.group === sec.id);
+        if (!list.length) return;
+        if (list.length === 1) { out += navLink(list[0]); return; }
+        out += (out ? '<div class="nav-overflow-divider"></div>' : '') +
+          '<div class="nav-overflow-section"><div class="nav-overflow-title">' + L(sec.label) + '</div>' +
+            list.map(navLink).join('') + '</div>';
+      });
+      return out;
+    }
+
+    let navMarkup = '';
 
     NAV_GROUPS.forEach(group => {
-      const groupItems = items.filter(n => n.group === group.id);
+      const groupItems = items.filter(n => group.sections
+        ? group.sections.some(sec => sec.id === n.group)
+        : n.group === group.id);
       if (!groupItems.length) return;
+      if (group.link) { navMarkup += navLink(groupItems[0]); return; }
       const active = groupItems.some(n => n.href === here);
 
       navMarkup +=
@@ -339,7 +362,7 @@ window.Sky = (function () {
             '<span>' + L(group.label) + '</span><span class="nav-caret" aria-hidden="true">⌄</span>' +
           '</button>' +
           '<div class="nav-group-menu" role="menu">' +
-            groupItems.map(navLink).join('') +
+            (group.sections ? sectionsMarkup(group, groupItems) : groupItems.map(navLink).join('')) +
           '</div>' +
         '</div>';
     });
