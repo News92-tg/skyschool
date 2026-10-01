@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>SkyySchool — учиться легко</title>
-<meta name="description" content="Подготовка к ЕГЭ и ОГЭ, шахматы, развивающие игры для младших, режим дня и занятия с учителями.">
+<meta name="description" content="Ученику — подготовка к ОГЭ и ЕГЭ с разбором, задания от учителя, шахматы и план. Учителю — подборки заданий по ссылке и быстрая проверка работ.">
 <meta name="theme-color" content="#f6faff">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="assets/icon-512.png">
@@ -20,7 +20,46 @@
 }
 .hero .cloud{width:150px;opacity:.95;animation:float 5s ease-in-out infinite}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
-@media(max-width:760px){.hero{grid-template-columns:1fr}.hero .cloud{width:96px}}
+@media(max-width:760px){.hero{grid-template-columns:1fr}.hero .cloud{display:none}}
+
+/* две цели: ученик и учитель */
+.goals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:26px}
+@media(max-width:760px){.goals{grid-template-columns:minmax(0,1fr);gap:14px;margin-top:18px}}
+.goal{--g:var(--m-learn);--g-soft:var(--m-learn-soft);padding:20px;display:flex;flex-direction:column;gap:14px}
+.goal.teacher{--g:var(--m-teach);--g-soft:var(--m-teach-soft)}
+.goal.mine{border-color:var(--g);box-shadow:0 0 0 1px var(--g),var(--shadow-sm)}
+.goal-head{display:flex;align-items:center;gap:14px}
+.goal-head .ico{width:48px;height:48px;flex:none;border-radius:14px;display:grid;place-items:center;font-size:24px;background:var(--g-soft)}
+.goal-head h2{font-size:22px}
+.goal-head p{font-size:13px;color:var(--muted);margin-top:2px}
+.goal-head .tag{margin-left:auto;align-self:flex-start;background:var(--g-soft);color:var(--g)}
+.goal-links{display:flex;flex-direction:column;gap:8px}
+.goal-links a{
+  display:grid;grid-template-columns:36px minmax(0,1fr) auto;align-items:center;gap:12px;
+  min-height:58px;padding:9px 14px 9px 10px;border:1px solid var(--line);border-radius:14px;
+  background:var(--panel-2);color:var(--ink);text-decoration:none;transition:border-color .15s,background .15s,transform .15s;
+}
+.goal-links a:hover{border-color:var(--g);background:var(--panel);transform:translateX(2px)}
+.goal-links a:focus-visible{outline:2px solid var(--g);outline-offset:2px}
+.goal-links .gi{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:18px;background:var(--g-soft)}
+.goal-links b{display:block;font-size:15px;font-weight:800;line-height:1.25}
+.goal-links small{display:block;font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.35}
+.goal-links .arr{color:var(--g);font-weight:900;font-size:18px}
+
+/* что повторить: компактные строки вместо больших плиток */
+.subjects{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+@media(max-width:560px){.subjects{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}}
+.subj{display:grid;grid-template-columns:36px minmax(0,1fr);gap:10px;align-items:center;padding:10px 12px;
+  border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink);text-decoration:none;
+  transition:border-color .15s,transform .15s}
+.subj:hover{border-color:var(--m-learn);transform:translateY(-2px)}
+.subj:focus-visible{outline:2px solid var(--m-learn);outline-offset:2px}
+.subj .si{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:17px;background:var(--m-learn-soft);color:var(--m-learn)}
+.subj b{display:block;font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.subj small{display:block;font-size:12px;color:var(--muted);margin-top:1px}
+.subj small .due{color:var(--m-learn);font-weight:800}
+.subj small .done{color:var(--ok);font-weight:800}
+@media(max-width:560px){.subj{grid-template-columns:30px minmax(0,1fr);gap:8px;padding:9px 10px}.subj .si{width:30px;height:30px;font-size:15px}}
 .today-card{
   background:linear-gradient(135deg,var(--sky-500),var(--sky-700));
   color:#fff;border:none;
@@ -41,10 +80,29 @@
     <div>
       <h1 data-i18n="h1"></h1>
       <p class="lead" style="margin-top:10px" data-i18n="lead"></p>
-      <div class="actions" id="heroActions"></div>
     </div>
     <div class="cloud" id="heroCloud"></div>
   </section>
+
+  <!-- две цели -->
+  <div class="goals rise">
+    <section class="panel goal student" id="goalStudent" aria-labelledby="goalStudentT">
+      <div class="goal-head">
+        <span class="ico" aria-hidden="true">🎒</span>
+        <div><h2 id="goalStudentT" data-i18n="gStudent"></h2><p data-i18n="gStudentD"></p></div>
+        <span class="tag" hidden data-i18n="gMine"></span>
+      </div>
+      <div class="goal-links" id="studentLinks"></div>
+    </section>
+    <section class="panel goal teacher" id="goalTeacher" aria-labelledby="goalTeacherT">
+      <div class="goal-head">
+        <span class="ico" aria-hidden="true">🎓</span>
+        <div><h2 id="goalTeacherT" data-i18n="gTeacher"></h2><p data-i18n="gTeacherD"></p></div>
+        <span class="tag" hidden data-i18n="gMine"></span>
+      </div>
+      <div class="goal-links" id="teacherLinks"></div>
+    </section>
+  </div>
 
   <!-- сегодня -->
   <div class="grid g2 section">
@@ -74,23 +132,17 @@
     <div class="stat"><b id="stBest">0</b><span data-i18n="best"></span></div>
   </div>
 
-  <!-- модули -->
-  <div class="section">
-    <div class="section-head"><h2 data-i18n="modules"></h2></div>
-    <div class="tiles" id="moduleTiles"></div>
-  </div>
-
   <!-- что повторить -->
   <div class="section">
     <div class="section-head">
       <h2 data-i18n="repeat"></h2>
       <span class="lead" style="font-size:12px" data-i18n="repeatNote"></span>
     </div>
-    <div class="tiles" id="subjectCards"></div>
+    <div class="subjects" id="subjectCards"></div>
   </div>
 
   <!-- ошибки -->
-  <div class="section">
+  <div class="section" id="weakSection" hidden>
     <div class="section-head"><h2 data-i18n="weak"></h2></div>
     <div class="panel" id="weakPanel"><div class="list" id="weakList"></div></div>
   </div>
@@ -119,11 +171,29 @@
 <script>
 'use strict';
 Sky.init({
-  h1:{ru:'Учиться легко, когда понятно зачем',en:'Learning is easy when you see the point'},
-  lead:{ru:'Подготовка к ЕГЭ и ОГЭ с разбором каждого решения, шахматы с нуля, развивающие игры для младших и режим дня, который держит всё это вместе.',
-        en:'Exam preparation with a walkthrough for every problem, chess from scratch, learning games for younger kids and a daily routine that holds it all together.'},
-  startNow:{ru:'Начать заниматься',en:'Start practising'},
-  findTeacher:{ru:'Найти учителя',en:'Find a teacher'},
+  h1:{ru:'Готовиться к экзаменам и учить — в одном месте',en:'Prepare for exams and teach — in one place'},
+  lead:{ru:'Ученику — тренажёр ОГЭ и ЕГЭ с разбором каждого решения, задания от учителя и шахматы. Учителю — подборки заданий по ссылке и проверка работ за минуты.',
+        en:'For students: exam practice with a walkthrough for every problem, homework from the teacher and chess. For teachers: task sets shared by link and marking in minutes.'},
+
+  gStudent:{ru:'Я ученик',en:'I’m a student'},
+  gStudentD:{ru:'Готовлюсь к экзаменам и делаю задания',en:'Preparing for exams and doing homework'},
+  gTeacher:{ru:'Я учитель',en:'I’m a teacher'},
+  gTeacherD:{ru:'Даю задания и проверяю работы',en:'Setting tasks and marking work'},
+  gMine:{ru:'Это вы',en:'That’s you'},
+  sExam:{ru:'Готовиться к ОГЭ/ЕГЭ',en:'Prepare for exams'},
+  sExamD:{ru:'Задания по предметам с подсказкой и полным разбором',en:'Problems by subject with a hint and a full walkthrough'},
+  sHw:{ru:'Мои задания от учителя',en:'My homework from the teacher'},
+  sHwD:{ru:'Откройте по коду от учителя или из своего класса',en:'Open by the teacher’s code or from your class'},
+  sChess:{ru:'Играть в шахматы',en:'Play chess'},
+  sChessD:{ru:'Уроки, задачи с разбором и партия против бота',en:'Lessons, puzzles with explanations and a game against the bot'},
+  sPlan:{ru:'Мой план',en:'My plan'},
+  sPlanD:{ru:'Дата экзамена, цель на день и список дел',en:'Exam date, a daily goal and a to-do list'},
+  tCreate:{ru:'Создать задание',en:'Create a task set'},
+  tCreateD:{ru:'Подборка по ссылке — ответы проверяются сами',en:'Shared by link — answers are checked automatically'},
+  tCheck:{ru:'Проверить работы',en:'Mark work'},
+  tCheckD:{ru:'Фото эталона и работ — оценки всего класса',en:'Photo of the key and the papers — marks for the whole class'},
+  tStudents:{ru:'Мои ученики',en:'My students'},
+  tStudentsD:{ru:'Успеваемость класса и у кого больше всего ошибок',en:'Class progress and who struggles most'},
 
   todayGoal:{ru:'Решено сегодня',en:'Solved today'},
   untilExam:{ru:'До экзамена',en:'Until the exam'},
@@ -140,38 +210,12 @@ Sky.init({
   goalDone:{ru:'Цель на сегодня выполнена. Дальше — по желанию.',en:'Today’s goal is done. Anything more is a bonus.'},
   goalStart:{ru:'Ещё ничего не решено сегодня. Начните с пяти минут.',en:'Nothing solved today yet. Five minutes is a fine start.'},
 
-  modules:{ru:'Разделы',en:'Sections'},
-  mLearn:{ru:'Тренажёр',en:'Trainer'},
-  mLearnD:{ru:'Шесть предметов ЕГЭ и ОГЭ. У каждого задания подсказка и полный разбор.',
-           en:'Six exam subjects. Every problem comes with a hint and a full walkthrough.'},
-  mKids:{ru:'Детям',en:'For kids'},
-  mKidsD:{ru:'«Три в ряд», где ходы зарабатываются правильными ответами, счёт, память и логика.',
-          en:'A match-3 game where moves are earned by correct answers, plus counting, memory and logic.'},
-  mChess:{ru:'Шахматы',en:'Chess'},
-  mChessD:{ru:'Уроки, задачи с разбором, игра против бота и партия с учителем.',
-           en:'Lessons, puzzles with explanations, a game against the bot and play with a teacher.'},
-  mTeach:{ru:'Учителя',en:'Teachers'},
-  mTeachD:{ru:'Каталог преподавателей, домашние задания и переписка по ним.',
-           en:'A directory of teachers, homework assignments and messages about them.'},
-  mLife:{ru:'Режим дня',en:'Daily life'},
-  mLifeD:{ru:'Сон, расписание, питание и экранное время — в одном месте и на графиках.',
-          en:'Sleep, schedule, meals and screen time — in one place, on charts.'},
-  mPlan:{ru:'План',en:'Plan'},
-  mPlanD:{ru:'Дата экзамена, цель на день, список дел и напоминание.',
-          en:'Exam date, a daily goal, a to-do list and a reminder.'},
-  mTools:{ru:'Инструменты',en:'Tools'},
-  mToolsD:{ru:'Калькулятор, браузер для справочников и песочница Python — прямо на сайте.',
-           en:'A calculator, a reference browser and a Python sandbox — right on the site.'},
-
   repeat:{ru:'Что повторить',en:'What to review'},
   repeatNote:{ru:'по методу интервального повторения',en:'using spaced repetition'},
   due:{ru:'доступно сейчас',en:'available now'},
   allDone:{ru:'всё повторено',en:'all reviewed'},
   ofTotal:{ru:'%1 заданий',en:'%1 problems'},
   weak:{ru:'Работа над ошибками',en:'Your mistakes'},
-  noWeakT:{ru:'Ошибок пока нет',en:'No mistakes yet'},
-  noWeakD:{ru:'Как только они появятся, задания соберутся здесь и будут возвращаться чаще остальных — пока не начнут получаться.',
-           en:'As soon as there are some, those problems gather here and come back more often than the rest — until they stick.'},
   times:{ru:'ошибок: %1',en:'mistakes: %1'},
   practise:{ru:'Решать',en:'Practise'}
 });
@@ -181,29 +225,41 @@ const $ = s => document.querySelector(s);
 
 document.getElementById('heroCloud').innerHTML = Sky.logoSvg('');
 
-const MODULES = [
-  { href:'trainer.html',  cls:'learn', ico:'📚', t:'mLearn', d:'mLearnD' },
-  { href:'kids.html',     cls:'kids',  ico:'🎈', t:'mKids',  d:'mKidsD' },
-  { href:'chess.html',    cls:'chess', ico:'♞', t:'mChess', d:'mChessD' },
-  { href:'teachers.html', cls:'teach', ico:'🎓', t:'mTeach', d:'mTeachD' },
-  { href:'life.html',     cls:'life',  ico:'🌙', t:'mLife',  d:'mLifeD' },
-  { href:'plan.html',     cls:'plan',  ico:'🗓', t:'mPlan',  d:'mPlanD' },
-  { href:'tools.html',    cls:'tools', ico:'🧮', t:'mTools', d:'mToolsD' }
-];
+/* Куда ведут кнопки целей. «Мои ученики» — пока аналитика класса: там
+   успеваемость каждого ученика; отдельная страница учеников появится
+   позже — тогда поменять ссылку здесь. */
+const GOALS = {
+  student: [
+    { href:'trainer.html',  ico:'📚', t:'sExam',  d:'sExamD' },
+    { href:'homework.html', ico:'📝', t:'sHw',    d:'sHwD' },
+    { href:'chess.html',    ico:'♞',  t:'sChess', d:'sChessD' },
+    { href:'plan.html',     ico:'🗓', t:'sPlan',  d:'sPlanD' }
+  ],
+  teacher: [
+    { href:'collections.html', ico:'✏️', t:'tCreate',   d:'tCreateD' },
+    { href:'fast-check.html',  ico:'✅', t:'tCheck',    d:'tCheckD' },
+    { href:'analytics.html',   ico:'👥', t:'tStudents', d:'tStudentsD' }
+  ]
+};
 
-function renderHero() {
-  $('#heroActions').innerHTML =
-    `<a class="btn big" href="trainer.html">${Sky.t('startNow')}</a>` +
-    `<a class="btn ghost big" href="teachers.html">${Sky.t('findTeacher')}</a>`;
-}
+function renderGoals() {
+  const links = list => list.map(g =>
+    `<a href="${g.href}"><span class="gi" aria-hidden="true">${g.ico}</span>
+       <span><b>${Sky.t(g.t)}</b><small>${Sky.t(g.d)}</small></span>
+       <span class="arr" aria-hidden="true">→</span></a>`).join('');
+  $('#studentLinks').innerHTML = links(GOALS.student);
+  $('#teacherLinks').innerHTML = links(GOALS.teacher);
 
-function renderModules() {
-  $('#moduleTiles').innerHTML = MODULES.map(m =>
-    `<a class="tile ${m.cls}" href="${m.href}">
-       <div class="ico">${m.ico}</div>
-       <h3>${Sky.t(m.t)}</h3>
-       <p>${Sky.t(m.d)}</p>
-     </a>`).join('');
+  /* Вошли — отмечаем свою карточку; учителю она идёт первой и на телефоне. */
+  const me = Sky.db && Sky.db.me && Sky.db.me();
+  const role = me && me.role;
+  const mine = role === 'teacher' ? 'teacher' : (role === 'student' ? 'student' : null);
+  [['student', '#goalStudent'], ['teacher', '#goalTeacher']].forEach(([id, sel]) => {
+    const el = $(sel);
+    el.classList.toggle('mine', mine === id);
+    el.querySelector('.tag').hidden = mine !== id;
+  });
+  $('#goalTeacher').style.order = mine === 'teacher' ? '-1' : '';
 }
 
 function renderToday() {
@@ -255,15 +311,16 @@ function renderSubjects() {
     const due = Sky.dueIds(bank.id, ids).length;
     const st = Sky.stats().bySubject[bank.id];
     const a = document.createElement('a');
-    a.className = 'tile learn';
+    a.className = 'subj';
     a.href = 'trainer.html?subject=' + bank.id;
-    a.innerHTML =
-      `<div class="ico">${bank.icon}</div><h3></h3><p></p>
-       <div class="foot"><span class="tag ${due ? '' : 'ok'}"></span></div>`;
-    a.querySelector('h3').textContent = Sky.L(bank.name);
-    a.querySelector('p').textContent = Sky.t('ofTotal').replace('%1', ids.length) +
-      (st ? ' · ' + Sky.pct(st.right, st.n) + '% ' + Sky.t('accuracy') : '');
-    a.querySelector('.tag').textContent = due ? due + ' ' + Sky.t('due') : Sky.t('allDone');
+    a.innerHTML = '<span class="si" aria-hidden="true"></span><span><b></b><small><span></span></small></span>';
+    a.querySelector('.si').textContent = bank.icon;
+    a.querySelector('b').textContent = Sky.L(bank.name);
+    const mark = a.querySelector('small span');
+    mark.className = due ? 'due' : 'done';
+    mark.textContent = due ? due + ' ' + Sky.t('due') : Sky.t('allDone');
+    if (st) mark.after(' · ' + Sky.pct(st.right, st.n) + '% ' + Sky.t('accuracy'));
+    a.title = Sky.L(bank.name) + ' — ' + Sky.t('ofTotal').replace('%1', ids.length);
     box.appendChild(a);
   }
 }
@@ -278,12 +335,10 @@ function renderWeak() {
   }
   rows.sort((a, b) => b.fails - a.fails);
 
-  const panel = $('#weakPanel'), list = $('#weakList');
-  if (!rows.length) {
-    panel.innerHTML = `<div class="empty"><div class="big">🌤</div>
-      <b>${Sky.t('noWeakT')}</b><p>${Sky.t('noWeakD')}</p></div>`;
-    return;
-  }
+  /* Ошибок нет — блока нет: главная и так длинная. */
+  const panel = $('#weakPanel');
+  $('#weakSection').hidden = !rows.length;
+  if (!rows.length) return;
   panel.innerHTML = '<div class="list" id="weakList"></div>';
   const box = $('#weakList');
   for (const r of rows.slice(0, 8)) {
@@ -300,8 +355,9 @@ function renderWeak() {
   }
 }
 
-function renderAll() { renderHero(); renderModules(); renderToday(); renderSubjects(); renderWeak(); }
+function renderAll() { renderGoals(); renderToday(); renderSubjects(); renderWeak(); }
 document.addEventListener('langchange', renderAll);
+document.addEventListener('authchange', renderGoals);
 document.addEventListener('statschange', renderAll);
 renderAll();
 </script>
