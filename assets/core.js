@@ -59,6 +59,7 @@ window.Sky = (function () {
     navBody:{ru:'Тело',en:'Body'},
     navPlan:{ru:'План',en:'Plan'},
     navTools:{ru:'Инструменты',en:'Tools'},
+    backMenu:{ru:'Назад в меню',en:'Back to menu'},
     navPhoto:{ru:'Домашка по фото',en:'Photo homework'},
     navHomework:{ru:'Задания',en:'Homework'},
     navCollections:{ru:'Подборки',en:'Collections'},

@@ -5,7 +5,9 @@
 
    В строке — «Обзор», «Учёба», «Шахматы», «Класс», «План» и «Ещё»;
    остальные разделы — в «Ещё», ни одна страница из меню не пропала;
-   на телефоне всё в одном меню, и спрятанные ссылки там видны.
+   на телефоне всё в одном меню, и спрятанные ссылки там видны;
+   на страницах «Развития» — «Назад в меню»; на тренажёре, заданиях
+   и плане — ни психолога, ни трекеров.
    ============================================================ */
 'use strict';
 
@@ -102,6 +104,33 @@ const MORE = ['kids.html', 'parent.html', 'teachers.html', 'psychologist.html', 
   ok('телефон: разделы Учёба, Класс, Развитие; без «Ещё» внутри «Ещё»', JSON.stringify(phone.titles) === '["Учёба","Класс","Развитие"]', JSON.stringify(phone.titles));
   ok('телефон: страница не листается вбок', phone.sw <= 390, String(phone.sw));
   await ctx.close();
+
+  /* ---------- «Назад в меню» на страницах «Развития» ---------- */
+  const backs = [];
+  for (const f of ['psychologist.html', 'life.html', 'tools.html', 'trackers.html', 'body.html']) {
+    ({ page, ctx } = await open(f));
+    backs.push(f + ': ' + await page.$eval('main > .back-link', a => a.textContent + ' → ' + a.getAttribute('href')).catch(() => 'нет'));
+    await ctx.close();
+  }
+  ok('«Назад в меню» → index.html на психологе, режиме дня, инструментах, трекерах, теле',
+    backs.every(b => /: Назад в меню → index\.html$/.test(b)), backs.join(' | '));
+  ({ page, ctx } = await open('tools.html', { en: true }));
+  ok('английский: «Back to menu»', await page.$eval('main > .back-link', a => a.textContent) === 'Back to menu');
+  await ctx.close();
+
+  /* ---------- учёба, задания, план — без психолога и трекеров ---------- */
+  const extra = [];
+  for (const f of ['trainer.html', 'homework.html', 'plan.html']) {
+    ({ page, ctx } = await open(f));
+    const hits = await page.evaluate(() => {
+      const m = document.querySelector('main');
+      const txt = m.innerText + ' ' + [...m.querySelectorAll('a[href]')].map(a => a.getAttribute('href')).join(' ');
+      return txt.match(/психолог\w*|трекер\w*|режим\w* дня|psychologist\.html|trackers\.html|life\.html|body\.html/gi) || [];
+    });
+    if (hits.length) extra.push(f + ': ' + hits.join(', '));
+    await ctx.close();
+  }
+  ok('на тренажёре, заданиях и плане нет психолога, трекеров и режима дня', !extra.length, extra.join(' | '));
 
   ok('без ошибок на страницах', !errors.length, errors.join(' | '));
   await browser.close();
