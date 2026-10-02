@@ -193,7 +193,7 @@ Sky.init({
   tCheck:{ru:'Проверить работы',en:'Mark work'},
   tCheckD:{ru:'Фото эталона и работ — оценки всего класса',en:'Photo of the key and the papers — marks for the whole class'},
   tStudents:{ru:'Мои ученики',en:'My students'},
-  tStudentsD:{ru:'Успеваемость класса и у кого больше всего ошибок',en:'Class progress and who struggles most'},
+  tStudentsD:{ru:'Ответы каждого по заданиям и разбор ошибок',en:'Each student’s answers, task by task, with mistakes explained'},
 
   todayGoal:{ru:'Решено сегодня',en:'Solved today'},
   untilExam:{ru:'До экзамена',en:'Until the exam'},
@@ -225,9 +225,8 @@ const $ = s => document.querySelector(s);
 
 document.getElementById('heroCloud').innerHTML = Sky.logoSvg('');
 
-/* Куда ведут кнопки целей. «Мои ученики» — пока аналитика класса: там
-   успеваемость каждого ученика; отдельная страница учеников появится
-   позже — тогда поменять ссылку здесь. */
+/* Куда ведут кнопки целей. «Мои ученики» — разбор работ: как каждый
+   решал подборки, по заданиям, с объяснением ошибок. */
 const GOALS = {
   student: [
     { href:'trainer.html',  ico:'📚', t:'sExam',  d:'sExamD' },
@@ -238,7 +237,7 @@ const GOALS = {
   teacher: [
     { href:'collections.html', ico:'✏️', t:'tCreate',   d:'tCreateD' },
     { href:'fast-check.html',  ico:'✅', t:'tCheck',    d:'tCheckD' },
-    { href:'analytics.html',   ico:'👥', t:'tStudents', d:'tStudentsD' }
+    { href:'teacher-review.html', ico:'👥', t:'tStudents', d:'tStudentsD' }
   ]
 };
 

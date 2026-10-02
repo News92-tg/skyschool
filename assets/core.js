@@ -63,6 +63,7 @@ window.Sky = (function () {
     navPhoto:{ru:'Домашка по фото',en:'Photo homework'},
     navHomework:{ru:'Задания',en:'Homework'},
     navCollections:{ru:'Подборки',en:'Collections'},
+    navReview:{ru:'Разбор работ',en:'Student work'},
     navFastCheck:{ru:'Быстрая проверка теста',en:'Quick test check'},
     navAnalytics:{ru:'Аналитика класса',en:'Class analytics'},
 
@@ -282,7 +283,7 @@ window.Sky = (function () {
   ];
 
   /* «Подборки» — тем, кто вошёл (подборку по ссылке ученик открывает и
-     без входа), учителю — ещё и аналитика класса. */
+     без входа), учителю — ещё разбор работ и аналитика класса. */
   function navItems() {
     const me = window.Sky && Sky.db && Sky.db.me && Sky.db.me();
     if (!me) return NAV;
@@ -291,6 +292,7 @@ window.Sky = (function () {
       { href:'collections.html', key:'navCollections', group:'class' });
     if (me.role === 'teacher') {
       out.splice(out.findIndex(n => n.key === 'navFastCheck') + 1, 0,
+        { href:'teacher-review.html', key:'navReview', group:'class' },
         { href:'analytics.html', key:'navAnalytics', group:'class' });
     }
     return out;

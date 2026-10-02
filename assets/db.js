@@ -88,11 +88,15 @@ Sky.db = (function () {
   function seedLocal() { return; }
   function uid() { return 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
  
-  async function list(table, filter) {
+  /* opts.strict — ошибку чтения бросить, а не вернуть пустой список:
+     где пустота что-то значит («подборок нет»), сбой сети нельзя за
+     неё выдавать. Без opts — как всегда, пустой список. */
+  async function list(table, filter, opts) {
     if (mode === 'cloud' && sb) {
       let q = sb.from(table).select('*');
       for (const [k, v] of Object.entries(filter || {})) q = q.eq(k, v);
       const { data, error } = await q;
+      if (error && opts && opts.strict) throw error;
       if (error) { console.warn('[SkyySchool] чтение', table, error.message); return []; }
       return data || [];
     }

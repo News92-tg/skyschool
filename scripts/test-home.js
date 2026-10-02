@@ -60,7 +60,7 @@ const inDays = n => { const d = new Date(); d.setDate(d.getDate() + n); return d
     'Готовиться к ОГЭ/ЕГЭ → trainer.html', 'Мои задания от учителя → homework.html', 'Играть в шахматы → chess.html', 'Мой план → plan.html']), JSON.stringify(st));
   const te = await links(page, '#teacherLinks');
   ok('учитель: создать задание, проверить работы, мои ученики', JSON.stringify(te) === JSON.stringify([
-    'Создать задание → collections.html', 'Проверить работы → fast-check.html', 'Мои ученики → analytics.html']), JSON.stringify(te));
+    'Создать задание → collections.html', 'Проверить работы → fast-check.html', 'Мои ученики → teacher-review.html']), JSON.stringify(te));
   ok('без входа своя карточка не отмечена', await page.$$eval('.goal.mine', e => e.length) === 0);
 
   const main = await page.evaluate(() => {

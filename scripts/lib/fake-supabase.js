@@ -76,6 +76,8 @@ function createBackend(opts) {
       tables[m.table] = keep;
       return { data: null, error: null, count: n };
     }
+    /* selectError — сбой чтения: вернуть ошибку, как Supabase при обрыве */
+    if (opts.selectError) { const err = opts.selectError(m, state.session); if (err) return { data: null, error: err }; }
     let out = rows.filter(where);
     if (opts.visible) out = out.filter(r => opts.visible(m.table, r, state.session));
     if (m.order) {
