@@ -133,6 +133,11 @@ echo "→ подборки и инструменты учителя (дважд�
 for f in schema-collections.sql schema-teacher-tools.sql schema-collections.sql schema-teacher-tools.sql; do
   run "$PSQL -d $TDB -f '$ROOT/sql/$f'" >/dev/null
 done
+echo "→ задания учителя: домашка по фото и «Мои задания» (дважды)…"
+run "$PSQL -d $TDB -f '$ROOT/sql/tests/01-storage-stub.sql'" >/dev/null
+for f in schema-homework.sql schema-teacher-tasks.sql schema-homework.sql schema-teacher-tasks.sql; do
+  run "$PSQL -d $TDB -f '$ROOT/sql/$f'" >/dev/null
+done
 echo "→ тесты тарифов:"
 echo
 if run "psql -h $SOCKET_DIR -p $PGPORT -U postgres -d $TDB -q -f '$ROOT/sql/tests/tariffs-tests.sql'"; then
@@ -174,6 +179,17 @@ if run "psql -h $SOCKET_DIR -p $PGPORT -U postgres -d $TDB -q -f '$ROOT/sql/test
 else
   echo
   echo "ТЕСТЫ АДМИНКИ НЕ ПРОШЛИ — смотрите таблицу выше." >&2
+  exit 1
+fi
+echo
+echo "→ тесты своих заданий учителя (teacher_tasks):"
+echo
+if run "psql -h $SOCKET_DIR -p $PGPORT -U postgres -d $TDB -q -f '$ROOT/sql/tests/teacher-tasks-tests.sql'"; then
+  echo
+  echo "Готово: свои задания учителя работают как задумано."
+else
+  echo
+  echo "ТЕСТЫ СВОИХ ЗАДАНИЙ НЕ ПРОШЛИ — смотрите таблицу выше." >&2
   exit 1
 fi
 echo
