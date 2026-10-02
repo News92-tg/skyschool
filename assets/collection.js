@@ -6,6 +6,8 @@
    2. Ученик пишет имя (или входит), решает и жмёт «Отправить».
    3. submit_collection проверяет на сервере всё, где есть правильный
       ответ, и возвращает «Верно: 7 из 10». Оценку ставит учитель.
+      Разбор по заданиям для учителя (task_details) база собирает сама
+      из этой проверки — отсюда уходят только ответы и класс.
    Без кода — поле «Код подборки».
    ============================================================ */
 'use strict';
@@ -26,6 +28,8 @@
     until:{ru:'Сдать до %1',en:'Due %1'},
     nameL:{ru:'Ваше имя и фамилия',en:'Your first and last name'},
     namePh:{ru:'Например: Петя Иванов',en:'For example: Peter Smith'},
+    classL:{ru:'Класс',en:'Class'},
+    classPh:{ru:'7Б',en:'7B'},
     nameAs:{ru:'Ответы уйдут от имени: %1',en:'Answers will be sent as: %1'},
     answerPh:{ru:'Ваш ответ',en:'Your answer'},
     progress:{ru:'Отвечено: %1 из %2',en:'Answered: %1 of %2'},
@@ -112,9 +116,10 @@
         ${coll.description ? `<div class="cn-desc">${esc(coll.description)}</div>` : ''}
       </div>
     </div>
-    <div class="panel pad-sm" style="margin-top:16px">
-      ${me ? `<div style="font-size:13.5px;font-weight:700">${esc(Sky.t('nameAs').replace('%1', me.name || me.email || ''))}</div>`
+    <div class="panel pad-sm cn-who" style="margin-top:16px">
+      ${me ? `<div class="as">${esc(Sky.t('nameAs').replace('%1', me.name || me.email || ''))}</div>`
            : `<div class="field"><label for="stName" data-i18n="nameL"></label><input type="text" id="stName" maxlength="100" autocomplete="name" value="${esc(d.__name || '')}" data-i18n-ph="namePh"></div>`}
+      <div class="field"><label for="stClass" data-i18n="classL"></label><input type="text" id="stClass" maxlength="20" autocomplete="off" value="${esc(Sky.get('stClass', '') || '')}" data-i18n-ph="classPh"></div>
     </div>
     <form id="solveForm" class="list" style="margin-top:16px" novalidate>
       ${tasks.map((t, i) => `<div class="cn-task" data-task="${esc(t.id)}">
@@ -134,6 +139,8 @@
     $('#solveForm').addEventListener('submit', submit);
     const nameIn = $('#stName');
     if (nameIn) nameIn.addEventListener('input', () => { const dd = draft(); dd.__name = nameIn.value; saveDraft(dd); });
+    /* класс у ученика тот же во всех подборках — помним на устройстве */
+    $('#stClass').addEventListener('input', e => Sky.set('stClass', e.target.value.trim()));
     progress();
   }
 
@@ -183,7 +190,8 @@
     btn.disabled = true;
     btn.innerHTML = `<span class="spin"></span> ${esc(Sky.t('sending'))}`;
     let res = null;
-    try { res = await Sky.db.rpc('submit_collection', { p_code: code, p_student_name: name || null, p_answers: a }); }
+    const cls = ($('#stClass').value || '').trim().slice(0, 20);
+    try { res = await Sky.db.rpc('submit_collection', { p_code: code, p_student_name: name || null, p_answers: a, p_student_class: cls || null }); }
     catch (err) { res = null; }
     busy = false;
     btn.disabled = false;

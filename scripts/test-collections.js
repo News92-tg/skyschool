@@ -105,7 +105,7 @@ function rpc({ fn, args, uid }) {
       return { task_id: t.id, answer: given, correct: v };
     });
     DB.collection_submissions.push({ id: 'sub-' + (DB.collection_submissions.length + 1), collection_id: c.id, student_id: uid || null, student_name: name,
-      answers, score: correct, percent: Math.round(correct * 1000 / c.tasks.length) / 10, status: open ? 'pending' : 'checked', teacher_comment: null, created_at: now() });
+      student_class: String(args.p_student_class || '').trim().slice(0, 20) || null, answers, score: correct, percent: Math.round(correct * 1000 / c.tasks.length) / 10, status: open ? 'pending' : 'checked', teacher_comment: null, created_at: now() });
     return { data: { ok: true, correct, auto, open, total: c.tasks.length }, error: null };
   }
   if (fn === 'review_collection_submission') {
@@ -269,11 +269,13 @@ function fakeSupabase(me) {
     (await s.$$('.cn-task')).length === 4 && /Решите до пятницы/.test(await text(s, '.cn-desc')));
   ok('выбор — переключатели, текст — поле ответа', (await s.$$('.cn-task:nth-child(1) input[type=radio]')).length === 4 &&
     (await s.$$('.cn-task:nth-child(3) textarea')).length === 1 && (await s.$$('.cn-task:nth-child(4) textarea')).length === 1);
-  ok('без аккаунта — поле для имени', await shown(s, '#stName'));
+  ok('без аккаунта — поле для имени и необязательное «Класс»', await shown(s, '#stName') && await shown(s, '#stClass') &&
+    (await text(s, 'label[for=stClass]')) === 'Класс');
   ok('ученик: все подписи переведены', !(await rawKeys(s)).length, (await rawKeys(s)).join());
   await s.click('#sendBtn');
   ok('без имени — не отправляется', await toastLike(s, /Впишите имя/) && !DB.collection_submissions.length);
   await s.fill('#stName', 'Петя Иванов');
+  await s.fill('#stClass', ' 7Б ');
   const right0 = coll.tasks[0].answer;
   await s.check(`.cn-task:nth-child(1) input[value="${right0}"]`);
   await s.check('.cn-task:nth-child(2) input[value="0"]');           /* 54 — неверно */
@@ -281,7 +283,7 @@ function fakeSupabase(me) {
   ok('счётчик «Отвечено»', (await text(s, '#prog')) === 'Отвечено: 3 из 4');
   await s.reload();
   await s.waitForSelector('#solveForm');
-  ok('черновик переживает перезагрузку', (await s.$eval('#stName', i => i.value)) === 'Петя Иванов' &&
+  ok('черновик переживает перезагрузку, класс — тоже', (await s.$eval('#stName', i => i.value)) === 'Петя Иванов' && (await s.$eval('#stClass', i => i.value)) === '7Б' &&
     (await s.$eval(`.cn-task:nth-child(1) input[value="${right0}"]`, i => i.checked)) && (await s.$eval('.cn-task:nth-child(3) textarea', i => i.value)) === '0.5',
     JSON.stringify(await s.evaluate(() => [document.querySelector('#stName').value, Object.keys(sessionStorage), sessionStorage.getItem(Object.keys(sessionStorage).find(k => /clDraft/.test(k)) || 'x')])));
   if (process.env.SHOTS) await s.screenshot({ path: path.join(process.env.SHOTS, 'coll-student.png'), fullPage: true });
@@ -292,6 +294,8 @@ function fakeSupabase(me) {
   ok('отправлено: код, имя, ответы по task_id (номер варианта строкой)', sentRpc.args.p_code === coll.share_code && sentRpc.args.p_student_name === 'Петя Иванов' &&
     JSON.stringify(sentRpc.args.p_answers) === JSON.stringify([{ task_id: 't1', answer: String(right0) }, { task_id: 't2', answer: '0' }, { task_id: 't3', answer: '0.5' }, { task_id: 't4', answer: '' }]),
     JSON.stringify(sentRpc.args));
+  ok('…и класс «7Б»; «верно» из браузера не уходит — его считает база', sentRpc.args.p_student_class === '7Б' &&
+    !/correct|is_correct|task_details/.test(JSON.stringify(sentRpc.args)), JSON.stringify(sentRpc.args));
   ok('ученик видит «Ответы отправлены» и «Верно: 2 из 3», без оценки', /Ответы отправлены учителю/.test(await text(s, '.cn-done')) &&
     (await text(s, '.cn-done .score')) === 'Верно: 2 из 3' && /на проверке у учителя: 1/.test(await text(s, '.cn-done')) && /Оценку поставит учитель/.test(await text(s, '.cn-done')));
   ok('в базе: ждёт проверки учителем', sub && sub.status === 'pending' && sub.score === 2 && sub.student_name === 'Петя Иванов');
