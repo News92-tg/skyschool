@@ -132,6 +132,27 @@ select t_check('по каждому заданию — ответ и верно/
           and answers -> 2 ->> 'answer' = 'Листья жёлтые'
      from collection_submissions where collection_id = 'c1000000-0000-0000-0000-000000000001'));
 
+-- разбор по заданиям для учителя (teacher-review.html)
+select t_check('task_details: вопрос, ответ ученика (текст варианта), верно/неверно/ждёт',
+  (select jsonb_array_length(task_details) = 3
+          and task_details -> 0 ->> 'question' = '2+2?' and task_details -> 0 ->> 'student_answer' = '4'
+          and (task_details -> 0 ->> 'student_choice')::int = 1 and task_details -> 0 ->> 'is_correct' = 'true'
+          and task_details -> 0 -> 'options' = '["3","4","5"]'::jsonb
+          and task_details -> 1 ->> 'student_answer' = ' 0.5 ' and task_details -> 1 ->> 'is_correct' = 'true'
+          and task_details -> 2 ->> 'type' = 'text' and jsonb_typeof(task_details -> 2 -> 'is_correct') = 'null'
+     from collection_submissions where collection_id = 'c1000000-0000-0000-0000-000000000001'));
+select t_check('task_details: ПРАВИЛЬНЫХ ОТВЕТОВ НЕТ (строку читает и сам ученик)',
+  (select position('0,5' in task_details::text) = 0 and position('1/2' in task_details::text) = 0
+          and position('accept' in task_details::text) = 0 and position('correct_answer' in task_details::text) = 0
+          and not (task_details -> 0 ? 'answer')
+     from collection_submissions where collection_id = 'c1000000-0000-0000-0000-000000000001'));
+select t_check('task_details совпадает с разбором из сохранённых ответов (им заполняются старые отправки)',
+  (select task_details = collection_task_details(c.tasks, s.answers)
+     from collection_submissions s join task_collections c on c.id = s.collection_id
+    where s.collection_id = 'c1000000-0000-0000-0000-000000000001'));
+select t_check('без класса — student_class пустой',
+  (select student_class is null from collection_submissions where collection_id = 'c1000000-0000-0000-0000-000000000001'));
+
 set role anon;
 select t_check('повтор через секунду — too_fast', submit_collection(:'code_pub', 'Петя Иванов', '[]') ->> 'error' = 'too_fast');
 select t_check('без имени — name_required', submit_collection(:'code_pub', '  ', '[]') ->> 'error' = 'name_required');
@@ -141,6 +162,24 @@ select t_check('ответы не массивом — bad_answers', submit_coll
 select t_check('только выбор варианта — сразу checked', submit_collection(:'code_choice', 'Коля', '[{"task_id":"q1","answer":"0"}]') ->> 'correct' = '1');
 reset role;
 select t_check('…статус checked, 100 %', (select status = 'checked' and percent = 100 from collection_submissions where collection_id = 'c1000000-0000-0000-0000-000000000004'));
+set role anon;
+select t_check('с классом — принят (четвёртый параметр)', submit_collection(:'code_choice', 'Вера', '[{"task_id":"q1","answer":"1"}]', '  7   Б ') ->> 'correct' = '0');
+select t_check('класс длиннее 20 знаков обрезается', submit_collection(:'code_choice', 'Гоша', '[]', repeat('Ж', 50)) ->> 'ok' = 'true');
+select t_check('номер варианта «99999999999» — не ошибка, просто неверно', submit_collection(:'code_choice', 'Дима', '[{"task_id":"q1","answer":"99999999999"}]') ->> 'correct' = '0');
+select t_expect_denied('аноним не вызывает служебную функцию разбора', $q$ select collection_task_details('[]', '[]') $q$);
+-- так зовёт PostgREST: по именам. Три имени — прежняя функция, четыре —
+-- новая; неоднозначности нет
+select t_check('вызов по именам без класса (как со старой страницы) — работает',
+  submit_collection(p_code => :'code_choice', p_student_name => 'Ира', p_answers => '[{"task_id":"q1","answer":"0"}]') ->> 'correct' = '1');
+select t_check('вызов по именам с классом — работает',
+  submit_collection(p_code => :'code_choice', p_student_name => 'Олег', p_answers => '[]', p_student_class => '5А') ->> 'ok' = 'true');
+reset role;
+select t_check('…класс «7 Б» (пробелы схлопнуты), вариант «3» — неверно',
+  (select student_class = '7 Б' and task_details -> 0 ->> 'student_answer' = '3' and task_details -> 0 ->> 'is_correct' = 'false'
+     from collection_submissions where student_name = 'Вера'));
+select t_check('…класс обрезан до 20, без ответа — student_answer пустой',
+  (select char_length(student_class) = 20 and jsonb_typeof(task_details -> 0 -> 'student_answer') = 'null'
+     from collection_submissions where student_name = 'Гоша'));
 
 set role authenticated;
 select t_login('c0000000-0000-0000-0000-00000000000c');
@@ -164,18 +203,25 @@ select t_expect('чужой учитель не видит отправок', (s
 select t_expect_denied('чужой учитель не проверяет',
   $q$ select review_collection_submission((select id from collection_submissions limit 1), '{}'::jsonb, 'x') $q$);
 select t_login('c0000000-0000-0000-0000-00000000000a');
-select t_expect('учитель видит все отправки по своим подборкам', (select count(*) from collection_submissions), 3);
+select t_expect('учитель видит все отправки по своим подборкам', (select count(*) from collection_submissions), 8);
 create temp table _v as select review_collection_submission(
   (select id from collection_submissions where student_name = 'Петя Иванов'), '{"t3": true}'::jsonb, 'Хорошо описал!') as j;
 select t_check('проверка учителем: открытое засчитано — 3/3, 100 %, checked, комментарий',
   (select (j ->> 'score')::int = 3 and (j ->> 'percent')::numeric = 100 and j ->> 'status' = 'checked' and j ->> 'teacher_comment' = 'Хорошо описал!' from _v));
 drop table _v;
+select t_check('…и в task_details открытое теперь «верно»',
+  (select task_details -> 2 ->> 'is_correct' = 'true' and task_details -> 0 ->> 'is_correct' = 'true'
+     from collection_submissions where student_name = 'Петя Иванов'));
 select t_check('учитель может поправить и автопроверку',
   (review_collection_submission((select id from collection_submissions where student_name = 'Петя Иванов'), '{"t1": false}'::jsonb, null) ->> 'score')::int = 2);
+select t_check('…task_details за ней следует: первое — неверно',
+  (select task_details -> 0 ->> 'is_correct' = 'false' and task_details -> 2 ->> 'is_correct' = 'true'
+     from collection_submissions where student_name = 'Петя Иванов'));
+select t_expect_denied('учитель не вызывает служебную функцию разбора напрямую', $q$ select collection_task_details('[]', '[]') $q$);
 select t_check('без оценки открытого — остаётся pending',
   review_collection_submission((select id from collection_submissions where student_name = 'Саша Ученик'), '{"t1": true}'::jsonb, null) ->> 'status' = 'pending');
 select t_expect_rows_affected('учитель удаляет свою подборку', $q$ delete from task_collections where id = 'c1000000-0000-0000-0000-000000000001' $q$, 1);
-select t_expect('…и её отправки ушли вместе с ней', (select count(*) from collection_submissions), 2);
+select t_expect('…и её отправки ушли вместе с ней', (select count(*) from collection_submissions), 7);
 reset role;
 set role anon;
 select t_expect_denied('аноним не вызывает проверку', $q$ select review_collection_submission(gen_random_uuid(), '{}'::jsonb, null) $q$);

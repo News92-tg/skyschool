@@ -71,6 +71,14 @@ create index if not exists collection_submissions_coll_idx
 create index if not exists collection_submissions_student_idx
   on public.collection_submissions (student_id);
 
+-- Разбор по заданиям для учителя (teacher-review.html) и класс ученика
+-- для выгрузки. Пишет обе колонки только submit_collection.
+-- В task_details НЕТ правильных ответов: свою строку может читать и сам
+-- ученик (политика ниже), и по ней он узнал бы ответы и пересдал на
+-- 100 %. Правильные ответы — в tasks подборки, их видит только учитель.
+alter table public.collection_submissions add column if not exists task_details jsonb;
+alter table public.collection_submissions add column if not exists student_class text;
+
 
 -- ---------------------------------------------------------------------
 -- 2. Код подборки: 6 символов, как код класса. Буквы I, O и цифры 1, 0
@@ -133,6 +141,38 @@ language sql immutable set search_path = public as $$
              replace(translate(lower(btrim(coalesce(t, ''))), 'ё', 'е'), ',', '.'),
              '\s+', ' ', 'g'),
            '\.$', '');
+$$;
+
+
+-- ---------------------------------------------------------------------
+-- 3a. task_details: что спросили, что ответил ученик и верно ли —
+--     [{task_id, type, question, options, student_answer, student_choice,
+--       is_correct}]. p_results — проверенные ответы из submit_collection
+--     [{task_id, answer, correct}]. is_correct: true / false / null
+--     (открытое задание ждёт учителя). Правильных ответов здесь нет —
+--     см. комментарий у колонки.
+-- ---------------------------------------------------------------------
+create or replace function public.collection_task_details(p_tasks jsonb, p_results jsonb)
+returns jsonb
+language sql immutable set search_path = public as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'task_id',        t ->> 'id',
+           'type',           coalesce(t ->> 'type', 'text'),
+           'question',       t ->> 'text',
+           'options',        case when jsonb_typeof(t -> 'options') = 'array' then t -> 'options' else '[]'::jsonb end,
+           'student_choice', case when coalesce(t ->> 'type', 'text') = 'choice' and r ->> 'answer' ~ '^\d{1,4}$'
+                                  then (r ->> 'answer')::int end,
+           'student_answer', case when coalesce(t ->> 'type', 'text') = 'choice'
+                                  then case when r ->> 'answer' ~ '^\d{1,4}$' then t -> 'options' ->> (r ->> 'answer')::int end
+                                  else nullif(r ->> 'answer', '') end,
+           'is_correct',     r -> 'correct')
+         order by n), '[]'::jsonb)
+    from jsonb_array_elements(case when jsonb_typeof(p_tasks) = 'array' then p_tasks else '[]'::jsonb end) with ordinality as x(t, n)
+    left join lateral (
+      select a as r
+        from jsonb_array_elements(case when jsonb_typeof(p_results) = 'array' then p_results else '[]'::jsonb end) as y(a)
+       where a ->> 'task_id' = t ->> 'id'
+       limit 1) z on true;
 $$;
 
 
@@ -248,18 +288,28 @@ end $$;
 
 -- ---------------------------------------------------------------------
 -- 6. Отправить ответы. p_answers: [{task_id, answer}]; для выбора
---    варианта answer — номер варианта с нуля.
+--    варианта answer — номер варианта с нуля. p_student_class — класс
+--    ученика («7Б»), необязательно: для выгрузки учителю.
 --    Проверяет сразу всё, где есть правильный ответ; открытые задания
---    (без ответа) ждут учителя — тогда статус pending.
+--    (без ответа) ждут учителя — тогда статус pending. Разбор по
+--    заданиям (task_details) собирает сама функция из этой проверки:
+--    присланному из браузера «верно» верить нельзя.
 --    Ответ ученику: {ok, correct, auto, open, total} — «Верно: 7/10».
+--
+--    Прежняя версия — с тремя параметрами — осталась (ниже) и просто
+--    зовёт эту без класса: страницы, открытые до обновления, работают.
+--    У p_student_class нет значения по умолчанию нарочно: иначе вызов с
+--    тремя параметрами подходил бы к обеим функциям.
 -- ---------------------------------------------------------------------
-create or replace function public.submit_collection(p_code text, p_student_name text, p_answers jsonb)
+create or replace function public.submit_collection(p_code text, p_student_name text, p_answers jsonb,
+                                                    p_student_class text)
 returns jsonb
 language plpgsql volatile security definer set search_path = public as $$
 declare
   v_coll    public.task_collections%rowtype;
   v_uid     uuid := auth.uid();
   v_name    text := nullif(btrim(coalesce(p_student_name, '')), '');
+  v_class   text := nullif(left(regexp_replace(btrim(coalesce(p_student_class, '')), '\s+', ' ', 'g'), 20), '');
   v_task    jsonb;
   v_given   text;
   v_ok      boolean;
@@ -310,8 +360,11 @@ begin
      limit 1;
     v_given := coalesce(v_given, '');
 
-    if coalesce(v_task ->> 'type', 'text') = 'choice' and (v_task ->> 'answer') ~ '^\d+$' then
-      v_ok := v_given ~ '^\d+$' and v_given::int = (v_task ->> 'answer')::int;
+    -- номер варианта — не длиннее 4 цифр: «99999999999» не помещается в
+    -- int, и раньше на нём падала вся отправка; case — чтобы до
+    -- приведения к int доходило только число
+    if coalesce(v_task ->> 'type', 'text') = 'choice' and (v_task ->> 'answer') ~ '^\d{1,4}$' then
+      v_ok := case when v_given ~ '^\d{1,4}$' then v_given::int = (v_task ->> 'answer')::int else false end;
       v_auto := v_auto + 1;
     elsif jsonb_typeof(v_task -> 'accept') = 'array' and jsonb_array_length(v_task -> 'accept') > 0 then
       v_ok := public.norm_answer(v_given) <> ''
@@ -328,9 +381,9 @@ begin
   end loop;
 
   insert into public.collection_submissions
-    (collection_id, student_id, student_name, answers, score, percent, status)
+    (collection_id, student_id, student_name, student_class, answers, task_details, score, percent, status)
   values
-    (v_coll.id, v_uid, v_name, v_results, v_correct,
+    (v_coll.id, v_uid, v_name, v_class, v_results, public.collection_task_details(v_coll.tasks, v_results), v_correct,
      round(v_correct * 100.0 / greatest(v_total, 1), 1),
      case when v_open > 0 then 'pending' else 'checked' end)
   returning id into v_id;
@@ -341,13 +394,19 @@ begin
   return jsonb_build_object('ok', true, 'id', v_id, 'correct', v_correct, 'auto', v_auto, 'open', v_open, 'total', v_total);
 end $$;
 
+create or replace function public.submit_collection(p_code text, p_student_name text, p_answers jsonb)
+returns jsonb
+language sql volatile set search_path = public as $$
+  select public.submit_collection(p_code, p_student_name, p_answers, null::text);
+$$;
+
 
 -- ---------------------------------------------------------------------
 -- 7. Учитель проверяет ответы: p_marks — {task_id: true | false}
 --    (для открытых заданий, но можно поправить и автопроверку),
 --    p_comment — комментарий ученику (null — не менять).
 --    Балл и процент пересчитываются; когда открытых без оценки не
---    осталось — статус checked.
+--    осталось — статус checked. В task_details «верно» ставится то же.
 -- ---------------------------------------------------------------------
 create or replace function public.review_collection_submission(p_id uuid, p_marks jsonb, p_comment text default null)
 returns jsonb
@@ -383,6 +442,14 @@ begin
 
   update public.collection_submissions s set
     answers         = v_answers,
+    task_details    = case when jsonb_typeof(s.task_details) = 'array' then (
+                        select coalesce(jsonb_agg(
+                                 case when p_marks ? (d ->> 'task_id') and jsonb_typeof(p_marks -> (d ->> 'task_id')) = 'boolean'
+                                      then jsonb_set(d, '{is_correct}', p_marks -> (d ->> 'task_id'))
+                                      else d end
+                                 order by n), '[]'::jsonb)
+                          from jsonb_array_elements(s.task_details) with ordinality as x(d, n))
+                      else s.task_details end,
     score           = v_correct,
     percent         = round(v_correct * 100.0 / greatest(v_total, 1), 1),
     teacher_comment = case when p_comment is null then s.teacher_comment else left(p_comment, 2000) end,
@@ -396,10 +463,22 @@ end $$;
 
 
 -- ---------------------------------------------------------------------
+-- 7a. Отправкам до появления task_details — разбор из их же ответов.
+--     Повторный запуск ничего не меняет.
+-- ---------------------------------------------------------------------
+update public.collection_submissions s
+   set task_details = public.collection_task_details(c.tasks, s.answers)
+  from public.task_collections c
+ where c.id = s.collection_id and s.task_details is null;
+
+
+-- ---------------------------------------------------------------------
 -- 8. Права на функции
 -- ---------------------------------------------------------------------
 revoke all on function public.get_collection_by_code(text)                     from public;
 revoke all on function public.submit_collection(text, text, jsonb)             from public;
+revoke all on function public.submit_collection(text, text, jsonb, text)       from public;
+revoke all on function public.collection_task_details(jsonb, jsonb)            from public;
 revoke all on function public.review_collection_submission(uuid, jsonb, text)  from public;
 revoke all on function public.gen_share_code()                                 from public;
 revoke all on function public.task_collections_before_insert()                 from public;
@@ -413,15 +492,19 @@ begin
     revoke all on function public.gen_share_code() from anon;
     revoke all on function public.task_collections_before_insert() from anon;
     revoke all on function public.task_collections_keep_code() from anon;
-    grant execute on function public.get_collection_by_code(text)         to anon;
-    grant execute on function public.submit_collection(text, text, jsonb) to anon;
+    revoke all on function public.collection_task_details(jsonb, jsonb) from anon;
+    grant execute on function public.get_collection_by_code(text)               to anon;
+    grant execute on function public.submit_collection(text, text, jsonb)       to anon;
+    grant execute on function public.submit_collection(text, text, jsonb, text) to anon;
   end if;
   if exists (select 1 from pg_roles where rolname = 'authenticated') then
     revoke all on function public.gen_share_code() from authenticated;
     revoke all on function public.task_collections_before_insert() from authenticated;
     revoke all on function public.task_collections_keep_code() from authenticated;
+    revoke all on function public.collection_task_details(jsonb, jsonb) from authenticated;
     grant execute on function public.get_collection_by_code(text)                    to authenticated;
     grant execute on function public.submit_collection(text, text, jsonb)            to authenticated;
+    grant execute on function public.submit_collection(text, text, jsonb, text)      to authenticated;
     grant execute on function public.review_collection_submission(uuid, jsonb, text) to authenticated;
   end if;
 end $$;
