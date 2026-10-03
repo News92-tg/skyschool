@@ -89,6 +89,72 @@
   .cl-rv-marks button[aria-pressed="true"].yes{background:var(--ok);border-color:var(--ok);color:#fff}
   .cl-rv-marks button[aria-pressed="true"].no{background:var(--no);border-color:var(--no);color:#fff}
   .cl-code-form{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+  /* вкладки «Подборки | Мои задания» */
+  .cl-views{display:flex;gap:4px;margin-top:22px;border-bottom:1px solid var(--line)}
+  .cl-views button{position:relative;font:inherit;font-size:14.5px;font-weight:800;color:var(--muted);background:none;border:0;
+    padding:12px 14px;min-height:44px;cursor:pointer;border-radius:10px 10px 0 0}
+  .cl-views button:hover{color:var(--ink);background:var(--panel-2)}
+  .cl-views button[aria-selected="true"]{color:var(--ink)}
+  .cl-views button[aria-selected="true"]::after{content:'';position:absolute;left:10px;right:10px;bottom:-1px;height:3px;border-radius:3px 3px 0 0;background:var(--accent)}
+  .cl-views .n{display:inline-block;min-width:20px;margin-left:4px;padding:1px 6px;border-radius:99px;background:var(--panel-2);font-size:11.5px;color:var(--muted)}
+  .cl-views .n:empty{display:none}
+
+  /* мои задания */
+  .tt-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  .tt-bar .tt-f{min-width:180px}
+  .tt-bar .grow{flex:1}
+  .tt-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+  .tt-card{display:grid;gap:10px;align-content:start;padding:16px 18px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);transition:border-color .15s,box-shadow .15s}
+  .tt-card:hover{border-color:var(--line-2);box-shadow:var(--shadow-sm)}
+  .tt-q{font-size:14.5px;font-weight:700;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+  .tt-opts{margin:0;padding:0;list-style:none;display:grid;gap:4px;font-size:13px}
+  .tt-opts li{padding:5px 9px;border-radius:8px;background:var(--panel-2)}
+  .tt-opts li.ok{background:var(--ok-soft);color:var(--ok);font-weight:700}
+  .tt-ans{font-size:13px;font-weight:700;color:var(--ok)}
+  .tt-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .tt-date{margin-left:auto;font-size:12px;color:var(--muted);font-weight:700}
+  .tt-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
+  .tt-acts .btn{padding:8px 12px}
+  .tt-acts .tt-del{margin-left:auto}
+  .tt-none{margin:0;padding:18px;border:1px dashed var(--line-2);border-radius:var(--r);color:var(--muted);font-weight:700;font-size:13px;text-align:center}
+  .modal:has(.tt-form){max-width:640px}
+  /* minmax(0,1fr): иначе сетка растягивается по самому широкому полю и
+     на телефоне форма вылезает за край окна */
+  .tt-form,.tt-add{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+  .tt-form .seg{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);width:100%}
+  .tt-form .seg button{padding:9px 8px;min-height:40px;white-space:normal;line-height:1.2}
+  .tt-form .help{font-size:12px;color:var(--faint);font-weight:600;line-height:1.45}
+  .tt-form h2,.tt-add h2{margin:0}
+  .tt-photo{display:grid;gap:10px;padding:12px;border:1px dashed var(--line-2);border-radius:var(--r);background:var(--panel-2)}
+  .tt-photo-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .tt-photo-row img{width:64px;height:64px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+  .tt-msg{font-size:13px;font-weight:700}
+  .tt-msg:empty{display:none}
+  .tt-msg.ok{color:var(--ok)}
+  .tt-msg.bad{color:var(--no)}
+  .tt-opts-edit{display:grid;gap:8px}
+  .tt-opts-edit.invalid .tt-opt input[type=text]{border-color:var(--no)}
+  .tt-opt{display:flex;gap:8px;align-items:center}
+  .tt-opt .tt-l{flex:none;width:18px;font-weight:900;color:var(--muted);text-align:center}
+  .tt-opt input[type=text]{flex:1;min-width:0;min-height:44px;padding:9px 12px;border:1.5px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);font:inherit;font-size:14px}
+  .tt-opt input[type=text]:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3.5px color-mix(in srgb, var(--accent) 16%, transparent)}
+  .tt-opt input[type=radio]{flex:none;width:20px;height:20px;accent-color:var(--ok);margin:0}
+  .tt-end{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+  .tt-add-q{margin:0;font-weight:700;white-space:pre-wrap;color:var(--ink-2);max-height:6.5em;overflow:hidden}
+  .tt-add-list{display:grid;gap:8px;max-height:46vh;overflow:auto}
+  .tt-add-item{display:flex;gap:10px;align-items:center;padding:10px 12px;min-height:44px;border:1px solid var(--line);border-radius:12px;cursor:pointer}
+  .tt-add-item:has(input:checked){border-color:var(--accent);background:var(--m-learn-soft)}
+  .tt-add-item.has{opacity:.6;cursor:default}
+  .tt-add-item input{width:18px;height:18px;accent-color:var(--accent);margin:0;flex:none}
+  .tt-add-item b{display:block}
+  .tt-add-item small{display:block;color:var(--muted);font-weight:700;font-size:12px}
+  @media (max-width:560px){
+    .tt-list{grid-template-columns:minmax(0,1fr)}
+    .tt-bar .tt-f{min-width:0;flex:1 1 100%}
+    .tt-bar .btn{flex:1 1 100%}
+    .cl-views{overflow-x:auto}
+  }
   .cl-code-form input{width:130px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);
     font-family:'JetBrains Mono',monospace;font-size:14px;letter-spacing:.12em;text-transform:uppercase}
 </style>
@@ -111,14 +177,22 @@
   <div id="gate" class="section"></div>
 
   <div id="app" class="hidden">
-    <div class="cl-bar">
-      <div class="cl-tabs" id="catTabs" role="tablist"></div>
-      <button type="button" class="btn grow" id="newBtn" data-i18n="newColl"></button>
+    <!-- Подборки | Мои задания (assets/teacher-tasks.js) -->
+    <div class="cl-views" id="clViews" role="tablist">
+      <button type="button" role="tab" data-view="colls" aria-selected="true" data-i18n="ttViewColls"></button>
+      <button type="button" role="tab" data-view="tasks" aria-selected="false"><span data-i18n="ttViewTasks"></span> <span class="n" id="ttN"></span></button>
     </div>
-    <div class="cl-catline hidden" id="catLine"></div>
-    <div class="section" style="margin-top:16px">
-      <div class="list" id="colls"></div>
+    <div id="viewColls">
+      <div class="cl-bar">
+        <div class="cl-tabs" id="catTabs" role="tablist"></div>
+        <button type="button" class="btn grow" id="newBtn" data-i18n="newColl"></button>
+      </div>
+      <div class="cl-catline hidden" id="catLine"></div>
+      <div class="section" style="margin-top:16px">
+        <div class="list" id="colls"></div>
+      </div>
     </div>
+    <div id="viewTasks" class="hidden" style="margin-top:18px"></div>
   </div>
 </main>
 
@@ -129,6 +203,7 @@
 <script src="assets/db.js"></script>
 <script src="assets/auth.js"></script>
 <script src="assets/collection-common.js"></script>
+<script src="assets/teacher-tasks.js"></script>
 <script src="assets/collections.js"></script>
 </body>
 </html>

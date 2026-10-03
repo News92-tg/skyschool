@@ -23,7 +23,7 @@ const PRECACHE_URLS = [
   'assets/match3.js','assets/python-editor.js','assets/ai-teachers.js','data/ai-teachers.js','assets/sky.css',
   'assets/photo-api.js','assets/photo-teacher.js','assets/photo-text.js','assets/grading-criteria.js',
   'admin.html','assets/admin.js',
-  'collections.html','collection.html','assets/collection-common.js','assets/collections.js','assets/collection.js',
+  'collections.html','collection.html','assets/collection-common.js','assets/collections.js','assets/collection.js','assets/teacher-tasks.js',
   'fast-check.html','assets/fast-check.js','assets/limits.js',
   'auth.html','assets/auth-ui.js','onboarding.html','assets/onboarding.js','profile.html','assets/profile.js','assets/telegram.js','assets/submissions.js',
   'analytics.html','assets/analytics.js','teacher-review.html','assets/teacher-review.js',

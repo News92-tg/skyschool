@@ -78,7 +78,9 @@ const FOREIGN = { id: 's-foreign', collection_id: CX, student_name: 'Чужой'
       tables: {
         profiles: [{ id: 'u-t', name: 'Ольга Петровна', role: 'teacher' }, { id: 'u-s', name: 'Маша', role: 'student' }, { id: 'u-x', name: 'Борис', role: 'teacher' }],
         task_collections: [
-          { id: C1, teacher_id: 'u-t', title: 'Дроби — разминка', subject: 'math', share_code: 'A3K7MN', tasks: TASKS, is_public: true, created_at: ago(500) },
+          { id: C1, teacher_id: 'u-t', title: 'Дроби — разминка', subject: 'math', share_code: 'A3K7MN', is_public: true, created_at: ago(500),
+            /* o.teacherExpl — у второго задания есть своё объяснение учителя (из «Моих заданий») */
+            tasks: o.teacherExpl ? TASKS.map(x => x.id === 't2' ? Object.assign({}, x, { explanation: 'Половина — это 1 : 2 = 0,5' }) : x) : TASKS },
           { id: C2, teacher_id: 'u-t', title: 'Пустая подборка', subject: 'physics', share_code: 'B4P8QR', tasks: [TASKS[0]], is_public: true, created_at: ago(400) },
           { id: CX, teacher_id: 'u-x', title: 'Чужая подборка', subject: 'math', share_code: 'XXXXXX', tasks: [TASKS[0]], is_public: true, created_at: ago(300) }
         ],
@@ -263,6 +265,21 @@ const FOREIGN = { id: 's-foreign', collection_id: CX, student_name: 'Чужой'
   await page.waitForSelector('.tr-tasks');
   ok('английский: «Correct 1 of 3 (33.3%), mark 2», варианты A/B/C', (await text(page, '#trSummary')) === 'Correct 1 of 3 (33.3%), mark 2' &&
     (await text(page, '.tr-tasks tbody tr:first-child td:nth-child(3)')) === 'B. 4');
+  await ctx.close();
+
+  /* ---------- своё объяснение учителя: ИИ — только по кнопке ---------- */
+  explainCalls = [];
+  ({ page, ctx } = await open({ teacherExpl: true, qs: `?c=${C1}&s=s-petya` }));
+  await page.waitForSelector('.tr-tasks');
+  await page.click('[data-explain="t2"]');
+  await page.waitForSelector('.tr-ex-mine');
+  ok('есть своё объяснение — показано сразу, Worker не спрошен', /Ваше объяснение\s*Половина — это 1 : 2 = 0,5/.test(await text(page, '.tr-ex-mine')) &&
+    explainCalls.length === 0 && await page.$('#trExAi') !== null);
+  await page.click('#trExAi');
+  await page.waitForSelector('.tr-ex-body p');
+  ok('«Объяснение от ИИ» — запрос ушёл, ответ под своим', explainCalls.length === 1 && /перепутал деление/.test(await text(page, '.tr-ex-body')));
+  ok('классы разбора: review-table, review-correct, review-wrong, review-modal', await page.evaluate(() =>
+    !!document.querySelector('table.review-table .review-correct') && !!document.querySelector('table.review-table .review-wrong') && !!document.querySelector('.review-modal')));
   await ctx.close();
 
   ok('без ошибок на странице', !errors.length, errors.join(' | '));

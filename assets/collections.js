@@ -88,6 +88,8 @@
     nTasks:{ru:'Задания',en:'Tasks'},
     nPickedEmpty:{ru:'Пока пусто — добавьте задания из банка или свои.',en:'Empty — add tasks from the bank or your own.'},
     nFromBank:{ru:'Из банка',en:'From the bank'},
+    nMine:{ru:'Мои задания',en:'My tasks'},
+    nMineEmpty:{ru:'Своих заданий пока нет — их можно создать во вкладке «Мои задания».',en:'No tasks of your own yet — create them on the “My tasks” tab.'},
     nOwn:{ru:'Своё задание',en:'Your own task'},
     nBank:{ru:'Банк',en:'Bank'},
     nSearch:{ru:'Поиск по тексту или теме',en:'Search text or topic'},
@@ -399,11 +401,13 @@
     BANKS.map(([id, n]) => `<option value="${id}"${id === sel ? ' selected' : ''}>${esc(Sky.L(n))}</option>`).join('') +
     `<option value="other"${sel === 'other' ? ' selected' : ''}>${esc(Sky.t('other'))}</option>`;
 
-  /* ---------- новая подборка ---------- */
-  function newCollection() {
-    const picked = [];                                   // задания подборки по порядку
+  /* ---------- новая подборка ----------
+     prefill — задания, которые сразу попадут в подборку (из «Моих
+     заданий»: «В подборку» → «Новая подборка с этим заданием»). */
+  function newCollection(prefill, subject) {
+    const picked = Array.isArray(prefill) ? prefill.slice(0, 100) : [];   // задания подборки по порядку
     const cat = S.cats.find(c => c.id === S.cat);
-    const defSubject = (cat && cat.subject) || '';
+    const defSubject = subject || (cat && cat.subject) || '';
     let kind = 'choice';
 
     Sky.modal(`<div class="cl-new">
@@ -426,7 +430,13 @@
 
       <div class="seg seg-lg" id="nSrc" role="tablist" style="width:max-content">
         <button type="button" data-src="bank" aria-pressed="true">${esc(Sky.t('nFromBank'))}</button>
+        <button type="button" data-src="mine" aria-pressed="false">${esc(Sky.t('nMine'))}</button>
         <button type="button" data-src="own" aria-pressed="false">${esc(Sky.t('nOwn'))}</button>
+      </div>
+
+      <div class="cl-sec hidden" id="srcMine">
+        <div class="field"><label for="mSearch">${esc(Sky.t('nSearch'))}</label><input type="search" id="mSearch" autocomplete="off"></div>
+        <div class="cl-bank" id="mList"></div>
       </div>
 
       <div class="cl-sec" id="srcBank">
@@ -466,6 +476,42 @@
           <span class="k">${t.type === 'choice' ? esc((t.options || [])[t.answer] || '') : esc(Array.isArray(t.accept) && t.accept.length ? t.accept.join(' / ') : Sky.t('nOpenAnswer'))}</span>
           <button type="button" data-rm="${i}" aria-label="${esc(Sky.t('rm'))}">×</button></div>`).join('');
         renderBank();
+        renderMine();
+      }
+
+      /* мои задания (assets/teacher-tasks.js) */
+      const TT = window.SkyTeacherTasks;
+      function renderMine() {
+        if (!TT) return;
+        const needle = q('#mSearch').value.trim().toLowerCase();
+        const all = TT.items().filter(x => !needle || String(x.task_text).toLowerCase().includes(needle));
+        const has = new Set(picked.map(t => t.source));
+        q('#mList').innerHTML = !TT.items().length ? `<span style="font-size:13px;color:var(--muted);font-weight:600">${esc(Sky.t('nMineEmpty'))}</span>` :
+          !all.length ? `<span style="font-size:13px;color:var(--muted);font-weight:600">${esc(Sky.t('nNoMatch'))}</span>` :
+          all.slice(0, 100).map(x => {
+            const src = 'teacher:' + x.id;
+            return `<button type="button" class="cl-bt${has.has(src) ? ' on' : ''}" data-mine="${esc(x.id)}">
+              <span class="box">${has.has(src) ? '✓' : ''}</span>
+              <span class="t">${esc(x.task_text)}<small>${esc(TT.subjName(x.subject))}</small></span></button>`;
+          }).join('');
+      }
+      if (TT) {
+        q('#mSearch').addEventListener('input', renderMine);
+        q('#mList').addEventListener('click', e => {
+          const b = e.target.closest('[data-mine]');
+          const x = b && TT.items().find(y => y.id === b.dataset.mine);
+          if (!x) return;
+          const i = picked.findIndex(t => t.source === 'teacher:' + x.id);
+          if (i >= 0) picked.splice(i, 1);
+          else {
+            if (picked.length >= 100) { Sky.toast(Sky.t('nMax')); return; }
+            picked.push(TT.toCollectionTask(x));
+          }
+          renderPicked();
+        });
+        TT.ready().then(() => { if (box.isConnected) renderMine(); });
+      } else {
+        q('[data-src="mine"]').remove();
       }
       q('#nPicked').addEventListener('click', e => {
         const b = e.target.closest('[data-rm]');
@@ -557,6 +603,7 @@
         if (!b) return;
         q('#nSrc').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
         q('#srcBank').classList.toggle('hidden', b.dataset.src !== 'bank');
+        q('#srcMine').classList.toggle('hidden', b.dataset.src !== 'mine');
         q('#srcOwn').classList.toggle('hidden', b.dataset.src !== 'own');
       });
 
@@ -604,7 +651,7 @@
     if (!cat || !confirm(Sky.t('catDelQ').replace('%1', cat.name))) return;
     if (await Sky.db.remove('task_categories', cat.id)) { S.cat = 'all'; Sky.set('clCat', S.cat); await reload(); }
   });
-  $('#newBtn').addEventListener('click', newCollection);
+  $('#newBtn').addEventListener('click', () => newCollection());
   $('#colls').addEventListener('click', async e => {
     const rv = e.target.closest('[data-review]');
     if (rv) { review(rv.dataset.review); return; }
@@ -629,6 +676,9 @@
   let loading = null;
   const reload = () => loading || (loading = load().finally(() => { loading = null; }));
   document.addEventListener('authchange', reload);
+  /* задание добавили в подборку со вкладки «Мои задания» */
+  document.addEventListener('collectionschange', reload);
+  window.SkyCollectionsPage = { newCollection, reload: () => reload() };
   document.addEventListener('langchange', () => { if (!$('#app').classList.contains('hidden')) render(); });
   reload();
 })();

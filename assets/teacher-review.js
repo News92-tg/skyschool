@@ -70,6 +70,8 @@
     trExH:{ru:'Задание %1',en:'Task %1'},
     trExWait:{ru:'Готовлю объяснение…',en:'Preparing an explanation…'},
     trExRetry:{ru:'Повторить',en:'Try again'},
+    trExMine:{ru:'Ваше объяснение',en:'Your explanation'},
+    trExAskAi:{ru:'Объяснение от ИИ',en:'Explanation from AI'},
     trExSrc:{ru:'Объяснение написал ИИ — проверьте его, прежде чем отправлять ученику.',en:'Written by AI — check it before passing it on to the student.'},
     trClose:{ru:'Закрыть',en:'Close'},
     trPrev:{ru:'← Предыдущий ученик',en:'← Previous student'},
@@ -182,6 +184,7 @@
       const right = rightChoice != null ? String(options[rightChoice] == null ? '' : options[rightChoice]) : accept.join(' / ');
       return {
         n: i + 1, id: d.task_id, type, options, question: d.question || task.text || '',
+        explanation: String(task.explanation || '').trim(),
         given, choice, ok: ok === true ? true : ok === false ? false : null,
         right, rightChoice,
         shownGiven: given && choice != null && type === 'choice' ? letter(choice) + '. ' + given : given,
@@ -313,13 +316,13 @@
       <a class="btn small" href="collections.html?review=${encodeURIComponent(s.id)}">${esc(t('trCheckNow'))}</a></div>` : ''}
     ${s.teacher_comment ? `<div class="tr-comment"><b>${esc(t('trComment'))}</b>${esc(s.teacher_comment)}</div>` : ''}
     <section class="panel" style="padding:6px 10px">
-      <div class="tr-table-wrap"><table class="ctable tr-tasks">
+      <div class="tr-table-wrap"><table class="ctable tr-tasks review-table">
         <thead><tr><th>${esc(t('trColN'))}</th><th>${esc(t('trColTask'))}</th><th>${esc(t('trColAnswer'))}</th><th>${esc(t('trColCorrect'))}</th><th></th><th></th></tr></thead>
         <tbody>${rows.map(r => `<tr class="${r.ok === false ? 'is-wrong' : ''}" data-task="${esc(r.id)}">
           <td>${r.n}</td>
           <td class="q-cell"><div class="q">${esc(r.question)}</div></td>
-          <td data-l="${esc(t('trColAnswer'))}"><div class="a ${!r.given ? 'none' : r.ok === false ? 'wrong' : ''}">${esc(r.shownGiven || t('trNoAnswer'))}</div></td>
-          <td data-l="${esc(t('trColCorrect'))}"><div class="a ${r.right ? 'right' : 'none'}">${esc(r.shownRight || t('trByTeacher'))}</div></td>
+          <td data-l="${esc(t('trColAnswer'))}"><div class="a ${!r.given ? 'none' : r.ok === false ? 'wrong review-wrong' : ''}">${esc(r.shownGiven || t('trNoAnswer'))}</div></td>
+          <td data-l="${esc(t('trColCorrect'))}"><div class="a ${r.right ? 'right review-correct' : 'none'}">${esc(r.shownRight || t('trByTeacher'))}</div></td>
           <td class="mk">${mark(r)}</td>
           <td class="act">${r.ok === false ? `<button type="button" class="btn small ghost" data-explain="${esc(r.id)}">${esc(t('trExplain'))}</button>` : ''}</td>
         </tr>`).join('')}</tbody></table></div>
@@ -355,13 +358,14 @@
     if (!r) return;
     const key = subId + ':' + taskId;
 
-    Sky.modal(`<div class="tr-ex">
+    Sky.modal(`<div class="tr-ex review-modal">
       <h2>${esc(t('trExH').replace('%1', r.n))}</h2>
       <p class="q">${esc(r.question)}</p>
       <div class="pair">
         <div><small>${esc(t('trColAnswer'))}</small><span class="no">${esc(r.shownGiven || t('trNoAnswer'))}</span></div>
         <div><small>${esc(t('trColCorrect'))}</small><span class="ok">${esc(r.shownRight || t('trByTeacher'))}</span></div>
       </div>
+      ${r.explanation ? `<div class="tr-ex-mine"><b>${esc(t('trExMine'))}</b><div>${esc(r.explanation)}</div></div>` : ''}
       <div class="tr-ex-body" id="trExBody" aria-live="polite"></div>
       <div class="actions" style="justify-content:flex-end;margin-top:14px">
         <button type="button" class="btn ghost" data-x>${esc(t('trClose'))}</button>
@@ -391,7 +395,12 @@
           <button type="button" class="btn small" id="trExAgain">${esc(t('trExRetry'))}</button>`;
         body.querySelector('#trExAgain').addEventListener('click', ask);
       }
-      if (explained.has(key)) show(explained.get(key)); else ask();
+      /* своё объяснение учителя уже есть — ИИ спрашиваем только по кнопке */
+      if (explained.has(key)) show(explained.get(key));
+      else if (r.explanation) {
+        body.innerHTML = `<button type="button" class="btn ghost small" id="trExAi">${esc(t('trExAskAi'))}</button>`;
+        body.querySelector('#trExAi').addEventListener('click', ask);
+      } else ask();
     });
   }
 
