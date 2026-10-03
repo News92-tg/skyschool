@@ -140,7 +140,7 @@ function ok(name, cond, extra) {
   ok('разбор по каждому фото', (await page.$$('#result .part-h')).length === 2 && /Фото 1/.test(res) && /Фото 2/.test(res));
   ok('оценка, что верно, ошибка с объяснением и исправлением',
     (await text(page, '#result .grade')) === '3' && /Условие записано верно/.test(res) && /Ошибка в сложении/.test(res) && /Как надо: 2\+2=4/.test(res));
-  ok('комментарий, «что дальше», распознанный текст', /Внимательнее со сложением/.test(res) && /Повтори таблицу сложения/.test(res) && (await page.$$('#result details .recog')).length === 2);
+  ok('комментарий, «что дальше», распознанный текст', /Внимательнее со сложением/.test(res) && /Повтори таблицу сложения/.test(res) && (await page.$$('#result .recog-box .recog')).length === 2 && !(await page.$('#result details .recog')));
   ok('после проверки — ждать 30 с, кнопка ждёт', /через 00:(29|30)/.test(await text(page, '#studentMode .js-wait')) && await visible(page, '#studentMode .js-wait'));
 
   await page.click('#againBtn');

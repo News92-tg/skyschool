@@ -36,12 +36,18 @@
 .grade,.gr,.hist-row .g{grid-template-columns:none}
 .gradebox .said{flex:1;min-width:200px;font-size:13.5px;line-height:1.6}
 
+/* «тетрадный» блок всегда тёмный: var(--ink) в тёмной теме светлеет,
+   и светлый текст на нём пропадал */
 .recog{
-  background:var(--ink,#0e2540);color:#d7e6fa;border-radius:var(--r);padding:14px;
+  background:#0e2540;color:#d7e6fa;border:1px solid var(--line);border-radius:var(--r);padding:14px;
   font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.65;
   white-space:pre-wrap;word-break:break-word;max-height:260px;overflow:auto;
 }
 .recog-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.recog-box .recog-head h3{margin:0}
+.recog.empty{color:#9fb3cc;font-style:italic}
+.recog-box .tok-note{margin-top:8px}
+.recog-head .btn.flag-done{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 45%,var(--line));opacity:1}
 
 .err-item{
   border-left:3px solid var(--no);background:var(--panel-2);border-radius:0 var(--r) var(--r) 0;
@@ -709,6 +715,11 @@ Sky.init({
   flagged:{ru:'Отмечено: распознано неверно',en:'Flagged as misread'},
   flagThanks:{ru:'Отмечено. Оценка по неверно прочитанному тексту не считается справедливой — перефотографируйте страницу при лучшем освещении.',
               en:'Flagged. A mark based on misread text is not fair — retake the photo in better light.'},
+  flagFail:{ru:'Не получилось отметить: проверка ещё не сохранилась или нет связи. Попробуйте через минуту.',
+            en:'Could not flag it: the check is not saved yet or you are offline. Try again in a minute.'},
+  recogHint:{ru:'Сверьте с тетрадью: если модель прочитала почерк неверно, оценка и ошибки ниже тоже неточны.',
+             en:'Compare with the notebook: if the model misread the handwriting, the mark and mistakes below are off too.'},
+  recogEmpty:{ru:'Модель не нашла на фото текста.',en:'The model found no text in the photo.'},
   goodH:{ru:'Что сделано верно',en:'What is right'},
   errH:{ru:'Ошибки',en:'Mistakes'},
   fixL:{ru:'Как надо: ',en:'Should be: '},
@@ -717,8 +728,6 @@ Sky.init({
 
   histH:{ru:'Ваши работы',en:'Your work'},
   histEmpty:{ru:'Пока пусто.',en:'Nothing yet.'},
-  saveFail:{ru:'Разбор показан, но не сохранён: для истории работ нужно войти в аккаунт.',
-            en:'The review is shown but not saved: sign in to keep a history.'},
   tooBig:{ru:'Фото не удалось сжать до допустимого размера. Попробуйте снять ближе.',
           en:'Could not compress the photo enough. Try shooting closer.'}
 });
@@ -739,7 +748,6 @@ let stream = null;        // поток камеры, чтобы потом за
    Премиум 20). Лимит запросов и тариф живут в assets/photo-api.js;
    прежний «1 раз в день по предмету» заменён ими. */
 const capNow = () => SkyCheck.photoCap();
-let lastSaved = null;     // строка photo_checks для кнопки «распознано неверно»
 
 /* ---------- учитель ---------- */
 function renderTeacher() {
@@ -1128,7 +1136,7 @@ async function checkOrders() {
 
   SkyCheck.applyRate(res.data.rate);
   SkyCheck.addTokens(res.data.tokens_used);
-  renderOrdersResult(res.data, null);
+  renderOrdersResult(res.data, null, imgs[0]);
   clearPhotos();
   renderUsage();
   await renderHistory();
@@ -1167,6 +1175,7 @@ function renderHomeworkResult(data, fail, opt) {
       html += `<div class="gradebox"><div class="grade g${g}">${g}</div>
         <div class="said"><b>${esc(Sky.t('gradeL'))}</b></div></div>`;
     }
+    html += recogBlock(d.recognized_text, null);
     const good = Array.isArray(d.correct_parts) ? d.correct_parts : [];
     if (good.length) html += block('goodH', good.map(x => `<div class="good-item">${esc(typeof x === 'string' ? x : JSON.stringify(x))}</div>`).join(''));
     const errs = Array.isArray(d.errors) ? d.errors.filter(e => e && typeof e === 'object') : [];
@@ -1179,9 +1188,6 @@ function renderHomeworkResult(data, fail, opt) {
       : `<p class="lead" style="font-size:13px">${esc(Sky.t('noErrors'))}</p>`);
     if (d.overall_feedback) html += block('resComment', `<div class="res-text">${mdLite(d.overall_feedback)}</div>`);
     if (d.next_step) html += block('nextH', `<div class="res-text">${mdLite(d.next_step)}</div>`);
-    if (d.recognized_text) {
-      html += `<details class="res-more"><summary>${esc(Sky.t('recogH'))}</summary><div class="recog">${esc(d.recognized_text)}</div></details>`;
-    }
   });
 
   showHomeworkResult(html, fail, null);
@@ -1189,7 +1195,7 @@ function renderHomeworkResult(data, fail, opt) {
 
 /* Разбор от нового Worker: только те поля, что просили (оценка,
    тест, списывание, ошибки, сверка, комментарий…). */
-function renderOrdersResult(data, fail) {
+function renderOrdersResult(data, fail, img) {
   const block = (key, inner) => `<div class="res-block"><h3>${esc(Sky.t(key))}</h3>${inner}</div>`;
   let html = '';
   if (data) {
@@ -1204,6 +1210,8 @@ function renderOrdersResult(data, fail) {
     }
     /* критерии учителя: таблица, итог 4.2/5 и оценка из него */
     if (Array.isArray(data.criteria)) html += SkyCriteria.table(data.criteria, data.score, data.assessment);
+    /* что прочитала модель — сразу под оценкой и всегда открыто */
+    html += recogBlock(data.recognized_text, img);
     /* тест */
     if (data.test) {
       const t = data.test;
@@ -1238,9 +1246,6 @@ function renderOrdersResult(data, fail) {
     if (data.ai_solution) {
       html += `<details class="res-more"><summary>${esc(Sky.t('resAiSol'))}</summary><div class="res-text">${mdLite(data.ai_solution)}</div></details>`;
     }
-    if (data.recognized_text) {
-      html += `<details class="res-more"><summary>${esc(Sky.t('recogH'))}</summary><div class="recog">${esc(data.recognized_text)}</div></details>`;
-    }
     if (data.truncated) html += `<div class="limit-note">${esc(Sky.t('resTrunc'))}</div>`;
   }
   showHomeworkResult(html, fail, data && data.tokens_used);
@@ -1254,6 +1259,7 @@ function showHomeworkResult(html, fail, tokens) {
   $('#resultSection').classList.remove('hidden');
   $('#result').innerHTML = html;
   $('#againBtn').addEventListener('click', resetCheck);
+  $('#result').querySelectorAll('[data-flag]').forEach(b => b.addEventListener('click', () => flagOcr(b)));
   $('#resultSection').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
@@ -1266,96 +1272,42 @@ function resetCheck() {
   $('.shot').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-/* ---------- сохранение ---------- */
-async function save(data) {
-  const t = SkyTeachers.selected();
-  const me = Sky.db && Sky.db.me && Sky.db.me();
-
-  /* В сетевом режиме RLS требует, чтобы student_id совпадал с тем, кто
-     пишет: без входа строку просто не примут. Показать разбор это не
-     мешает, а вот промолчать про несохранённую историю — нечестно. */
-  if (Sky.db && Sky.db.isCloud && Sky.db.isCloud() && !me) {
-    lastSaved = null;
-    Sky.toast(Sky.t('saveFail'), 5000);
-    return;
-  }
-
-  try {
-    lastSaved = await Sky.db.insert('photo_checks', {
-      student_id: me ? me.id : 'local',
-      teacher_id: t ? t.id : null,
-      subject: 'english',
-      task_text: $('#taskText').value.trim().slice(0, 800) || null,
-      recognized_text: data.recognized_text || null,
-      grade: data.grade || null,
-      errors: data.errors || [],
-      feedback: data.overall_feedback || null,
-      next_step: data.next_step || null,
-      ocr_flagged: false,
-      status: 'ok'
-    });
-  } catch (e) {
-    lastSaved = null;
-  }
-}
-
-/* ---------- показ разбора ---------- */
-function renderResult(data, partial) {
-  $('#resultSection').classList.remove('hidden');
-  const box = $('#result');
-  const g = data.grade;
-
-  const errors = Array.isArray(data.errors) ? data.errors : [];
-  const good = Array.isArray(data.correct_parts) ? data.correct_parts : [];
-
-  box.innerHTML =
-    (partial ? '' :
-    `<div class="gradebox">
-       <div class="grade g${g || 3}">${esc(g || '—')}</div>
-       <div class="said">${esc(data.overall_feedback || '')}</div>
-     </div>`) +
-
-    `<div class="recog-head">
-       <b>${Sky.t('recogH')}</b>
-       <button class="btn ghost small" id="flagBtn">${Sky.t('flagBtn')}</button>
-     </div>
-     <div class="recog">${esc(data.recognized_text || '')}</div>` +
-
-    (partial ? '' :
-      (good.length ? `<h3 style="margin:18px 0 9px;font-size:14px">${Sky.t('goodH')}</h3>` +
-        good.map(x => `<div class="good-item">${esc(typeof x === 'string' ? x : JSON.stringify(x))}</div>`).join('') : '') +
-
-      `<h3 style="margin:18px 0 9px;font-size:14px">${Sky.t('errH')}</h3>` +
-      (errors.length
-        ? errors.map(e => `
-            <div class="err-item">
-              <div class="frag">${esc(e.fragment || '')}</div>
-              <div class="why">${esc(e.explanation || '')}</div>
-              ${e.fix ? `<div class="fix">${Sky.t('fixL')}${esc(e.fix)}</div>` : ''}
-            </div>`).join('')
-        : `<p class="lead" style="font-size:13px">${Sky.t('noErrors')}</p>`) +
-
-      (data.next_step
-        ? `<h3 style="margin:18px 0 9px;font-size:14px">${Sky.t('nextH')}</h3>
-           <p style="font-size:13.5px;line-height:1.65">${esc(data.next_step)}</p>` : '')
-    );
-
-  const flag = box.querySelector('#flagBtn');
-  if (flag) flag.addEventListener('click', flagOcr);
+/* ---------- что прочитала модель ----------
+   Показываем всегда и открыто: оценка, выставленная по неверно
+   прочитанному почерку, выглядит убедительно и при этом несправедлива.
+   img — ссылка на первое фото, по ней photo_check_flag находит строку
+   истории; без неё (прежний Worker историю не пишет) — без кнопки. */
+function recogBlock(text, img) {
+  const t = String(text || '').trim();
+  const canFlag = img && Sky.db && Sky.db.me && Sky.db.me();
+  return `<div class="res-block recog-box">
+    <div class="recog-head"><h3>${esc(Sky.t('recogH'))}</h3>` +
+      (canFlag ? `<button type="button" class="btn ghost small" data-flag="${esc(img)}">${esc(Sky.t('flagBtn'))}</button>` : '') +
+    `</div>
+    <div class="recog${t ? '' : ' empty'}">${esc(t || Sky.t('recogEmpty'))}</div>
+    <p class="tok-note">${esc(Sky.t('recogHint'))}</p>
+  </div>`;
 }
 
 /* ---------- жалоба на распознавание ----------
-   Нужна не для красоты: это единственный способ узнать, как часто
-   модель врёт на почерке. Оценка, выставленная по неверно прочитанному
-   тексту, выглядит убедительно и при этом несправедлива — ученик
-   должен иметь возможность сказать об этом прямо в интерфейсе. */
-async function flagOcr(e) {
-  const btn = e.currentTarget;
+   Единственный способ узнать, как часто модель врёт на почерке.
+   Строку истории Worker пишет уже после ответа, поэтому «не нашли»
+   повторяем несколько раз с паузой. */
+async function flagOcr(btn) {
   btn.disabled = true;
-  if (lastSaved && lastSaved.id) {
-    try { await Sky.db.update('photo_checks', lastSaved.id, { ocr_flagged: true }); } catch (err) {}
+  let ok = false;
+  for (let i = 0; i < 4 && !ok; i++) {
+    if (i) await new Promise(r => setTimeout(r, 1500));
+    try { ok = !!(await Sky.db.rpc('photo_check_flag', { p_image_url: btn.dataset.flag })); }
+    catch (e) { break; }
+  }
+  if (!ok) {
+    btn.disabled = false;
+    Sky.toast(Sky.t('flagFail'), 6000);
+    return;
   }
   btn.textContent = Sky.t('flagged');
+  btn.classList.add('flag-done');
   Sky.toast(Sky.t('flagThanks'), 6000);
   await renderHistory();
 }

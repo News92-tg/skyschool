@@ -177,7 +177,27 @@ function ok(name, cond, extra) {
     await page.$eval('#result .grade', el => getComputedStyle(el).gridTemplateColumns.split(' ').length === 1));
   ok('разбор: оценка, текст оценки, обоснование', (await text(page, '#result .grade')) === '3' && /удовлетворительно/.test(await text(page, '#result .said')) && /Ошибка в ответе/.test(await text(page, '#result .said')));
   ok('разбор: ошибка с видом и исправлением', /вычислительная/.test(await text(page, '#result .err-item .kind')) && /2\+2=4/.test(await text(page, '#result .err-item .fix')));
-  ok('разбор: комментарий и распознанный текст (свёрнут)', /Внимательнее/.test(await page.textContent('#result')) && await page.$('#result details .recog') !== null);
+  ok('разбор: комментарий есть', /Внимательнее/.test(await page.textContent('#result')));
+  ok('распознанный текст виден сразу (не свёрнут), под оценкой',
+    (await text(page, '#result .recog-box .recog')) === '2+2=5' && await visible(page, '#result .recog-box .recog') &&
+    await page.$('#result details .recog') === null &&
+    await page.$eval('#result', r => { const all = [...r.querySelectorAll('.gradebox, .recog-box, .err-item')]; return all[0].matches('.gradebox') && all[1].matches('.recog-box'); }));
+
+  /* «Это распознано неверно»: строку истории Worker пишет после ответа —
+     первая попытка «не нашла», вторая отметила */
+  await page.evaluate(() => {
+    window.__flags = [];
+    Sky.db.rpc = async (fn, args) => { window.__flags.push({ fn, args }); return window.__flags.length > 1; };
+  });
+  ok('кнопка «Это распознано неверно» есть', (await text(page, '#result [data-flag]')) === 'Это распознано неверно');
+  await page.click('#result [data-flag]');
+  await page.waitForFunction(() => /Отмечено/.test(document.querySelector('#result [data-flag]').textContent), null, { timeout: 6000 });
+  const flags = await page.evaluate(() => window.__flags);
+  ok('флаг: photo_check_flag со ссылкой на первое фото, повтор после «не нашли»',
+    flags.length === 2 && flags.every(f => f.fn === 'photo_check_flag') && /^https:\/\/sb\.test\/sign\/u1\/.+\/1\.jpg\?token=x$/.test(flags[0].args.p_image_url), JSON.stringify(flags));
+  ok('флаг: кнопка «Отмечено» и неактивна, тост с советом',
+    await page.$eval('#result [data-flag]', b => b.disabled && b.classList.contains('flag-done')) &&
+    /перефотографируйте/.test(await text(page, '.toast')));
   ok('счётчик токенов внизу', /Потрачено: 150 токенов/.test(await text(page, '#tokenLine')), await text(page, '#tokenLine'));
   ok('лимит исчерпан: обратный отсчёт и кнопка неактивна',
     /следующая проверка через 0?9:5\d|10:00/.test(await text(page, '#studentMode .js-wait')) && await visible(page, '#studentMode .js-wait'), await text(page, '#studentMode .js-wait'));

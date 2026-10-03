@@ -138,6 +138,10 @@ run "$PSQL -d $TDB -f '$ROOT/sql/tests/01-storage-stub.sql'" >/dev/null
 for f in schema-homework.sql schema-teacher-tasks.sql schema-homework.sql schema-teacher-tasks.sql; do
   run "$PSQL -d $TDB -f '$ROOT/sql/$f'" >/dev/null
 done
+echo "→ «распознано неверно» в истории фото (дважды)…"
+for f in schema-photo-flag.sql schema-photo-flag.sql; do
+  run "$PSQL -d $TDB -f '$ROOT/sql/$f'" >/dev/null
+done
 echo "→ тесты тарифов:"
 echo
 if run "psql -h $SOCKET_DIR -p $PGPORT -U postgres -d $TDB -q -f '$ROOT/sql/tests/tariffs-tests.sql'"; then
@@ -201,5 +205,16 @@ if run "psql -h $SOCKET_DIR -p $PGPORT -U postgres -d $TDB -q -f '$ROOT/sql/test
 else
   echo
   echo "ТЕСТЫ ИНСТРУМЕНТОВ УЧИТЕЛЯ НЕ ПРОШЛИ — смотрите таблицу выше." >&2
+  exit 1
+fi
+echo
+echo "→ тесты флага «распознано неверно» (photo_checks):"
+echo
+if run "psql -h $SOCKET_DIR -p $PGPORT -U postgres -d $TDB -q -f '$ROOT/sql/tests/photo-flag-tests.sql'"; then
+  echo
+  echo "Готово: флаг распознавания работает как задумано."
+else
+  echo
+  echo "ТЕСТЫ ФЛАГА РАСПОЗНАВАНИЯ НЕ ПРОШЛИ — смотрите таблицу выше." >&2
   exit 1
 fi
