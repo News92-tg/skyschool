@@ -16,6 +16,13 @@
         60–74% → 3, <60% → 2; ход проверки приходит строками NDJSON;
      3. после ответа фото из хранилища удаляются.
 
+   Одно плохое фото не ломает остальные: каждое сжимается и
+   загружается отдельно — не открылось или не загрузилось, работа
+   помечается «Не проверено» и в запрос не идёт, остальные проверяются.
+   Worker тоже помечает по одной работе («модель не разобрала»).
+   «Перепроверить непроверенные» шлёт только их и вписывает ответ в ту
+   же таблицу; сводка и CSV считаются здесь по итоговой таблице.
+
    Нужен новый Worker (worker/news92-orders.js): у прежнего адреса
    /fast-check нет, и страница честно об этом говорит. Проверка
    тестов — в тарифе Премиум (решает Worker). Ключей здесь нет.
@@ -58,6 +65,13 @@
     fcPgStart:{ru:'Сверяю с эталоном: по 5 работ за раз, 10–30 секунд на каждые 5…',en:'Comparing with the key: 5 works at a time, 10–30 seconds per batch…'},
     fcPgCheck:{ru:'Проверено %1 из %2',en:'Checked %1 of %2'},
     fcUpFail:{ru:'Не удалось загрузить фото. Проверьте интернет и попробуйте ещё раз.',en:'Could not upload the photos. Check your connection and try again.'},
+    fcRefBad:{ru:'Фото эталона не открылось — выберите другое.',en:'The answer key photo could not be opened — choose another one.'},
+    fcBadPhoto:{ru:'фото не открылось — снимите заново',en:'the photo could not be opened — retake it'},
+    fcUpOne:{ru:'фото не загрузилось',en:'the photo was not uploaded'},
+    fcAllFailed:{ru:'Проверка не прошла: %1',en:'The check did not go through: %1'},
+    fcRetryFailed:{ru:'Перепроверить непроверенные (%1)',en:'Re-check the unchecked (%1)'},
+    fcRetryAll:{ru:'Проверить ещё раз',en:'Check again'},
+    fcFailedHint:{ru:'Не проверено: %1 — перепроверьте их или замените фото.',en:'Not checked: %1 — re-check them or replace the photos.'},
     colN:{ru:'№',en:'#'},
     colName:{ru:'Ученик',en:'Student'},
     colClass:{ru:'Класс',en:'Class'},
@@ -83,6 +97,9 @@
   const MAX_INPUT_MB = 25;
   let busy = false;
   let csvUrl = null;
+  /* последняя проверка: работы (с фото) и результат по каждой — для
+     «Перепроверить непроверенные» и для сводки/CSV */
+  let last = null;
 
   /* ---------- выбор фото ---------- */
   function goodFiles(list) {
@@ -153,6 +170,8 @@
 
   function renderButtons() {
     $('#fcRun').disabled = busy || workerMode !== 'orders' || !ref.items.length || !works.items.length || !SkyCheck.canRequest();
+    const again = $('#fcRetry');
+    if (again) again.disabled = busy || workerMode !== 'orders' || !last || !last.ref || !SkyCheck.canRequest();
     ['#fcPick', '#fcRefPick'].forEach(s => { $(s).disabled = busy; });
     $('#fcClear').classList.toggle('hidden', !works.items.length);
     $('#fcCount').textContent = works.items.length ? Sky.t('fcCount').replace('%1', works.items.length) : '';
@@ -197,31 +216,44 @@
     renderButtons();
   }
 
-  /* ---------- проверка ---------- */
-  async function uploadAll(blobs) {
+  /* ---------- проверка ----------
+     Эталон — 1.jpg, работы — 2.jpg, 3.jpg, … в папке сеанса. Каждое фото
+     отдельно: не открылось или не загрузилось — в ответе { ok:false } с
+     причиной, остальные идут дальше. Эталон обязателен. */
+  async function uploadEach(refBlob, blobs) {
     const me = Sky.db.me();
     const session = 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    const paths = [], urls = [];
-    try {
-      for (let i = 0; i < blobs.length; i++) {
-        prog(Sky.t('fcPgUpload').replace('%1', i + 1).replace('%2', blobs.length), i / blobs.length);
-        const small = await SkyCheck.compress(blobs[i]);
-        const path = `${me.id}/${session}/${i + 1}.jpg`;
+    const n = blobs.length + 1;
+    const out = { ref: null, works: [], paths: [] };
+    async function one(blob, i) {
+      let small;
+      try { small = await SkyCheck.compress(blob); } catch (e) { return { ok: false, error: Sky.t('fcBadPhoto') }; }
+      const path = `${me.id}/${session}/${i + 1}.jpg`;
+      try {
         await Sky.db.upload('homework', path, small, 'image/jpeg');
-        paths.push(path);
-      }
-      for (const p of paths) urls.push(await Sky.db.signedUrl('homework', p, 3600));
-    } catch (e) {
-      await Sky.db.removeFiles('homework', paths);
-      throw e;
+        out.paths.push(path);
+        return { ok: true, path, url: await Sky.db.signedUrl('homework', path, 3600) };
+      } catch (e) { return { ok: false, error: Sky.t('fcUpOne') }; }
     }
-    return { paths, urls };
+    prog(Sky.t('fcPgUpload').replace('%1', 1).replace('%2', n), 0);
+    out.ref = await one(refBlob, 0);
+    if (!out.ref.ok) return out;
+    for (let i = 0; i < blobs.length; i++) {
+      prog(Sky.t('fcPgUpload').replace('%1', i + 2).replace('%2', n), (i + 1) / n);
+      out.works.push(await one(blobs[i], i + 1));
+    }
+    return out;
   }
 
-  async function run() {
+  /* only — номера работ (с нуля) из прошлой проверки, которые
+     перепроверить; без него — все работы из списка заново. */
+  async function run(only) {
     if (busy || workerMode !== 'orders') return;
-    if (!ref.items.length) { Sky.toast(Sky.t('fcNeedRef'), 4000); return; }
-    if (!works.items.length) { Sky.toast(Sky.t('fcNeedWorks'), 4000); return; }
+    const retry = Array.isArray(only) && last;
+    if (!retry) {
+      if (!ref.items.length) { Sky.toast(Sky.t('fcNeedRef'), 4000); return; }
+      if (!works.items.length) { Sky.toast(Sky.t('fcNeedWorks'), 4000); return; }
+    }
     if (!(Sky.db && Sky.db.me && Sky.db.me())) {
       Sky.toast(Sky.t('fcNeedLogin'), 5000);
       if (Sky.auth && Sky.auth.openAuth) Sky.auth.openAuth();
@@ -229,41 +261,81 @@
     }
     if (SkyCheck.limits && !SkyCheck.feature('teacher')) { SkyCheck.openTariffs('premium'); return; }
 
-    const items = works.items.slice();
-    setBusy(true);
-    $('#fcResultSec').classList.add('hidden');
-    let up;
-    try { up = await uploadAll([ref.items[0].blob].concat(items.map(i => i.blob))); }
-    catch (e) { progDone(); setBusy(false); Sky.toast(Sky.t('fcUpFail'), 6000); return; }
+    const items = retry ? last.items : works.items.map(it => Object.assign({}, it));
+    const refBlob = retry ? last.ref : ref.items[0].blob;
+    const idx = retry ? only : items.map((_, i) => i);
+    const defClass = retry ? last.defClass : $('#fcClass').value.trim();
+    const total = retry ? last.total : parseInt($('#fcTotal').value, 10);
+    const subject = retry ? last.subject : $('#fcSubject').value;
+    if (!retry) last = { items, ref: refBlob, defClass, total, subject, results: items.map(() => null) };
 
-    const defClass = $('#fcClass').value.trim();
-    const total = parseInt($('#fcTotal').value, 10);
-    prog(Sky.t('fcPgStart'), null);
-    const res = await SkyCheck.request('/fast-check', {
-      method: 'POST',
-      json: {
-        reference_img: up.urls[0],
-        student_imgs: items.map((it, i) => ({ img: up.urls[i + 1], name: it.name.trim(), class: it.cls.trim() || defClass })),
-        total: total >= 1 && total <= 200 ? total : undefined,
-        subject: $('#fcSubject').value
-      },
-      timeout: 240000,
-      onProgress: m => prog(Sky.t('fcPgCheck').replace('%1', m.done).replace('%2', m.total), m.done / m.total)
+    setBusy(true);
+    if (!retry) $('#fcResultSec').classList.add('hidden');
+    let up;
+    try { up = await uploadEach(refBlob, idx.map(i => items[i].blob)); }
+    catch (e) { up = null; }
+    if (!up || !up.ref || !up.ref.ok) {
+      if (up) await Sky.db.removeFiles('homework', up.paths);
+      progDone(); setBusy(false);
+      Sky.toast(Sky.t(up && up.ref && up.ref.error === Sky.t('fcBadPhoto') ? 'fcRefBad' : 'fcUpFail'), 6000);
+      return;
+    }
+
+    const who = i => ({ index: i + 1, name: items[i].name.trim(), class: items[i].cls.trim() || defClass });
+    /* фото, которые не открылись или не загрузились, — сразу «Не проверено» */
+    const send = [];
+    idx.forEach((i, k) => {
+      if (up.works[k].ok) send.push({ i, url: up.works[k].url });
+      else last.results[i] = Object.assign(who(i), { status: 'failed', error: up.works[k].error });
     });
+
+    let res = null;
+    if (send.length) {
+      prog(Sky.t('fcPgStart'), null);
+      res = await SkyCheck.request('/fast-check', {
+        method: 'POST',
+        json: {
+          reference_img: up.ref.url,
+          student_imgs: send.map(x => { const w = who(x.i); return { img: x.url, name: w.name, class: w.class }; }),
+          total: total >= 1 && total <= 200 ? total : undefined,
+          subject
+        },
+        timeout: 240000,
+        onProgress: m => prog(Sky.t('fcPgCheck').replace('%1', m.done).replace('%2', m.total), m.done / m.total)
+      });
+    }
     await Sky.db.removeFiles('homework', up.paths);
     progDone();
     setBusy(false);
 
-    const d = res.data || {};
-    if (d.code === 'rate_limit' && d.retry_after) SkyCheck.setWait(d.retry_after);
-    else SkyCheck.loadLimits();
-    if (res.status === 402 && d.code === 'tariff') SkyCheck.openTariffs(d.need);
-    /* новый Worker, но развёрнут до появления /fast-check */
-    if (res.status === 404) { showError(Sky.t('fcLegacy')); return; }
-    if (!res.ok) { showError(SkyCheck.errorText(res)); return; }
-    SkyCheck.addTokens(d.tokens_used);
-    render(d);
+    if (res) {
+      const d = res.data || {};
+      if (d.code === 'rate_limit' && d.retry_after) SkyCheck.setWait(d.retry_after);
+      else SkyCheck.loadLimits();
+      if (res.status === 402 && d.code === 'tariff') { SkyCheck.openTariffs(d.need); showError(SkyCheck.errorText(res)); return; }
+      /* новый Worker, но развёрнут до появления /fast-check */
+      if (res.status === 404) { showError(Sky.t('fcLegacy')); return; }
+      if (res.ok) {
+        SkyCheck.addTokens(d.tokens_used);
+        (d.students || []).forEach((st, j) => {
+          const at = send[clampIdx(st.index, j, send.length)];
+          if (at) last.results[at.i] = Object.assign({}, st, { index: at.i + 1 });
+        });
+        /* Worker не вернул строку — «не разобрал» */
+        send.forEach(x => { if (!last.results[x.i]) last.results[x.i] = Object.assign(who(x.i), { status: 'failed', error: '' }); });
+      } else {
+        /* весь запрос не прошёл (сеть, таймаут, сбой) — отправленные
+           помечаем с причиной, их можно перепроверить */
+        const why = SkyCheck.errorText(res);
+        send.forEach(x => { last.results[x.i] = Object.assign(who(x.i), { status: 'failed', error: why }); });
+        last.note = Sky.t('fcAllFailed').replace('%1', why);
+      }
+    }
+    if (res && res.ok) last.note = '';
+    render();
   }
+  /* номер строки в ответе Worker: index (с 1) или порядок */
+  const clampIdx = (index, j, n) => { const k = Number(index) - 1; return Number.isInteger(k) && k >= 0 && k < n ? k : j; };
 
   /* ---------- результат ---------- */
   const badge = g => typeof g === 'number' ? `<span class="gr g${g}">${g}</span>` : '<span class="gr gx">—</span>';
@@ -272,44 +344,75 @@
   function showError(text) {
     $('#fcResultSec').classList.remove('hidden');
     $('#fcCsv').classList.add('hidden');
+    $('#fcRetry').classList.add('hidden');
     $('#fcResult').innerHTML = `<div class="limit-note">${esc(text)}</div>`;
     $('#fcResultSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
-  function render(data) {
-    const s = data.summary || {};
-    const students = data.students || [];
+  /* сводка — здесь, по итоговой таблице: после перепроверки в ней
+     ответы из нескольких запросов */
+  function summarize(list) {
+    const ok = list.filter(st => st && st.status === 'ok');
+    const grades = { 5: 0, 4: 0, 3: 0, 2: 0 };
+    ok.forEach(st => { if (grades[st.grade] != null) grades[st.grade]++; });
+    return {
+      students: list.length, checked: ok.length, failed: list.length - ok.length, grades,
+      avg_percent: ok.length ? Math.round(ok.reduce((a, st) => a + (Number(st.percent) || 0), 0) / ok.length) : null,
+      avg_grade: ok.length ? Math.round(ok.reduce((a, st) => a + (Number(st.grade) || 0), 0) / ok.length * 10) / 10 : null
+    };
+  }
+
+  function render() {
+    const students = last.results.map((st, i) => st || { index: i + 1, name: last.items[i].name, class: last.items[i].cls || last.defClass, status: 'failed', error: '' });
+    const s = summarize(students);
+    const failedIdx = students.map((st, i) => st.status === 'ok' ? -1 : i).filter(i => i >= 0);
+    const failText = st => Sky.t('failedRow').replace('%1', st.error || (Sky.lang === 'en' ? 'the model could not read this work' : 'модель не разобрала эту работу'));
     const rows = students.map(st => st.status !== 'ok'
       ? `<tr class="failed"><td class="c-n">${st.index}</td><td>${esc(st.name || '—')}</td><td class="c-cls">${esc(st.class || '')}</td>
-           <td class="num">—</td><td class="num">—</td><td>—</td><td>${esc(Sky.t('failedRow').replace('%1', st.error || ''))}</td></tr>`
+           <td class="num">—</td><td class="num">—</td><td><span class="gr gx">—</span></td><td><span class="fc-fail">${esc(failText(st))}</span></td></tr>`
       : `<tr><td class="c-n">${st.index}</td><td>${esc(st.name || '—')}</td><td class="c-cls">${esc(st.class || '')}</td>
            <td class="num"><b>${st.correct}/${st.total}</b></td><td class="num">${st.percent}%</td><td>${badge(st.grade)}</td>
            <td>${(st.errors || []).length ? `<details><summary>${esc(Sky.t('wrongList').replace('%1', st.errors.length))}</summary><ul>${st.errors.map(e =>
              `<li>${esc(Sky.t('wrongN').replace('%1', e.n).replace('%2', e.student).replace('%3', e.correct))}</li>`).join('')}</ul></details>` : '—'}</td></tr>`
     ).join('');
-    const grades = s.grades || {};
     $('#fcResult').innerHTML =
+      (last.note ? `<div class="limit-note" style="margin:0 0 12px">${esc(last.note)}</div>` : '') +
       `<div class="stats">
          <div class="stat accent"><b>${s.avg_percent == null ? '—' : s.avg_percent + '%'}</b><span>${esc(Sky.t('sumPct'))}</span></div>
          <div class="stat"><b>${s.avg_grade == null ? '—' : esc(num(s.avg_grade))}</b><span>${esc(Sky.t('sumGrade'))}</span></div>
-         <div class="stat ok"><b>${s.checked || 0}/${s.students || students.length}</b><span>${esc(Sky.t('sumChecked'))}</span></div>
+         <div class="stat ok"><b>${s.checked}/${s.students}</b><span>${esc(Sky.t('sumChecked'))}</span></div>
        </div>
-       <div class="fc-dist">${[5, 4, 3, 2].map(g => `<span>${badge(g)} × ${grades[g] || 0}</span>`).join('')}</div>
+       <div class="fc-dist">${[5, 4, 3, 2].map(g => `<span>${badge(g)} × ${s.grades[g] || 0}</span>`).join('')}</div>
+       ${failedIdx.length ? `<div class="fc-failnote">${esc(Sky.t('fcFailedHint').replace('%1', failedIdx.length))}</div>` : ''}
        <div class="table-wrap"><table class="rtable">
          <thead><tr><th class="c-n">${esc(Sky.t('colN'))}</th><th>${esc(Sky.t('colName'))}</th><th class="c-cls">${esc(Sky.t('colClass'))}</th>
            <th class="num">${esc(Sky.t('colRight'))}</th><th class="num">${esc(Sky.t('colPct'))}</th><th>${esc(Sky.t('colGrade'))}</th><th>${esc(Sky.t('colWrong'))}</th></tr></thead>
          <tbody>${rows}</tbody></table></div>`;
-    /* CSV — от Worker (ФИО, класс, верно, всего, %, оценка); если его
-       нет, собираем такой же здесь */
-    csvUrl = data.csv_url || SkyCheck.csvDataUrl(['ФИО', 'Класс', 'Верно', 'Всего', '%', 'Оценка'],
+    /* CSV «ФИО, класс, верно, всего, %, оценка» — по итоговой таблице */
+    csvUrl = SkyCheck.csvDataUrl(['ФИО', 'Класс', 'Верно', 'Всего', '%', 'Оценка'],
       students.map(st => st.status === 'ok'
         ? [st.name, st.class, st.correct, st.total, st.percent, st.grade]
-        : [st.name, st.class, '', '', '', Sky.t('failedRow').replace('%1', st.error || '')]));
+        : [st.name, st.class, '', '', '', failText(st)]));
+    const again = $('#fcRetry');
+    again.textContent = failedIdx.length ? Sky.t('fcRetryFailed').replace('%1', failedIdx.length) : Sky.t('fcRetryAll');
+    again.dataset.mode = failedIdx.length ? 'failed' : 'all';
+    again.classList.toggle('ghost', !failedIdx.length);
     $('#fcCsv').classList.remove('hidden');
+    again.classList.remove('hidden');
+    renderButtons();
     $('#fcResultSec').classList.remove('hidden');
     $('#fcResultSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
+  $('#fcRetry').addEventListener('click', () => {
+    if (!last) return;
+    if ($('#fcRetry').dataset.mode === 'failed') {
+      run(last.results.map((st, i) => st && st.status === 'ok' ? -1 : i).filter(i => i >= 0));
+    } else {
+      /* всё заново — по тем же фото, что в таблице */
+      run(last.items.map((_, i) => i));
+    }
+  });
   $('#fcCsv').addEventListener('click', () => { if (csvUrl) SkyCheck.download(csvUrl, 'skyschool-fast-check.csv'); });
   $('#fcRun').addEventListener('click', run);
   SkyCheck.onChange(renderButtons);

@@ -32,7 +32,8 @@ function ok(name, cond, extra) {
 
 (async () => {
   const browser = await browserLaunch();
-  const state = { legacy: false, calls: [], next: null };
+  /* failName — работы с таким ФИО Worker «не разобрал» (status failed) */
+  const state = { legacy: false, calls: [], next: null, failName: null };
 
   async function newCtx(viewport) {
     const ctx = await browser.newContext({ locale: 'ru-RU', viewport: viewport || { width: 1100, height: 900 }, acceptDownloads: true });
@@ -55,6 +56,7 @@ function ok(name, cond, extra) {
         const pct = [100, 80, 70, 50];
         const students = body.student_imgs.map((s, i) => {
           const p = pct[i % 4], total = body.total || 10, correct = Math.round(p * total / 100);
+          if (state.failName && s.name === state.failName) return { index: i + 1, name: s.name, class: s.class, status: 'failed', error: 'Модель не разобрала эту работу' };
           return { index: i + 1, name: s.name || 'С фото ' + (i + 1), class: s.class, correct, total, percent: p,
             grade: p >= 90 ? 5 : p >= 75 ? 4 : p >= 60 ? 3 : 2, errors: p < 100 ? [{ n: 3, student: 'Б', correct: 'А' }] : [], comment: '', status: 'ok' };
         });
@@ -130,7 +132,8 @@ function ok(name, cond, extra) {
   const rows = await page.$$eval('#fcResult tbody tr', trs => trs.map(tr => [...tr.children].map(td => td.textContent.trim())));
   ok('таблица: ученик, верно/всего, %, оценка', rows.length === 3 && rows[0][1] === 'Иванов Иван' && rows[0][3] === '20/20' && rows[0][4] === '100%' && rows[0][5] === '5' &&
     rows[1][4] === '80%' && rows[1][5] === '4' && rows[2][5] === '3', JSON.stringify(rows));
-  ok('итог: средний %, средняя оценка 3,5, распределение', /75%/.test(await text(page, '#fcResult .stat.accent b')) && /3,5/.test(await page.textContent('#fcResult .stats')) &&
+  /* сводка — по самой таблице (100, 80, 70 % → в среднем 83 %, оценки 5, 4, 3 → 4) */
+  ok('итог: средний % и средняя оценка по таблице, распределение', /83%/.test(await text(page, '#fcResult .stat.accent b')) && /\b4\b/.test(await text(page, '#fcResult .stat:nth-child(2) b')) &&
     (await page.$$('#fcResult .fc-dist > span')).length === 4, await page.textContent('#fcResult .stats') + ' / ' + (await page.$$('#fcResult .fc-dist > span')).length);
   ok('ошибки — свёрнуто в строке', await page.$('#fcResult tbody details') !== null);
 
@@ -161,6 +164,75 @@ function ok(name, cond, extra) {
   await page.click('#fcRun');
   await page.waitForFunction(() => /news92-orders/.test((document.querySelector('#fcResult .limit-note') || {}).textContent || ''));
   ok('404: объяснение про новый Worker', /прежний/.test(await text(page, '#fcResult .limit-note')));
+  await page.close();
+
+  /* ---------- одно плохое фото не ломает остальные ---------- */
+  const BAD = { name: 'bad.png', mimeType: 'image/png', buffer: Buffer.from('это не картинка') };
+  const GOOD = { name: 'work.png', mimeType: 'image/png', buffer: fs.readFileSync(IMG) };
+  const rowsOf = p => p.$$eval('#fcResult tbody tr', trs => trs.map(tr => ({ failed: tr.classList.contains('failed'), cells: [...tr.children].map(td => td.textContent.trim()) })));
+  const sent = () => JSON.parse(state.calls.filter(c => c.path === '/fast-check').pop().body);
+
+  page = await open(ctx);
+  await page.setInputFiles('#fcRefFile', IMG);
+  await page.setInputFiles('#fcFiles', [GOOD, GOOD, BAD, GOOD, GOOD]);
+  await page.fill('#fcTotal', '10');
+  await page.click('#fcRun');
+  await page.waitForSelector('#fcResult .rtable');
+  let r5 = await rowsOf(page);
+  ok('5 фото, третье битое: в Worker ушли 4, проверены 4', sent().student_imgs.length === 4 && r5.length === 5 && r5.filter(r => !r.failed).length === 4, JSON.stringify(r5.map(r => r.failed)));
+  ok('битое — «Не проверено: фото не открылось», номер на месте', r5[2].failed && r5[2].cells[0] === '3' && /фото не открылось/.test(r5[2].cells[6]), JSON.stringify(r5[2]));
+  ok('сводка: проверено 4/5, подсказка и «Перепроверить непроверенные (1)»', /4\/5/.test(await text(page, '#fcResult .stat.ok b')) &&
+    /Не проверено: 1/.test(await text(page, '.fc-failnote')) && (await text(page, '#fcRetry')) === 'Перепроверить непроверенные (1)');
+  if (process.env.SHOTS) await (await page.$('#fcResultSec')).screenshot({ path: path.join(process.env.SHOTS, 'fast-check-failed.png') });
+  const callsBefore = state.calls.filter(c => c.path === '/fast-check').length;
+  await page.evaluate(() => SkyCheck.setWait(0));
+  await page.click('#fcRetry');
+  await page.waitForFunction(() => !document.querySelector('#fcProgress:not(.hidden)'));
+  await page.waitForTimeout(150);
+  ok('повтор: битое снова не открылось — в Worker ничего не ушло, проверенные на месте', state.calls.filter(c => c.path === '/fast-check').length === callsBefore &&
+    (await rowsOf(page)).filter(r => !r.failed).length === 4);
+  await page.close();
+
+  page = await open(ctx);
+  await page.setInputFiles('#fcRefFile', IMG);
+  await page.setInputFiles('#fcFiles', Array(15).fill(IMG));
+  for (let i = 1; i <= 15; i++) await page.fill(`#fcRoster .roster-row:nth-child(${i}) input[data-k="name"]`, 'Ученик ' + i);
+  state.failName = 'Ученик 7';
+  await page.evaluate(() => SkyCheck.setWait(0));
+  await page.click('#fcRun');
+  await page.waitForSelector('#fcResult .rtable');
+  let r15 = await rowsOf(page);
+  ok('15 фото: седьмую Worker не разобрал — она помечена, 14 проверены', r15.length === 15 && r15[6].failed && /модель не разобрала/i.test(r15[6].cells[6]) &&
+    r15.filter(r => !r.failed).length === 14, JSON.stringify(r15.map(r => r.failed)));
+  state.failName = null;
+  await page.evaluate(() => SkyCheck.setWait(0));
+  await page.click('#fcRetry');
+  await page.waitForFunction(() => /15\/15/.test((document.querySelector('#fcResult .stat.ok b') || {}).textContent || ''));
+  const again = sent();
+  r15 = await rowsOf(page);
+  ok('«Перепроверить непроверенные» — ушла одна работа, ответ встал в седьмую строку', again.student_imgs.length === 1 && again.student_imgs[0].name === 'Ученик 7' &&
+    !r15[6].failed && r15[6].cells[1] === 'Ученик 7' && r15[6].cells[0] === '7', JSON.stringify(again.student_imgs));
+  ok('всё проверено — кнопка стала «Проверить ещё раз», подсказки нет', (await text(page, '#fcRetry')) === 'Проверить ещё раз' && !(await page.$('.fc-failnote')));
+  const dl15 = page.waitForEvent('download');
+  await page.click('#fcCsv');
+  const csv15 = fs.readFileSync(await (await dl15).path(), 'utf8').replace(/^\ufeff/, '').split('\r\n');
+  ok('CSV после перепроверки: 15 учеников, у седьмого — верно, всего, %, оценка', csv15.length === 16 && /^Ученик 7,,\d+,\d+,\d+,[2-5]$/.test(csv15[7]), csv15[7]);
+  await page.close();
+
+  /* весь запрос не прошёл — работы помечены с причиной, повтор их проверяет */
+  page = await open(ctx);
+  await page.setInputFiles('#fcRefFile', IMG);
+  await page.setInputFiles('#fcFiles', [IMG, IMG]);
+  await page.evaluate(() => SkyCheck.setWait(0));
+  state.next = { status: 503, body: { error: 'Сервис перегружен', code: 'upstream' } };
+  await page.click('#fcRun');
+  await page.waitForSelector('#fcResult .rtable');
+  ok('сбой запроса: обе работы «Не проверено» с причиной и «Перепроверить непроверенные (2)»', (await rowsOf(page)).every(r => r.failed) &&
+    /Проверка не прошла/.test(await text(page, '#fcResult .limit-note')) && (await text(page, '#fcRetry')) === 'Перепроверить непроверенные (2)');
+  await page.evaluate(() => SkyCheck.setWait(0));
+  await page.click('#fcRetry');
+  await page.waitForFunction(() => /2\/2/.test((document.querySelector('#fcResult .stat.ok b') || {}).textContent || ''));
+  ok('повтор после сбоя — обе проверены, причина сбоя убрана', (await rowsOf(page)).every(r => !r.failed) && !(await page.$('#fcResult .limit-note')));
   await page.close();
 
   /* телефон: без горизонтальной прокрутки */

@@ -58,6 +58,8 @@
   .rtable td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.5}
   .rtable .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
   .rtable tr.failed td{color:var(--muted)}
+  .fc-fail{display:inline-block;padding:3px 8px;border-radius:8px;background:var(--warn-soft);color:var(--warn);font-weight:700;font-size:12.5px}
+  .fc-failnote{margin-top:12px;padding:10px 12px;border-radius:12px;background:var(--warn-soft);color:var(--ink);font-size:13px;font-weight:700}
   .rtable details summary{cursor:pointer;font-size:12px;color:var(--accent);font-weight:700}
   .rtable details ul{margin:6px 0 0;padding-left:16px;font-size:12px}
   /* телефон: главное — ученик, верно, %, оценка; № и класс прячем */
@@ -121,7 +123,9 @@
   </div>
 
   <div class="section hidden" id="fcResultSec">
-    <div class="section-head"><h2 data-i18n="fcResults"></h2><button type="button" class="btn ghost small" id="fcCsv" data-i18n="fcCsv"></button></div>
+    <div class="section-head"><h2 data-i18n="fcResults"></h2>
+      <div class="fc-acts"><button type="button" class="btn small hidden" id="fcRetry" data-needs-limit></button>
+        <button type="button" class="btn ghost small" id="fcCsv" data-i18n="fcCsv"></button></div></div>
     <div class="panel" id="fcResult"></div>
   </div>
 </main>
